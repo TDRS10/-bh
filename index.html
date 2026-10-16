@@ -432,6 +432,74 @@
           </div>
         </div>
 
+        <!-- ✅ Smart Financial Alarm Card -->
+        <div class="card" id="smartAlarmCard">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">⏰</span> منبه ذكي للاستيقاظ المبكر</span>
+            <span class="streak-badge" id="alarmStatusBadge" style="background: rgba(100,100,100,0.25);">غير مفعل</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+            لو محتاج فلوس، التطبيق يصحيك بدري عشان تشتغل وتعوض. بيحدد سبب التنبيه بناءً على وضعك المالي.
+          </p>
+
+          <!-- Trigger Conditions -->
+          <div style="margin-bottom: 14px;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; margin-bottom: 8px;">متى يصحيني؟</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label class="alarm-condition-row" id="condLowBalanceRow">
+                <input type="checkbox" id="condLowBalance" onchange="app.updateAlarmPreview()">
+                <span>💳 لو الرصيد المتاح أقل من</span>
+                <input type="number" id="alarmLowBalanceThreshold" class="form-control alarm-inline-input" value="200" placeholder="200" oninput="app.updateAlarmPreview()">
+                <span>ج.م</span>
+              </label>
+              <label class="alarm-condition-row" id="condPendingRow">
+                <input type="checkbox" id="condPendingIncomes" onchange="app.updateAlarmPreview()">
+                <span>⏳ لو عندي قبض قيد الانتظار</span>
+              </label>
+              <label class="alarm-condition-row" id="condAlwaysRow">
+                <input type="checkbox" id="condAlwaysAlarm" onchange="app.updateAlarmPreview()">
+                <span>📅 منبه يومي ثابت (بغض النظر)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Alarm Time -->
+          <div class="form-group">
+            <label class="form-label">🕐 وقت الاستيقاظ</label>
+            <input type="time" id="alarmTime" class="form-control" value="06:00" onchange="app.updateAlarmPreview()">
+          </div>
+
+          <!-- Alarm Days -->
+          <div style="margin-bottom: 14px;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; margin-bottom: 8px;">أيام الأسبوع</div>
+            <div class="alarm-days-row" id="alarmDaysRow">
+              <button type="button" class="day-btn active" data-day="0" onclick="app.toggleAlarmDay(this)">ح</button>
+              <button type="button" class="day-btn active" data-day="1" onclick="app.toggleAlarmDay(this)">إث</button>
+              <button type="button" class="day-btn active" data-day="2" onclick="app.toggleAlarmDay(this)">ث</button>
+              <button type="button" class="day-btn active" data-day="3" onclick="app.toggleAlarmDay(this)">أر</button>
+              <button type="button" class="day-btn active" data-day="4" onclick="app.toggleAlarmDay(this)">خ</button>
+              <button type="button" class="day-btn active" data-day="5" onclick="app.toggleAlarmDay(this)">ج</button>
+              <button type="button" class="day-btn" data-day="6" onclick="app.toggleAlarmDay(this)">س</button>
+            </div>
+          </div>
+
+          <!-- Preview Banner -->
+          <div id="alarmPreviewBanner" style="display:none; margin-bottom: 12px;" class="decision-card decision-green">
+            <div id="alarmPreviewText" style="font-size: 0.82rem; font-weight: 700;">📢 المنبه سيرن الساعة 6:00 صباحاً لو عندك قبض منتظر</div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="action-grid">
+            <button class="btn btn-primary" id="activateAlarmBtn" onclick="app.activateSmartAlarm()">⏰ تفعيل المنبه</button>
+            <button class="btn btn-secondary" id="cancelAlarmBtn" onclick="app.cancelSmartAlarm()" style="display:none;">🔕 إلغاء المنبه</button>
+          </div>
+
+          <!-- Next Alarm Info -->
+          <div id="nextAlarmInfo" style="display:none; margin-top: 10px; padding: 10px; background: rgba(0,217,255,0.07); border-radius: var(--radius-md); border: 1px solid rgba(0,217,255,0.2); font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
+            ⏰ المنبه القادم: <strong id="nextAlarmTimeLabel" style="color: #fff;">—</strong>
+          </div>
+        </div>
+
         <!-- GitHub Update Card -->
         <div class="card" id="updateCard">
           <div class="card-header">

@@ -904,3 +904,89 @@ body.big-numbers-mode .total-amount    { font-size: 3rem; }
 body.big-numbers-mode .sub-balance-val { font-size: 1.5rem; }
 body.big-numbers-mode .stat-box .value { font-size: 1.4rem; }
 body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
+
+/* ═══════════════════════════════════════════════════
+   SMART ALARM STYLES
+═══════════════════════════════════════════════════ */
+
+/* Alarm condition checkbox row */
+.alarm-condition-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--border);
+  background: var(--surface-glass);
+  transition: var(--trans-fast);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.alarm-condition-row:hover {
+  border-color: var(--border-accent);
+  background: rgba(0,217,255,0.05);
+  color: var(--text-primary);
+}
+.alarm-condition-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Small inline number input inside condition row */
+.alarm-inline-input {
+  width: 72px !important;
+  padding: 4px 8px !important;
+  font-size: 0.85rem !important;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Alarm days row */
+.alarm-days-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Individual day toggle button */
+.day-btn {
+  flex: 1;
+  min-width: 36px;
+  height: 38px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-glass);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: var(--trans-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.day-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.day-btn.active {
+  background: rgba(0, 217, 255, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(0,217,255,0.2);
+}
+
+/* Pulse animation for active alarm badge */
+@keyframes alarm-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 217, 100, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(0, 217, 100, 0); }
+}
+#alarmStatusBadge[style*="mfعّل"] {
+  animation: alarm-pulse 2s infinite;
+}

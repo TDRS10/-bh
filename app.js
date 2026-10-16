@@ -1408,6 +1408,325 @@ class BHApp {
       }
     }
   }
+  // ============================================================
+  //  SMART FINANCIAL ALARM SYSTEM
+  // ============================================================
+
+  /**
+   * Load alarm settings from localStorage into the UI
+   */
+  initSmartAlarm() {
+    const alarm = this.data.settings.smartAlarm;
+    if (!alarm) return;
+
+    // Restore checkboxes
+    const cbLow = document.getElementById('condLowBalance');
+    const cbPending = document.getElementById('condPendingIncomes');
+    const cbAlways = document.getElementById('condAlwaysAlarm');
+    const timeEl = document.getElementById('alarmTime');
+    if (cbLow) cbLow.checked = !!alarm.condLowBalance;
+    if (cbPending) cbPending.checked = !!alarm.condPendingIncomes;
+    if (cbAlways) cbAlways.checked = !!alarm.condAlwaysAlarm;
+    if (timeEl && alarm.time) timeEl.value = alarm.time;
+    if (alarm.threshold != null) {
+      const tEl = document.getElementById('alarmLowBalanceThreshold');
+      if (tEl) tEl.value = alarm.threshold;
+    }
+
+    // Restore days
+    const activeDays = alarm.days || [0,1,2,3,4,5];
+    document.querySelectorAll('#alarmDaysRow .day-btn').forEach(btn => {
+      const day = parseInt(btn.getAttribute('data-day'));
+      btn.classList.toggle('active', activeDays.includes(day));
+    });
+
+    // Restore active state UI
+    if (alarm.active) {
+      this._showAlarmActiveUI(alarm);
+    }
+
+    this.updateAlarmPreview();
+
+    // Arm the ticker to fire the alarm if active
+    if (alarm.active) {
+      this._armAlarmTicker();
+    }
+  }
+
+  /**
+   * Toggle a day button on/off
+   */
+  toggleAlarmDay(btn) {
+    btn.classList.toggle('active');
+    this.updateAlarmPreview();
+  }
+
+  /**
+   * Collect selected days as an array of integers
+   */
+  _getSelectedDays() {
+    const days = [];
+    document.querySelectorAll('#alarmDaysRow .day-btn').forEach(btn => {
+      if (btn.classList.contains('active')) {
+        days.push(parseInt(btn.getAttribute('data-day')));
+      }
+    });
+    return days;
+  }
+
+  /**
+   * Live preview of the alarm description
+   */
+  updateAlarmPreview() {
+    const condLow = document.getElementById('condLowBalance')?.checked;
+    const condPending = document.getElementById('condPendingIncomes')?.checked;
+    const condAlways = document.getElementById('condAlwaysAlarm')?.checked;
+    const timeVal = document.getElementById('alarmTime')?.value || '06:00';
+    const threshold = parseFloat(document.getElementById('alarmLowBalanceThreshold')?.value || 200);
+
+    const banner = document.getElementById('alarmPreviewBanner');
+    const previewText = document.getElementById('alarmPreviewText');
+    if (!banner || !previewText) return;
+
+    const reasons = [];
+    if (condAlways) reasons.push('📅 يومياً بشكل ثابت');
+    if (condLow) reasons.push(`💳 لو الرصيد أقل من ${threshold} ج.م`);
+    if (condPending) reasons.push('⏳ لو عندك قبض منتظر');
+
+    if (reasons.length === 0) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    const [h, m] = timeVal.split(':');
+    const hourNum = parseInt(h);
+    const period = hourNum < 12 ? 'صباحاً' : 'مساءً';
+    const displayH = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+    const timeDisplay = `${displayH}:${m} ${period}`;
+
+    banner.style.display = 'block';
+    previewText.textContent = `📢 المنبه سيرن الساعة ${timeDisplay} — ${reasons.join(' / ')}`;
+  }
+
+  /**
+   * Check right now if alarm conditions are met
+   */
+  _checkAlarmConditions(alarm) {
+    if (alarm.condAlwaysAlarm) return { fire: true, reason: '📅 وقت الاستيقاظ اليومي المحدد' };
+
+    if (alarm.condLowBalance) {
+      const spendable = this.data.balances.spendableBalance || 0;
+      const threshold = parseFloat(alarm.threshold) || 200;
+      if (spendable < threshold) {
+        return { fire: true, reason: `💳 رصيدك المتاح (${spendable.toFixed(0)} ج.م) أقل من ${threshold} ج.م — وقت الشغل!` };
+      }
+    }
+
+    if (alarm.condPendingIncomes) {
+      const hasPending = this.data.pendingIncomes && this.data.pendingIncomes.length > 0;
+      if (hasPending) {
+        const total = this.data.pendingIncomes.reduce((s, p) => s + (p.amount || 0), 0);
+        return { fire: true, reason: `⏳ عندك ${this.data.pendingIncomes.length} قبض قيد الانتظار بإجمالي ${total.toFixed(0)} ج.م — اصحى واقبض فلوسك!` };
+      }
+    }
+
+    return { fire: false, reason: '' };
+  }
+
+  /**
+   * Arms a setInterval ticker that checks the time every minute
+   */
+  _armAlarmTicker() {
+    if (this._alarmInterval) clearInterval(this._alarmInterval);
+
+    this._alarmInterval = setInterval(() => {
+      const alarm = this.data.settings.smartAlarm;
+      if (!alarm || !alarm.active) {
+        clearInterval(this._alarmInterval);
+        return;
+      }
+
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentH = now.getHours().toString().padStart(2, '0');
+      const currentM = now.getMinutes().toString().padStart(2, '0');
+      const currentTime = `${currentH}:${currentM}`;
+
+      // Check if today is an active day
+      if (!alarm.days.includes(currentDay)) return;
+
+      // Check if time matches
+      if (currentTime !== alarm.time) return;
+
+      // Avoid double-firing in the same minute
+      const todayKey = `${now.toISOString().split('T')[0]}_${alarm.time}`;
+      if (localStorage.getItem('BH_ALARM_FIRED') === todayKey) return;
+      localStorage.setItem('BH_ALARM_FIRED', todayKey);
+
+      // Check conditions
+      const { fire, reason } = this._checkAlarmConditions(alarm);
+      if (fire) {
+        this._fireAlarm(reason);
+      }
+    }, 30000); // check every 30s
+  }
+
+  /**
+   * Fire the alarm — sound + notification + toast
+   */
+  _fireAlarm(reason) {
+    // Play alarm sound via AudioContext
+    this._playAlarmSound();
+
+    // Show in-app toast
+    this.showToast(`⏰ ${reason}`, 'info');
+
+    // Show system notification if permission granted
+    if (Notification.permission === 'granted') {
+      const notif = new Notification('⏰ BH — منبه ذكي', {
+        body: reason,
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        tag: 'bh-smart-alarm',
+        requireInteraction: true,
+        vibrate: [500, 200, 500, 200, 500]
+      });
+      notif.onclick = () => { window.focus(); notif.close(); };
+    }
+  }
+
+  /**
+   * Play alarm beeps using Web Audio API
+   */
+  _playAlarmSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playBeep = (startTime, freq = 880, duration = 0.3) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.6, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      // Play 4 beeps
+      [0, 0.4, 0.8, 1.2].forEach(t => playBeep(ctx.currentTime + t));
+    } catch (e) {
+      console.warn('Audio play failed:', e);
+    }
+  }
+
+  /**
+   * Calculate the next alarm date/time string for display
+   */
+  _getNextAlarmLabel(alarm) {
+    if (!alarm || !alarm.active || !alarm.days || alarm.days.length === 0) return '—';
+    const now = new Date();
+    const [h, m] = alarm.time.split(':').map(Number);
+
+    for (let i = 0; i <= 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      const day = d.getDay();
+      if (!alarm.days.includes(day)) continue;
+      d.setHours(h, m, 0, 0);
+      if (d > now) {
+        const dayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+        const period = h < 12 ? 'صباحاً' : 'مساءً';
+        const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        return `${dayNames[day]} — ${displayH}:${m.toString().padStart(2,'0')} ${period}`;
+      }
+    }
+    return '—';
+  }
+
+  /**
+   * Show active alarm UI state
+   */
+  _showAlarmActiveUI(alarm) {
+    const badge = document.getElementById('alarmStatusBadge');
+    const activateBtn = document.getElementById('activateAlarmBtn');
+    const cancelBtn = document.getElementById('cancelAlarmBtn');
+    const nextInfo = document.getElementById('nextAlarmInfo');
+    const nextLabel = document.getElementById('nextAlarmTimeLabel');
+
+    if (badge) { badge.textContent = '✅ مفعّل'; badge.style.background = 'rgba(0,217,100,0.25)'; badge.style.color = '#00d964'; }
+    if (activateBtn) activateBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = '';
+    if (nextInfo) nextInfo.style.display = 'block';
+    if (nextLabel) nextLabel.textContent = this._getNextAlarmLabel(alarm);
+  }
+
+  /**
+   * Reset alarm UI to inactive state
+   */
+  _showAlarmInactiveUI() {
+    const badge = document.getElementById('alarmStatusBadge');
+    const activateBtn = document.getElementById('activateAlarmBtn');
+    const cancelBtn = document.getElementById('cancelAlarmBtn');
+    const nextInfo = document.getElementById('nextAlarmInfo');
+
+    if (badge) { badge.textContent = 'غير مفعل'; badge.style.background = 'rgba(100,100,100,0.25)'; badge.style.color = ''; }
+    if (activateBtn) activateBtn.style.display = '';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (nextInfo) nextInfo.style.display = 'none';
+  }
+
+  /**
+   * Activate the smart alarm — saves settings & requests notification permission
+   */
+  async activateSmartAlarm() {
+    const time = document.getElementById('alarmTime')?.value;
+    if (!time) { this.showToast('⚠️ اختار وقت المنبه الأول'); return; }
+
+    const condLow = document.getElementById('condLowBalance')?.checked;
+    const condPending = document.getElementById('condPendingIncomes')?.checked;
+    const condAlways = document.getElementById('condAlwaysAlarm')?.checked;
+    const threshold = parseFloat(document.getElementById('alarmLowBalanceThreshold')?.value || 200);
+    const days = this._getSelectedDays();
+
+    if (!condLow && !condPending && !condAlways) {
+      this.showToast('⚠️ اختار على الأقل شرط واحد للمنبه'); return;
+    }
+    if (days.length === 0) {
+      this.showToast('⚠️ اختار على الأقل يوم واحد'); return;
+    }
+
+    // Request notification permission
+    let notifGranted = false;
+    if ('Notification' in window) {
+      const perm = await Notification.requestPermission();
+      notifGranted = perm === 'granted';
+    }
+
+    const alarm = { active: true, time, condLowBalance: condLow, condPendingIncomes: condPending, condAlwaysAlarm: condAlways, threshold, days };
+    this.data.settings.smartAlarm = alarm;
+    this.saveData();
+
+    this._showAlarmActiveUI(alarm);
+    this._armAlarmTicker();
+
+    if (notifGranted) {
+      this.showToast('✅ المنبه الذكي اتفعّل! هيصحيك في الوقت المحدد 🔔', 'success');
+    } else {
+      this.showToast('✅ المنبه اتفعّل — لكن فعّل الإشعارات للصوت الكامل', 'info');
+    }
+  }
+
+  /**
+   * Deactivate / cancel the smart alarm
+   */
+  cancelSmartAlarm() {
+    if (this._alarmInterval) clearInterval(this._alarmInterval);
+    this.data.settings.smartAlarm = { active: false };
+    this.saveData();
+    this._showAlarmInactiveUI();
+    this.showToast('🔕 تم إلغاء المنبه الذكي');
+  }
 }
 
 // Global App Instance
@@ -1417,4 +1736,5 @@ window.addEventListener('DOMContentLoaded', function() {
   app.initUpdateUI();
   app.saveInitialVersion();
   app.autoCheckUpdates();
+  app.initSmartAlarm();
 });
