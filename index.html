@@ -494,6 +494,9 @@
             <button class="btn btn-secondary" id="cancelAlarmBtn" onclick="app.cancelSmartAlarm()" style="display:none;">🔕 إلغاء المنبه</button>
           </div>
 
+          <!-- Test Sound Button -->
+          <button class="btn btn-secondary btn-full btn-sm" style="margin-top:8px;" onclick="app._playAlarmSound()">🔊 تجربة صوت المنبه</button>
+
           <!-- Next Alarm Info -->
           <div id="nextAlarmInfo" style="display:none; margin-top: 10px; padding: 10px; background: rgba(0,217,255,0.07); border-radius: var(--radius-md); border: 1px solid rgba(0,217,255,0.2); font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
             ⏰ المنبه القادم: <strong id="nextAlarmTimeLabel" style="color: #fff;">—</strong>

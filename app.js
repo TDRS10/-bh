@@ -1572,53 +1572,180 @@ class BHApp {
   }
 
   /**
-   * Fire the alarm — sound + notification + toast
+   * Fire the alarm — full-screen ringing modal + continuous alarm sound + notification
    */
   _fireAlarm(reason) {
-    // Play alarm sound via AudioContext
-    this._playAlarmSound();
+    // Start continuous alarm sound
+    this._startAlarmRinging();
 
-    // Show in-app toast
-    this.showToast(`⏰ ${reason}`, 'info');
+    // Show in-app full-screen alarm modal
+    this._showAlarmRingingModal(reason);
 
-    // Show system notification if permission granted
-    if (Notification.permission === 'granted') {
-      const notif = new Notification('⏰ BH — منبه ذكي', {
-        body: reason,
-        icon: './icon-192.png',
-        badge: './icon-192.png',
-        tag: 'bh-smart-alarm',
-        requireInteraction: true,
-        vibrate: [500, 200, 500, 200, 500]
-      });
-      notif.onclick = () => { window.focus(); notif.close(); };
+    // Vibrate device (if supported)
+    if (navigator.vibrate) {
+      navigator.vibrate([800, 300, 800, 300, 800, 300, 800]);
     }
   }
 
   /**
-   * Play alarm beeps using Web Audio API
+   * Start the continuous two-tone alarm sound (classic alarm ring pattern)
+   * Stores AudioContext so it can be stopped later
    */
-  _playAlarmSound() {
+  _startAlarmRinging() {
+    this._stopAlarmSound(); // stop any previous sound first
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playBeep = (startTime, freq = 880, duration = 0.3) => {
+      this._alarmAudioCtx = ctx;
+      this._alarmRingInterval = null;
+
+      const playTone = (freq, startT, dur) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.6, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, startT);
+        gain.gain.setValueAtTime(0, startT);
+        gain.gain.linearRampToValueAtTime(0.55, startT + 0.02);
+        gain.gain.setValueAtTime(0.55, startT + dur - 0.04);
+        gain.gain.linearRampToValueAtTime(0, startT + dur);
+        osc.start(startT);
+        osc.stop(startT + dur);
       };
-      // Play 4 beeps
-      [0, 0.4, 0.8, 1.2].forEach(t => playBeep(ctx.currentTime + t));
+
+      // One alarm cycle = 0.6s high + 0.6s low + 0.2s silence = 1.4s
+      const playCycle = (offset) => {
+        playTone(880, ctx.currentTime + offset, 0.55);        // HIGH
+        playTone(660, ctx.currentTime + offset + 0.65, 0.55); // LOW
+      };
+
+      // Play first cycle immediately
+      playCycle(0);
+
+      // Repeat every 1.4 seconds
+      let elapsed = 1.4;
+      this._alarmRingInterval = setInterval(() => {
+        if (!this._alarmAudioCtx || this._alarmAudioCtx.state === 'closed') {
+          clearInterval(this._alarmRingInterval);
+          return;
+        }
+        const newCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this._alarmAudioCtx = newCtx;
+        const playTone2 = (freq, startT, dur) => {
+          const osc = newCtx.createOscillator();
+          const gain = newCtx.createGain();
+          osc.connect(gain);
+          gain.connect(newCtx.destination);
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, startT);
+          gain.gain.setValueAtTime(0, startT);
+          gain.gain.linearRampToValueAtTime(0.55, startT + 0.02);
+          gain.gain.setValueAtTime(0.55, startT + dur - 0.04);
+          gain.gain.linearRampToValueAtTime(0, startT + dur);
+          osc.start(startT);
+          osc.stop(startT + dur);
+        };
+        playTone2(880, newCtx.currentTime, 0.55);
+        playTone2(660, newCtx.currentTime + 0.65, 0.55);
+      }, 1400);
+
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Alarm sound failed:', e);
     }
   }
+
+  /**
+   * Stop the continuous alarm sound
+   */
+  _stopAlarmSound() {
+    if (this._alarmRingInterval) {
+      clearInterval(this._alarmRingInterval);
+      this._alarmRingInterval = null;
+    }
+    if (this._alarmAudioCtx) {
+      try { this._alarmAudioCtx.close(); } catch(e) {}
+      this._alarmAudioCtx = null;
+    }
+    if (navigator.vibrate) navigator.vibrate(0);
+  }
+
+  /**
+   * Short preview beep — used by Test button
+   */
+  _playAlarmSound() {
+    this._startAlarmRinging();
+    // Auto-stop after 4 seconds for preview
+    setTimeout(() => this._stopAlarmSound(), 4000);
+  }
+
+  /**
+   * Show full-screen alarm ringing modal
+   */
+  _showAlarmRingingModal(reason) {
+    // Remove old one if exists
+    const existing = document.getElementById('alarmRingingOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'alarmRingingOverlay';
+    overlay.innerHTML = `
+      <div class="alarm-ring-inner">
+        <div class="alarm-ring-pulse">⏰</div>
+        <div class="alarm-ring-title">وقت الصحيان!</div>
+        <div class="alarm-ring-reason">${reason}</div>
+        <div class="alarm-ring-time">${this._getCurrentTimeDisplay()}</div>
+        <div class="alarm-ring-actions">
+          <button class="btn btn-secondary alarm-snooze-btn" onclick="app._snoozeAlarm(5)">😴 سنوز 5 دقايق</button>
+          <button class="btn btn-danger alarm-stop-btn" onclick="app._dismissAlarmRinging()">🔕 وقّف المنبه</button>
+        </div>
+        <div class="alarm-ring-hint">اشتغل وهتعوض! 💪</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Animate in
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+  }
+
+  /**
+   * Returns current time as arabic display string
+   */
+  _getCurrentTimeDisplay() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes().toString().padStart(2, '0');
+    const period = h < 12 ? 'صباحاً' : 'مساءً';
+    const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${displayH}:${m} ${period}`;
+  }
+
+  /**
+   * Dismiss (stop) the alarm ringing overlay
+   */
+  _dismissAlarmRinging() {
+    this._stopAlarmSound();
+    const overlay = document.getElementById('alarmRingingOverlay');
+    if (overlay) {
+      overlay.classList.remove('visible');
+      setTimeout(() => overlay.remove(), 400);
+    }
+  }
+
+  /**
+   * Snooze the alarm for N minutes
+   */
+  _snoozeAlarm(minutes) {
+    this._dismissAlarmRinging();
+    this.showToast(`😴 سنوز ${minutes} دقايق... هتصحى تاني قريب!`);
+    setTimeout(() => {
+      const alarm = this.data.settings.smartAlarm;
+      if (alarm && alarm.active) {
+        const { fire, reason } = this._checkAlarmConditions(alarm);
+        this._fireAlarm(reason || 'انتهت فترة السنوز — وقت الصحيان!');
+      }
+    }, minutes * 60 * 1000);
+  }
+
 
   /**
    * Calculate the next alarm date/time string for display
