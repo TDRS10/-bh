@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v1';
+const CACHE_NAME = 'bh-finance-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -78,3 +78,97 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// ─── Smart Alarm: Notification click → open/focus the app ───
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  if (event.notification.tag && event.notification.tag.startsWith('bh-alarm')) {
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if ('focus' in client) return client.focus();
+        }
+        if (clients.openWindow) return clients.openWindow('./');
+      })
+    );
+  }
+});
+
+// ─── Smart Alarm: Message from app page ─────────────────────
+// Supports actions: 'SCHEDULE_ALARM' and 'CANCEL_ALARM'
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+
+  if (event.data.action === 'SCHEDULE_ALARM') {
+    const { timestamps, reason, title } = event.data;
+    scheduleAlarmNotifications(timestamps, reason, title);
+  }
+
+  if (event.data.action === 'CANCEL_ALARM') {
+    cancelScheduledAlarms();
+  }
+});
+
+/**
+ * Schedule notifications using Notification Triggers API (works when app is closed).
+ * Falls back gracefully if the API is unavailable.
+ */
+async function scheduleAlarmNotifications(timestamps, reason, title) {
+  // Cancel any previous scheduled alarms first
+  await cancelScheduledAlarms();
+
+  if (!('showNotification' in self.registration)) return;
+
+  // Check if Notification Triggers API is supported
+  const supportsTimestampTrigger = typeof TimestampTrigger !== 'undefined';
+
+  for (const ts of timestamps) {
+    const delay = ts - Date.now();
+    if (delay < 0) continue; // skip past times
+
+    try {
+      const options = {
+        body: reason,
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        tag: `bh-alarm-${ts}`,
+        requireInteraction: true,
+        data: { url: './' }
+      };
+
+      if (supportsTimestampTrigger) {
+        // Schedule to fire even when app is closed
+        options.showTrigger = new TimestampTrigger(ts);
+      }
+
+      await self.registration.showNotification(title || '⏰ BH — منبه ذكي', options);
+    } catch (err) {
+      console.warn('[SW] Could not schedule alarm notification:', err);
+    }
+  }
+
+  // Store scheduled timestamps in cache for reference
+  try {
+    const cache = await caches.open('bh-alarm-meta');
+    await cache.put('/bh-alarm-timestamps', new Response(JSON.stringify(timestamps)));
+  } catch (e) {/* non-critical */}
+}
+
+/**
+ * Cancel all previously scheduled alarm notifications
+ */
+async function cancelScheduledAlarms() {
+  try {
+    if (!('getNotifications' in self.registration)) return;
+    const notifications = await self.registration.getNotifications({ tag: 'bh-alarm' });
+    // Also get all bh-alarm-* tagged notifications
+    const all = await self.registration.getNotifications();
+    for (const n of all) {
+      if (n.tag && n.tag.startsWith('bh-alarm')) {
+        n.close();
+      }
+    }
+  } catch (e) {
+    console.warn('[SW] Could not cancel alarm notifications:', e);
+  }
+}

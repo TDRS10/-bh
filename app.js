@@ -1678,6 +1678,7 @@ class BHApp {
 
   /**
    * Activate the smart alarm — saves settings & requests notification permission
+   * Also sends SCHEDULE_ALARM message to the Service Worker for background firing.
    */
   async activateSmartAlarm() {
     const time = document.getElementById('alarmTime')?.value;
@@ -1696,11 +1697,16 @@ class BHApp {
       this.showToast('⚠️ اختار على الأقل يوم واحد'); return;
     }
 
-    // Request notification permission
+    // Request notification permission (required for SW notifications)
     let notifGranted = false;
     if ('Notification' in window) {
       const perm = await Notification.requestPermission();
       notifGranted = perm === 'granted';
+    }
+
+    if (!notifGranted) {
+      this.showToast('⚠️ لازم تسمح بالإشعارات عشان المنبه يشتغل وهو التطبيق مقفول', 'error');
+      return;
     }
 
     const alarm = { active: true, time, condLowBalance: condLow, condPendingIncomes: condPending, condAlwaysAlarm: condAlways, threshold, days };
@@ -1710,11 +1716,10 @@ class BHApp {
     this._showAlarmActiveUI(alarm);
     this._armAlarmTicker();
 
-    if (notifGranted) {
-      this.showToast('✅ المنبه الذكي اتفعّل! هيصحيك في الوقت المحدد 🔔', 'success');
-    } else {
-      this.showToast('✅ المنبه اتفعّل — لكن فعّل الإشعارات للصوت الكامل', 'info');
-    }
+    // ── Schedule via Service Worker (fires even when app is closed) ──
+    await this._scheduleSwAlarm(alarm);
+
+    this.showToast('⏰ المنبه الذكي اتفعّل! هيصحيك حتى لو التطبيق مقفول 🔔', 'success');
   }
 
   /**
@@ -1725,7 +1730,70 @@ class BHApp {
     this.data.settings.smartAlarm = { active: false };
     this.saveData();
     this._showAlarmInactiveUI();
+    // Tell SW to cancel scheduled notifications
+    this._sendSwMessage({ action: 'CANCEL_ALARM' });
     this.showToast('🔕 تم إلغاء المنبه الذكي');
+  }
+
+  /**
+   * Calculate next 7 alarm timestamps (one per active day within next 7 days)
+   * Used to pre-schedule SW notifications
+   */
+  _getNextAlarmTimestamps(alarm, maxDays = 7) {
+    const [h, m] = alarm.time.split(':').map(Number);
+    const now = new Date();
+    const timestamps = [];
+
+    for (let i = 0; i <= maxDays; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      d.setHours(h, m, 0, 0);
+      if (alarm.days.includes(d.getDay()) && d > now) {
+        timestamps.push(d.getTime());
+      }
+    }
+    return timestamps;
+  }
+
+  /**
+   * Build the alarm reason string for SW notification body
+   */
+  _buildAlarmReason(alarm) {
+    const reasons = [];
+    if (alarm.condAlwaysAlarm) reasons.push('📅 وقت الاستيقاظ اليومي');
+    if (alarm.condLowBalance) reasons.push(`💳 راجع رصيدك — تحت ${alarm.threshold} ج.م`);
+    if (alarm.condPendingIncomes) reasons.push('⏳ عندك قبض قيد الانتظار — اصحى واقبض فلوسك!');
+    return reasons.join(' | ') || '⏰ وقت الاستيقاظ';
+  }
+
+  /**
+   * Send a message to the active Service Worker
+   */
+  async _sendSwMessage(data) {
+    try {
+      if ('serviceWorker' in navigator) {
+        const sw = navigator.serviceWorker.controller ||
+          (await navigator.serviceWorker.ready).active;
+        if (sw) sw.postMessage(data);
+      }
+    } catch (e) {
+      console.warn('Could not message SW:', e);
+    }
+  }
+
+  /**
+   * Schedule alarm notifications via Service Worker (background-safe)
+   */
+  async _scheduleSwAlarm(alarm) {
+    const timestamps = this._getNextAlarmTimestamps(alarm);
+    if (timestamps.length === 0) return;
+    const reason = this._buildAlarmReason(alarm);
+    await this._sendSwMessage({
+      action: 'SCHEDULE_ALARM',
+      timestamps,
+      reason,
+      title: '⏰ BH — منبه ذكي'
+    });
   }
 }
 
