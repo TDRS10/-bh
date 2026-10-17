@@ -1588,71 +1588,68 @@ class BHApp {
   }
 
   /**
-   * Start the continuous two-tone alarm sound (classic alarm ring pattern)
-   * Stores AudioContext so it can be stopped later
+   * Start the continuous two-tone alarm sound using a SINGLE AudioContext
+   * with pre-scheduled notes (reliable and browser-safe)
    */
   _startAlarmRinging() {
-    this._stopAlarmSound(); // stop any previous sound first
+    this._stopAlarmSound();
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
       this._alarmAudioCtx = ctx;
-      this._alarmRingInterval = null;
 
-      const playTone = (freq, startT, dur) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(freq, startT);
-        gain.gain.setValueAtTime(0, startT);
-        gain.gain.linearRampToValueAtTime(0.55, startT + 0.02);
-        gain.gain.setValueAtTime(0.55, startT + dur - 0.04);
-        gain.gain.linearRampToValueAtTime(0, startT + dur);
-        osc.start(startT);
-        osc.stop(startT + dur);
+      // Chrome suspends AudioContext until user gesture — resume it
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      // Schedule 10 cycles (14 seconds) worth of beeps starting from now
+      const scheduleBlock = (fromTime) => {
+        for (let i = 0; i < 10; i++) {
+          const base = fromTime + i * 1.4;
+          this._scheduleTone(ctx, 880, base,        0.5); // HIGH
+          this._scheduleTone(ctx, 660, base + 0.65, 0.5); // LOW
+        }
       };
 
-      // One alarm cycle = 0.6s high + 0.6s low + 0.2s silence = 1.4s
-      const playCycle = (offset) => {
-        playTone(880, ctx.currentTime + offset, 0.55);        // HIGH
-        playTone(660, ctx.currentTime + offset + 0.65, 0.55); // LOW
-      };
+      // Schedule first 14 seconds immediately
+      scheduleBlock(ctx.currentTime + 0.05);
 
-      // Play first cycle immediately
-      playCycle(0);
-
-      // Repeat every 1.4 seconds
-      let elapsed = 1.4;
+      // Re-schedule every 12s to keep it running indefinitely
       this._alarmRingInterval = setInterval(() => {
-        if (!this._alarmAudioCtx || this._alarmAudioCtx.state === 'closed') {
+        if (!this._alarmAudioCtx || this._alarmAudioCtx !== ctx) {
           clearInterval(this._alarmRingInterval);
           return;
         }
-        const newCtx = new (window.AudioContext || window.webkitAudioContext)();
-        this._alarmAudioCtx = newCtx;
-        const playTone2 = (freq, startT, dur) => {
-          const osc = newCtx.createOscillator();
-          const gain = newCtx.createGain();
-          osc.connect(gain);
-          gain.connect(newCtx.destination);
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(freq, startT);
-          gain.gain.setValueAtTime(0, startT);
-          gain.gain.linearRampToValueAtTime(0.55, startT + 0.02);
-          gain.gain.setValueAtTime(0.55, startT + dur - 0.04);
-          gain.gain.linearRampToValueAtTime(0, startT + dur);
-          osc.start(startT);
-          osc.stop(startT + dur);
-        };
-        playTone2(880, newCtx.currentTime, 0.55);
-        playTone2(660, newCtx.currentTime + 0.65, 0.55);
-      }, 1400);
+        scheduleBlock(ctx.currentTime + 0.1);
+      }, 12000);
 
     } catch (e) {
-      console.warn('Alarm sound failed:', e);
+      console.warn('Alarm sound error:', e);
     }
   }
+
+  /**
+   * Schedule a single tone burst on an AudioContext
+   */
+  _scheduleTone(ctx, freq, startT, dur) {
+    try {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, startT);
+      gain.gain.setValueAtTime(0,    startT);
+      gain.gain.linearRampToValueAtTime(0.45, startT + 0.02);
+      gain.gain.setValueAtTime(0.45, startT + dur - 0.04);
+      gain.gain.linearRampToValueAtTime(0,    startT + dur);
+      osc.start(startT);
+      osc.stop(startT + dur + 0.01);
+    } catch(e) {/* skip if context is closed */}
+  }
+
 
   /**
    * Stop the continuous alarm sound

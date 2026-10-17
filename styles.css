@@ -26,6 +26,9 @@
   --r-card: 20px;
   --r-pill: 9999px;
   --r-cta:  16px;
+  --radius-sm:  10px;
+  --radius-md:  16px;
+  --radius-lg:  20px;
 
   --nav-h:     64px;
   --max-w:     480px;
