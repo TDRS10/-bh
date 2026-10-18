@@ -79,6 +79,39 @@ class BHApp {
     this.renderAll();
     this.calculateShiftNet();
     this.checkDebtDueNotifications();
+    this.initSplash();
+  }
+
+  // ── PWA Splash Screen ──────────────────────────────────────
+  // Shows the animated intro only when the app runs as an installed PWA.
+  isStandalone() {
+    return (
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true
+    );
+  }
+
+  initSplash() {
+    const overlay = document.getElementById('pwaSplashOverlay');
+    if (!overlay) return;
+
+    // Only for PWA launches — skip in a normal browser tab
+    if (!this.isStandalone()) {
+      overlay.remove();
+      return;
+    }
+
+    // Respect users who prefer reduced motion — show briefly, no long animation
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const holdTime = reduced ? 400 : 1500;
+
+    // Let the browser paint the first frame before starting the exit animation
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        overlay.classList.add('splash-hide');
+        setTimeout(() => overlay.remove(), 520);
+      }, holdTime);
+    });
   }
 
   applyBigNumbersMode() {

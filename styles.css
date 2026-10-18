@@ -1156,3 +1156,91 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 #alarmStatusBadge[style*="mfعّل"] {
   animation: alarm-pulse 2s infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PWA SPLASH — Entry animation once per install
+════════════════════════════════════════════════════════════ */
+#pwaSplashOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  animation: splashFadeIn 0.55s ease-out both;
+}
+
+.splash-hide {
+  animation: splashFadeOut 0.5s ease-in forwards !important;
+  pointer-events: none;
+}
+
+.splash-ring {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border: 2px solid rgba(0, 217, 255, 0.12);
+  border-radius: 50%;
+  box-shadow: 0 0 60px rgba(0, 217, 255, 0.08);
+}
+
+.splash-ring::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border-top: 3px solid var(--accent);
+  border-left: 3px solid rgba(0, 217, 255, 0.25);
+  animation: splashSpin 1.2s linear infinite;
+}
+
+.splash-logo {
+  position: relative;
+  font-family: var(--font-disp);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.04em;
+  margin-top: 14px;
+  text-shadow: 0 0 18px rgba(0, 217, 255, 0.35);
+}
+
+.splash-logo .splash-B {
+  color: var(--accent);
+  animation: splashBPulse 1.6s ease-in-out infinite alternate;
+}
+
+.splash-subtitle {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: splashTextIn 0.8s ease-out 0.3s forwards;
+}
+
+@keyframes splashFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes splashFadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.92); }
+}
+
+@keyframes splashSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes splashBPulse {
+  from { transform: scale(1); text-shadow: 0 0 12px rgba(0,217,255,0.3); }
+  to   { transform: scale(1.12); text-shadow: 0 0 30px rgba(0,217,255,0.9); }
+}
+
+@keyframes splashTextIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
