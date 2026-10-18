@@ -78,6 +78,7 @@ class BHApp {
     this.updateStreakCount();
     this.renderAll();
     this.calculateShiftNet();
+    this.checkDebtDueNotifications();
   }
 
   applyBigNumbersMode() {
@@ -754,6 +755,7 @@ class BHApp {
   renderAll() {
     this.renderBalances();
     this.renderPendingIncomes();
+    this.renderDebtAlerts();
     this.renderOutingsWidget();
     this.renderQuickStats();
     this.renderVariableIncomeStats();
@@ -1102,16 +1104,35 @@ class BHApp {
       return;
     }
 
-    container.innerHTML = this.data.debts.map(debt => {
+    // Sort: urgent unpaid first (by due date), then unpaid without dates, paid last
+    const sortedDebts = [...this.data.debts].sort((a, b) => {
+      const paidA = a.totalAmount - a.paidAmount <= 0;
+      const paidB = b.totalAmount - b.paidAmount <= 0;
+      if (paidA !== paidB) return paidA ? 1 : -1;
+      if (a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return 0;
+    });
+
+    container.innerHTML = sortedDebts.map(debt => {
       const remaining = debt.totalAmount - debt.paidAmount;
       totalRemaining += Math.max(0, remaining);
 
+      const urgency = this.getDebtUrgency(debt);
+      const urgencyColor = !urgency ? ''
+        : (urgency.level === 'overdue' || urgency.level === 'today') ? 'var(--danger)'
+        : urgency.level === 'soon' ? '#f59e0b'
+        : 'var(--savings)';
+      const urgencyHtml = urgency ? ` • <span style="color: ${urgencyColor}; font-weight: 800;">${urgency.label}</span>` : '';
+      const isDanger = urgency && (urgency.level === 'overdue' || urgency.level === 'today');
+
       return `
-        <div class="list-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+        <div class="list-item" style="flex-direction: column; align-items: stretch; gap: 8px; ${isDanger ? 'border-right: 3px solid var(--danger);' : ''}">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <strong style="color: #fff;">📌 ${debt.creditor}</strong>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">استحقاق: ${debt.dueDate || 'غير محدد'}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">استحقاق: ${debt.dueDate || 'غير محدد'}${urgencyHtml}</div>
             </div>
             <div style="display: flex; gap: 6px;">
               ${remaining > 0 ? `<button class="btn btn-primary btn-sm" onclick="app.payDebt('${debt.id}')">سداد جزء</button>` : `<span class="streak-badge">تم السداد بالكامل ✅</span>`}
@@ -1128,6 +1149,113 @@ class BHApp {
     }).join('');
 
     document.getElementById('totalDebtsRemainingVal').textContent = `${totalRemaining.toLocaleString()} ج.م`;
+  }
+
+  // ═══════ Debt Due Date Alerts (تنبيه استحقاق الديون) ═══════
+
+  // Calculate urgency level for a single debt
+  getDebtUrgency(debt) {
+    const remaining = debt.totalAmount - debt.paidAmount;
+    if (remaining <= 0 || !debt.dueDate) return null;
+
+    const due = new Date(debt.dueDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+
+    if (days < 0)  return { level: 'overdue', days, icon: '🔴', label: `متأخر ${this.daysArabic(Math.abs(days))}` };
+    if (days === 0) return { level: 'today', days: 0, icon: '🔴', label: 'مستحق النهاردة' };
+    if (days === 1) return { level: 'soon', days: 1, icon: '🟠', label: 'مستحق بكرة' };
+    if (days <= 3) return { level: 'soon', days, icon: '🟠', label: `مستحق بعد ${this.daysArabic(days)}` };
+    if (days <= 7) return { level: 'week', days, icon: '🟢', label: `مستحق بعد ${this.daysArabic(days)}` };
+    return null;
+  }
+
+  // Arabic plural helper for days
+  daysArabic(n) {
+    if (n === 1) return 'يوم';
+    if (n === 2) return 'يومين';
+    if (n <= 10) return `${n} أيام`;
+    return `${n} يوم`;
+  }
+
+  // All debts that need attention (overdue/today/soon/within a week), sorted by urgency
+  getUrgentDebts() {
+    return (this.data.debts || [])
+      .map(d => ({ debt: d, urgency: this.getDebtUrgency(d) }))
+      .filter(x => x.urgency !== null)
+      .sort((a, b) => a.urgency.days - b.urgency.days);
+  }
+
+  // Dashboard alert card for debts about to be due
+  renderDebtAlerts() {
+    const card = document.getElementById('debtAlertsCard');
+    if (!card) return;
+
+    const urgent = this.getUrgentDebts();
+    if (urgent.length === 0) {
+      card.style.display = 'none';
+      card.innerHTML = '';
+      return;
+    }
+
+    card.style.display = 'block';
+
+    const items = urgent.map(({ debt, urgency }) => {
+      const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
+      const isDanger = urgency.level === 'overdue' || urgency.level === 'today';
+
+      return `
+        <div class="list-item" style="border-right: 3px solid ${isDanger ? 'var(--danger)' : 'var(--savings)'};">
+          <div class="item-main">
+            <div class="item-icon expense">${urgency.icon}</div>
+            <div class="item-details">
+              <span class="item-title">📌 ${debt.creditor}</span>
+              <span class="item-sub">${urgency.label} • المتبقي: ${remaining.toLocaleString()} ج.م</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button class="btn btn-primary btn-sm" onclick="app.payDebt('${debt.id}')">سداد</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title"><span class="card-icon">⏰</span> ديون قربت تستحق</span>
+        <span class="sub-balance-label">${urgent.length} ديون</span>
+      </div>
+      <div class="history-list">${items}</div>
+    `;
+  }
+
+  // System notification for critical debts (overdue / today / soon) — once per day
+  checkDebtDueNotifications() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const critical = this.getUrgentDebts().filter(x => x.urgency.level !== 'week');
+    if (critical.length === 0) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    if (this.data.settings.lastDebtNotifyDate === today) return;
+
+    this.data.settings.lastDebtNotifyDate = today;
+    this.saveData();
+
+    const lines = critical.map(({ debt, urgency }) => {
+      const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
+      return `${urgency.icon} ${debt.creditor}: ${urgency.label} — المتبقي ${remaining.toLocaleString()} ج.م`;
+    });
+
+    try {
+      new Notification('⏰ تنبيه ديون مستحقة', {
+        body: lines.join('\n'),
+        icon: 'icon-192.png'
+      });
+    } catch (e) {
+      console.error('Debt notification error:', e);
+    }
   }
 
   // Financial Future Simulator ("مستقبلي المالي")
