@@ -909,6 +909,59 @@ body.big-numbers-mode .stat-box .value { font-size: 1.4rem; }
 body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 
 /* ═══════════════════════════════════════════════════
+   MONTH-OVER-MONTH COMPARISON
+═══════════════════════════════════════════════════ */
+.mc-header-row,
+.mc-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 0.5fr 1.5fr 1fr;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font-size: 0.82rem;
+}
+.mc-header-row {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+}
+.mc-col-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+}
+.mc-row {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background .15s;
+}
+.mc-row:last-of-type { border-bottom: none; }
+.mc-row:hover { background: rgba(255,255,255,0.03); border-radius: 10px; }
+
+.mc-label { font-weight: 700; color: var(--text-secondary); font-size: 0.8rem; }
+.mc-prev  { text-align: center; color: var(--text-muted); }
+.mc-cur   { text-align: center; font-weight: 700; color: #fff; }
+.mc-arrow { text-align: center; font-size: 0.75rem; font-weight: 900; }
+.mc-pct   { text-align: center; font-weight: 800; font-size: 0.82rem; border-radius: 6px; padding: 2px 4px; }
+
+.mc-good  { color: var(--savings); }
+.mc-bad   { color: var(--danger);  }
+
+.mc-verdict {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-ctrl);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  border: 1px solid;
+}
+.mc-verdict-great { background: rgba(0,200,122,0.12); border-color: rgba(0,200,122,0.3); color: var(--savings); }
+.mc-verdict-ok    { background: rgba(0,217,255,0.08); border-color: rgba(0,217,255,0.2); color: var(--accent);  }
+.mc-verdict-warn  { background: rgba(255,170,0,0.10); border-color: rgba(255,170,0,0.3); color: var(--essentials); }
+.mc-verdict-bad   { background: rgba(255,59,92,0.10); border-color: rgba(255,59,92,0.3); color: var(--danger); }
+
+/* ═══════════════════════════════════════════════════
    ALARM RINGING FULL-SCREEN OVERLAY
 ═══════════════════════════════════════════════════ */
 

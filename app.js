@@ -763,6 +763,86 @@ class BHApp {
     this.renderGoals();
     this.renderDebts();
     this.calculateFutureSimulation();
+    this.renderMonthComparison();
+  }
+
+  // ── Month-over-Month Comparison ──────────────────────────────
+  renderMonthComparison() {
+    const card = document.getElementById('monthComparisonCard');
+    if (!card) return;
+
+    const now   = new Date();
+    const curY  = now.getFullYear();
+    const curM  = now.getMonth();        // 0-indexed
+    const prevM = curM === 0 ? 11 : curM - 1;
+    const prevY = curM === 0 ? curY - 1 : curY;
+
+    const inMonth = (dateStr, y, m) => {
+      const d = new Date(dateStr);
+      return d.getFullYear() === y && d.getMonth() === m;
+    };
+
+    const sum = (arr, y, m) =>
+      arr.filter(x => inMonth(x.date, y, m)).reduce((s, x) => s + (x.amount || 0), 0);
+
+    const curInc  = sum(this.data.incomes,  curY,  curM);
+    const prevInc = sum(this.data.incomes,  prevY, prevM);
+    const curExp  = sum(this.data.expenses, curY,  curM);
+    const prevExp = sum(this.data.expenses, prevY, prevM);
+    const curSav  = curInc  - curExp;
+    const prevSav = prevInc - prevExp;
+
+    const pct = (cur, prev) => {
+      if (prev === 0) return cur > 0 ? 100 : 0;
+      return Math.round(((cur - prev) / prev) * 100);
+    };
+
+    const row = (label, cur, prev, higherIsBetter = true) => {
+      const diff = pct(cur, prev);
+      const up   = diff >= 0;
+      const good = higherIsBetter ? up : !up;
+      const arrow = up ? '▲' : '▼';
+      const cls   = good ? 'mc-good' : 'mc-bad';
+      const sign  = up ? '+' : '';
+      return `
+        <div class="mc-row">
+          <span class="mc-label">${label}</span>
+          <span class="mc-prev">${prev.toLocaleString()} <small>ج.م</small></span>
+          <span class="mc-arrow ${cls}">${arrow}</span>
+          <span class="mc-cur">${cur.toLocaleString()} <small>ج.م</small></span>
+          <span class="mc-pct ${cls}">${sign}${diff}%</span>
+        </div>`;
+    };
+
+    // Overall verdict
+    const score = (curInc >= prevInc ? 1 : 0) + (curExp <= prevExp ? 1 : 0) + (curSav >= prevSav ? 1 : 0);
+    const verdicts = [
+      { s: 0, icon: '📉', text: 'شهر صعب — ركّز في الشهر الجاي!', cls: 'mc-verdict-bad' },
+      { s: 1, icon: '😐', text: 'شهر عادي — ممكن تتحسن أكتر', cls: 'mc-verdict-warn' },
+      { s: 2, icon: '👍', text: 'شهر كويس — استمر!', cls: 'mc-verdict-ok' },
+      { s: 3, icon: '🏆', text: 'شهر ممتاز — أحسن من الشهر اللي فات في كل حاجة!', cls: 'mc-verdict-great' },
+    ];
+    const v = verdicts.find(x => x.s === score) || verdicts[0];
+
+    const monthNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title"><span class="card-icon">📊</span> مقارنة شهر بشهر</span>
+        <span class="sub-balance-label">${monthNames[prevM]} ← ${monthNames[curM]}</span>
+      </div>
+      <div class="mc-header-row">
+        <span></span>
+        <span class="mc-col-label">الشهر الماضي</span>
+        <span></span>
+        <span class="mc-col-label">الشهر الحالي</span>
+        <span class="mc-col-label">الفرق</span>
+      </div>
+      ${row('💰 القبض',     curInc, prevInc, true)}
+      ${row('💸 المصاريف', curExp, prevExp, false)}
+      ${row('🔒 الصافي',   curSav, prevSav, true)}
+      <div class="mc-verdict ${v.cls}">${v.icon} ${v.text}</div>
+    `;
   }
 
   // Render Pending Incomes Card & Items
