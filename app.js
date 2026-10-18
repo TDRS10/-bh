@@ -83,28 +83,18 @@ class BHApp {
   }
 
   // ── PWA Splash Screen ──────────────────────────────────────
-  // Shows the animated intro only when the app runs as an installed PWA.
-  isStandalone() {
-    return (
-      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-      window.navigator.standalone === true
-    );
-  }
-
+  // Shows the animated intro on app start. Works in PWA and in a browser tab.
   initSplash() {
     const overlay = document.getElementById('pwaSplashOverlay');
     if (!overlay) return;
 
-    // Only for PWA launches — skip in a normal browser tab
-    if (!this.isStandalone()) {
-      overlay.remove();
-      return;
-    }
+    // Make sure it's visible even if the head script didn't run
+    overlay.classList.add('splash-force');
+    document.documentElement.classList.add('splash-on');
 
-    // iOS Safari doesn't support the display-mode media query — force it via class
-    if (!window.matchMedia('(display-mode: standalone)').matches) {
-      overlay.classList.add('splash-force');
-    }
+    // Sync the toggle button state
+    const btn = document.getElementById('splashToggleBtn');
+    if (btn) btn.textContent = localStorage.getItem('BH_SPLASH_OFF') === '1' ? 'تفعيل' : 'إيقاف';
 
     this.fadeOutSplash(overlay);
   }
@@ -118,9 +108,25 @@ class BHApp {
     requestAnimationFrame(() => {
       setTimeout(() => {
         overlay.classList.add('splash-hide');
+        document.documentElement.classList.remove('splash-on');
         setTimeout(() => overlay.remove(), 520);
       }, holdTime);
     });
+  }
+
+  // Enable / disable the splash screen permanently
+  toggleSplash() {
+    const key = 'BH_SPLASH_OFF';
+    const isOff = localStorage.getItem(key) === '1';
+    if (isOff) {
+      localStorage.removeItem(key);
+      this.showToast('✨ تم تفعيل شاشة البداية');
+    } else {
+      localStorage.setItem(key, '1');
+      this.showToast('⏹️ تم إيقاف شاشة البداية');
+    }
+    const btn = document.getElementById('splashToggleBtn');
+    if (btn) btn.textContent = isOff ? 'إيقاف' : 'تفعيل';
   }
 
   // Replay the splash animation on demand (for preview / testing)
@@ -138,6 +144,7 @@ class BHApp {
       <div class="splash-subtitle">إدارة أموالك</div>
     `;
     document.body.appendChild(overlay);
+    document.documentElement.classList.add('splash-on');
     this.fadeOutSplash(overlay);
   }
 

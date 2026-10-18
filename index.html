@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#00D9FF">
   <meta name="description" content="تطبيق BH - إدارة القبض والمصاريف لسائقي وفرسان الدليفري">
   <title>BH - إدارة الفلوس والقبض</title>
@@ -11,6 +11,22 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css">
+
+  <!-- Show splash on the very first paint (before any flash of the app) -->
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('BH_SPLASH_OFF') === '1') return;
+        document.documentElement.classList.add('splash-on');
+      } catch (e) {}
+      // Safety net: never let the splash block the app if app.js fails to load
+      setTimeout(function () {
+        document.documentElement.classList.remove('splash-on');
+        var ov = document.getElementById('pwaSplashOverlay');
+        if (ov) ov.remove();
+      }, 4000);
+    })();
+  </script>
 </head>
 <body>
 
@@ -383,9 +399,12 @@
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px;">
             <div>
               <strong style="font-size: 0.95rem; color: #fff;">✨ شاشة البداية</strong>
-              <div style="font-size: 0.78rem; color: var(--text-muted);">أنيميشن الدخول — يظهر تلقائياً لما تفتح التطبيق من الشاشة الرئيسية</div>
+              <div style="font-size: 0.78rem; color: var(--text-muted);">أنيميشن الدخول — يظهر تلقائياً كل ما تفتح التطبيق</div>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="app.previewSplash()">معاينة ▶</button>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-secondary btn-sm" onclick="app.previewSplash()">معاينة ▶</button>
+              <button class="btn btn-secondary btn-sm" onclick="app.toggleSplash()" id="splashToggleBtn">إيقاف</button>
+            </div>
           </div>
         </div>
 
