@@ -118,9 +118,7 @@ body {
   z-index: 50;
   width: 100%;
   height: var(--nav-h);
-  background: rgba(6, 12, 22, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(6, 12, 22, 0.95);
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   padding: 0 12px;
   display: flex;
@@ -218,8 +216,7 @@ body {
 .motivation-banner {
   margin: 12px 16px 0;
   padding: 10px 14px;
-  background: rgba(9,9,11,.7);
-  backdrop-filter: blur(8px);
+  background: rgba(9,9,11,.92);
   border: 1px solid var(--border);
   border-right: 2px solid var(--accent);
   border-radius: var(--r-ctrl);
@@ -264,9 +261,7 @@ body {
    CARDS  ─  Glass panels, blur(12px)
 ═══════════════════════════════════════════════════ */
 .card {
-  background: rgba(10, 18, 30, 0.70);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(10, 18, 30, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   border-radius: var(--r-card);
@@ -298,9 +293,7 @@ body {
 
 /* ── BALANCE CARD (hero) ── */
 .balance-card {
-  background: rgba(8, 24, 42, 0.50);
-  backdrop-filter: blur(20px) saturate(200%);
-  -webkit-backdrop-filter: blur(20px) saturate(200%);
+  background: rgba(8, 24, 42, 0.88);
   border: 1px solid rgba(0, 217, 255, 0.35);
   border-top: 1.5px solid var(--accent);
   box-shadow: 0 12px 40px rgba(0, 217, 255, 0.14), inset 0 1px 0 rgba(0, 217, 255, 0.35);
@@ -331,8 +324,6 @@ body {
 
 .sub-balance-item {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border);
   border-radius: var(--r-ctrl);
   padding: 11px 13px;
@@ -490,7 +481,6 @@ body {
 
 .stat-box {
   background: rgba(255,255,255,.03);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--r-ctrl);
   padding: 13px;
@@ -661,9 +651,9 @@ select.form-control option {
 .modal-container {
   width: 100%;
   max-width: var(--max-w);
-  background: rgba(8, 14, 26, 0.75);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(8, 14, 26, 0.94);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-top: 1px solid rgba(0, 217, 255, 0.35);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
@@ -763,9 +753,7 @@ select.form-control option {
   width: 100%;
   max-width: var(--max-w);
   height: var(--nav-h);
-  background: rgba(6, 12, 22, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(6, 12, 22, 0.97);
   border-top: 1px solid rgba(255, 255, 255, 0.10);
   display: flex;
   align-items: center;
@@ -851,7 +839,6 @@ select.form-control option {
 
 .toast {
   background: rgba(9,9,11,.92);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-right: 2px solid var(--accent);
   color: var(--text-primary);

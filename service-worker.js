@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v2';
+const CACHE_NAME = 'bh-finance-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -48,14 +48,17 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return cached response & update in background if online
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-            }
-          })
-          .catch(() => {/* Offline mode */});
+        // Revalidate in background ONLY for page navigations (HTML).
+        // Static assets (css/js/icons) stay cache-first — no wasted network calls on every launch.
+        if (event.request.mode === 'navigate') {
+          fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+              }
+            })
+            .catch(() => {/* Offline mode */});
+        }
         return cachedResponse;
       }
 
