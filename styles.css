@@ -1164,11 +1164,21 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
   position: fixed;
   inset: 0;
   z-index: 10000;
-  display: grid;
+  display: none;
   place-items: center;
+  align-content: center;
+  justify-content: center;
   background: var(--bg);
   animation: splashFadeIn 0.55s ease-out both;
 }
+
+/* Only show on installed PWA launches (standalone) */
+@media (display-mode: standalone) {
+  #pwaSplashOverlay { display: grid; }
+}
+
+/* Forced display (used by the in-app preview button) */
+#pwaSplashOverlay.splash-force { display: grid !important; }
 
 .splash-hide {
   animation: splashFadeOut 0.5s ease-in forwards !important;
@@ -1177,11 +1187,13 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 
 .splash-ring {
   position: relative;
-  width: 150px;
-  height: 150px;
-  border: 2px solid rgba(0, 217, 255, 0.12);
+  width: 170px;
+  height: 170px;
+  border: 2px solid rgba(0, 217, 255, 0.14);
   border-radius: 50%;
-  box-shadow: 0 0 60px rgba(0, 217, 255, 0.08);
+  box-shadow: 0 0 70px rgba(0, 217, 255, 0.10);
+  display: grid;
+  place-items: center;
 }
 
 .splash-ring::after {
@@ -1197,11 +1209,10 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 .splash-logo {
   position: relative;
   font-family: var(--font-disp);
-  font-size: 2.2rem;
+  font-size: 2.6rem;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.04em;
-  margin-top: 14px;
   text-shadow: 0 0 18px rgba(0, 217, 255, 0.35);
 }
 
@@ -1211,7 +1222,7 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 }
 
 .splash-subtitle {
-  margin-top: 12px;
+  margin-top: 20px;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);

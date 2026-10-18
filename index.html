@@ -380,6 +380,13 @@
             </div>
             <button class="btn btn-secondary btn-sm" onclick="app.toggleBigNumbers()" id="bigNumbersToggleBtn">تفعيل 👁️</button>
           </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px;">
+            <div>
+              <strong style="font-size: 0.95rem; color: #fff;">✨ شاشة البداية</strong>
+              <div style="font-size: 0.78rem; color: var(--text-muted);">أنيميشن الدخول — يظهر تلقائياً لما تفتح التطبيق من الشاشة الرئيسية</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="app.previewSplash()">معاينة ▶</button>
+          </div>
         </div>
 
         <!-- "مستقبلي المالي" Simulator Card -->
@@ -813,9 +820,10 @@
 
   <!-- PWA Splash Overlay — shown once per install -->
   <div id="pwaSplashOverlay">
-    <div class="splash-ring"></div>
-    <div class="splash-logo">
-      <span class="splash-B">B</span>H
+    <div class="splash-ring">
+      <div class="splash-logo">
+        <span class="splash-B">B</span>H
+      </div>
     </div>
     <div class="splash-subtitle">إدارة أموالك</div>
   </div>

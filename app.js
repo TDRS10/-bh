@@ -101,7 +101,16 @@ class BHApp {
       return;
     }
 
-    // Respect users who prefer reduced motion — show briefly, no long animation
+    // iOS Safari doesn't support the display-mode media query — force it via class
+    if (!window.matchMedia('(display-mode: standalone)').matches) {
+      overlay.classList.add('splash-force');
+    }
+
+    this.fadeOutSplash(overlay);
+  }
+
+  // Fade out the splash overlay and remove it from the DOM
+  fadeOutSplash(overlay) {
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const holdTime = reduced ? 400 : 1500;
 
@@ -112,6 +121,24 @@ class BHApp {
         setTimeout(() => overlay.remove(), 520);
       }, holdTime);
     });
+  }
+
+  // Replay the splash animation on demand (for preview / testing)
+  previewSplash() {
+    const existing = document.getElementById('pwaSplashOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pwaSplashOverlay';
+    overlay.className = 'splash-force';
+    overlay.innerHTML = `
+      <div class="splash-ring">
+        <div class="splash-logo"><span class="splash-B">B</span>H</div>
+      </div>
+      <div class="splash-subtitle">إدارة أموالك</div>
+    `;
+    document.body.appendChild(overlay);
+    this.fadeOutSplash(overlay);
   }
 
   applyBigNumbersMode() {

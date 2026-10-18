@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v3';
+const CACHE_NAME = 'bh-finance-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -10,14 +10,19 @@ const ASSETS = [
   'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap'
 ];
 
-// Install event - Cache static assets
+// Install event - Cache static assets (bypass HTTP cache to always get fresh files)
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[ServiceWorker] Caching app shell');
-      return cache.addAll(ASSETS).catch((err) => {
-        console.warn('[ServiceWorker] Some assets failed to cache during install:', err);
-      });
+      return Promise.all(
+        ASSETS.map((url) =>
+          // `cache: 'reload'` forces a fresh network fetch, ignoring the HTTP cache
+          cache.add(new Request(url, { cache: 'reload' })).catch((err) => {
+            console.warn('[ServiceWorker] Failed to cache:', url, err);
+          })
+        )
+      );
     })
   );
   self.skipWaiting();
