@@ -1552,6 +1552,363 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 }
 
 /* ═══════════════════════════════════════════════════════════
+   DEBT PAYOFF PLANNER  (مخطط سداد الديون)
+════════════════════════════════════════════════════════════ */
+.dp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dp-strategies {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dp-strat {
+  padding: 10px 8px;
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--trans-fast);
+  font-family: var(--font-body);
+}
+
+.dp-strat.active {
+  background: rgba(0, 217, 255, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.18);
+}
+
+.dp-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 9px 12px;
+}
+
+.dp-budget-label {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dp-budget-row .form-control {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px !important;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.dp-budget-unit {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.dp-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dp-summary-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dp-sum-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.dp-sum-val {
+  font-family: var(--font-disp);
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.dp-section-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.dp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 11px 12px;
+}
+
+.dp-row.target {
+  background: rgba(0, 217, 255, 0.08);
+  border-color: var(--border-accent);
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.10);
+}
+
+.dp-order {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-disp);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.dp-row.target .dp-order {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+
+.dp-info { flex: 1; min-width: 0; }
+
+.dp-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dp-target-tag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: var(--accent);
+  background: rgba(0, 217, 255, 0.15);
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
+}
+
+.dp-meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dp-badge {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+}
+
+.dp-badge.paid {
+  color: var(--savings);
+  background: rgba(0, 200, 122, 0.12);
+}
+
+.dp-badge.late {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dp-amount {
+  font-family: var(--font-disp);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--danger);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dp-amount small {
+  font-size: 0.6rem;
+  margin-right: 2px;
+  opacity: 0.7;
+}
+
+.dp-timeline {
+  position: relative;
+  padding-right: 18px;
+  margin-bottom: 18px;
+}
+
+.dp-timeline::before {
+  content: '';
+  position: absolute;
+  right: 4px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent), rgba(0, 217, 255, 0.1));
+}
+
+.dp-timeline-item {
+  position: relative;
+  padding: 5px 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.dp-timeline-dot {
+  position: absolute;
+  right: -18px;
+  top: 12px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.6);
+}
+
+.dp-timeline-text strong { color: #fff; }
+
+.dp-tl-month {
+  color: var(--savings);
+  font-weight: 800;
+}
+
+.dp-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 10px;
+}
+
+.dp-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.dp-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dp-bar-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  width: 62px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dp-bar-track {
+  flex: 1;
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.dp-bar-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--danger), #ff7a90);
+}
+
+.dp-bar-val {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 46px;
+  text-align: left;
+  flex-shrink: 0;
+  font-family: var(--font-disp);
+}
+
+.dp-interest-note {
+  background: rgba(255, 59, 92, 0.08);
+  border: 1px solid rgba(255, 59, 92, 0.25);
+  border-radius: var(--r-ctrl);
+  padding: 11px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.dp-interest-note strong { color: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════════
+   SHARE TARGET  (شارك → BH)
+════════════════════════════════════════════════════════════ */
+.share-raw {
+  background: rgba(0, 217, 255, 0.07);
+  border: 1px solid var(--border-accent);
+  border-right: 3px solid var(--accent);
+  border-radius: var(--r-ctrl);
+  padding: 11px 13px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* Share hint card in the app */
+.share-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 217, 255, 0.06);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--r-ctrl);
+  padding: 12px;
+  margin-bottom: 12px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.share-hint-icon { font-size: 1.5rem; flex-shrink: 0; }
+
+.share-hint strong { color: #fff; }
+
+/* ═══════════════════════════════════════════════════════════
    PWA SPLASH — Entry animation once per install
 ════════════════════════════════════════════════════════════ */
 #pwaSplashOverlay {

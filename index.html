@@ -328,6 +328,15 @@
       <!-- ================= 3. EXPENSES VIEW ================= -->
       <section id="expensesView" class="view-page">
 
+        <!-- Share Target hint -->
+        <div class="share-hint">
+          <span class="share-hint-icon">📤</span>
+          <span>
+            <strong>سجّل من أي تطبيق:</strong> من واتساب أو أي تطبيق، اختار <strong>مشاركة → BH</strong>
+            واكتب "<strong>50 بنزين</strong>" والتطبيق هيقرأ المبلغ والتصنيف لوحده.
+          </span>
+        </div>
+
         <button class="btn btn-danger btn-full" onclick="app.openModal('newExpenseModal')">
           <span>➕</span> تسجيل مصروف جديد
         </button>
@@ -379,6 +388,18 @@
             <strong class="val-danger" id="totalDebtsRemainingVal">0 ج.م</strong>
           </div>
           <div id="debtsList" class="history-list"></div>
+        </div>
+
+        <!-- 💡 Debt Payoff Planner (مخطط سداد الديون) -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🧮</span> مخطط سداد الديون</span>
+            <span class="sub-balance-label">أفضل ترتيب + خطة</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+            بيحسب لك أفضل ترتيب لسداد ديونك، وإمتى تخلص كل واحد، كام تدفع شهرياً.
+          </p>
+          <div id="debtPlannerWrap"></div>
         </div>
 
       </section>
@@ -866,6 +887,10 @@
         <div class="form-group">
           <label class="form-label">موعد الاستحقاق</label>
           <input type="date" id="debtDueDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">نسبة الفايدة سنوياً % (اختياري)</label>
+          <input type="number" id="debtInterest" class="form-control" placeholder="مثال: 5" step="0.1" min="0">
         </div>
         <button type="submit" class="btn btn-danger btn-full">حفظ الدين</button>
       </form>

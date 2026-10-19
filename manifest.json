@@ -22,5 +22,31 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "قبض جديد",
+      "short_name": "قبض",
+      "description": "سجّل قبض سريع",
+      "url": "./index.html?action=income",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "مصروف جديد",
+      "short_name": "مصروف",
+      "description": "سجّل مصروف سريع",
+      "url": "./index.html?action=expense",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

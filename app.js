@@ -89,6 +89,29 @@ class BHApp {
     this.calculateShiftNet();
     this.checkDebtDueNotifications();
     this.initSplash();
+    this.handleLaunchIntent();
+  }
+
+  // Handle ?action=income / ?action=expense shortcuts AND share target params
+  handleLaunchIntent() {
+    const params = new URLSearchParams(window.location.search);
+
+    // 1. Share target (text/title/url from another app)
+    const hasShare = params.get('text') || params.get('title');
+    if (hasShare) {
+      setTimeout(() => this.handleShareTarget(), 400);
+      return;
+    }
+
+    // 2. App shortcuts
+    const action = params.get('action');
+    if (action) {
+      window.history.replaceState({}, '', './index.html');
+      setTimeout(() => {
+        if (action === 'income') this.openModal('newIncomeModal');
+        else if (action === 'expense') this.openModal('newExpenseModal');
+      }, 500);
+    }
   }
 
   // ── PWA Splash Screen ──────────────────────────────────────
@@ -716,6 +739,8 @@ class BHApp {
     const totalAmount = parseFloat(document.getElementById('debtTotalAmount').value);
     const paidAmount = parseFloat(document.getElementById('debtPaidAmount').value) || 0;
     const dueDate = document.getElementById('debtDueDate').value || '';
+    const interestEl = document.getElementById('debtInterest');
+    const interest = interestEl ? (parseFloat(interestEl.value) || 0) : 0;
 
     if (!creditor || isNaN(totalAmount) || totalAmount <= 0) {
       this.showToast('⚠️ يرجى إدخال اسم صاحب الدين والمبلغ الأصلي');
@@ -727,7 +752,8 @@ class BHApp {
       creditor,
       totalAmount,
       paidAmount,
-      dueDate
+      dueDate,
+      interest
     });
 
     this.saveData();
@@ -736,6 +762,7 @@ class BHApp {
     this.showToast('✅ تم تسجيل الدين بنجاح');
     document.getElementById('debtTitle').value = '';
     document.getElementById('debtTotalAmount').value = '';
+    if (interestEl) interestEl.value = '';
   }
 
   payDebt(debtId) {
@@ -879,6 +906,7 @@ class BHApp {
     this.renderHeatmap();
     this.checkBadges();
     this.renderChallenges();
+    this.renderDebtPlanner();
   }
 
   // ── Month-over-Month Comparison ──────────────────────────────
@@ -1864,6 +1892,467 @@ class BHApp {
     }
   }
 
+
+  // ═══════════════════════════════════════════════════════════
+  //  DEBT PAYOFF PLANNER  (مخطط سداد الديون)
+  // ═══════════════════════════════════════════════════════════
+
+  // Build an optimized payoff plan for unpaid debts
+  // Strategy: "avalanche" (highest remaining first) or "snowball" (smallest first)
+  getDebtPlan(strategy = 'avalanche', monthlyBudget = 0) {
+    const debts = (this.data.debts || [])
+      .filter(d => d.totalAmount - d.paidAmount > 0.001)
+      .map(d => ({
+        id: d.id,
+        creditor: d.creditor,
+        remaining: Math.round((d.totalAmount - d.paidAmount) * 100) / 100,
+        dueDate: d.dueDate || '',
+        interest: Number(d.interest) || 0
+      }));
+
+    if (debts.length === 0) return { debts: [], order: [], months: 0, totalInterest: 0, monthlyNeeded: 0, totalDebt: 0 };
+
+    // Sort by strategy
+    const sorted = [...debts].sort((a, b) => {
+      if (strategy === 'snowball') {
+        if (a.remaining !== b.remaining) return a.remaining - b.remaining;
+      } else {
+        if (a.interest !== b.interest) return b.interest - a.interest;
+        if (a.remaining !== b.remaining) return b.remaining - a.remaining;
+      }
+      return (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
+    });
+
+    const totalDebt = sorted.reduce((s, d) => s + d.remaining, 0);
+    const budget = monthlyBudget > 0 ? monthlyBudget : totalDebt / 6;
+    const monthlyNeeded = Math.ceil(budget);
+
+    let monthIndex = 0;
+    let totalInterest = 0;
+    const order = [];
+    const work = sorted.map(d => ({ ...d }));
+
+    const MAX_MONTHS = 600;
+    while (work.length > 0 && monthIndex < MAX_MONTHS) {
+      let monthSpend = 0;
+      let paidSomething = false;
+
+      for (const debt of work) {
+        if (monthSpend >= budget) break;
+        const available = budget - monthSpend;
+        const pay = Math.min(debt.remaining, available);
+        if (pay <= 0) continue;
+
+        debt.remaining = Math.round((debt.remaining - pay) * 100) / 100;
+        monthSpend += pay;
+        paidSomething = true;
+
+        if (debt.remaining <= 0.001 && !debt.paidOffMonth) {
+          debt.paidOffMonth = monthIndex + 1;
+          order.push({ creditor: debt.creditor, month: monthIndex + 1, dueDate: debt.dueDate });
+        }
+      }
+
+      // Simple monthly interest accrual on remaining balances
+      if (monthIndex > 0) {
+        work.forEach(d => {
+          if (d.remaining > 0 && d.interest > 0) {
+            totalInterest += d.remaining * (d.interest / 100 / 12);
+          }
+        });
+      }
+
+      monthIndex++;
+      if (!paidSomething) break;
+    }
+
+    work.filter(d => d.remaining > 0.001).forEach(d => {
+      order.push({ creditor: d.creditor, month: null, remaining: d.remaining, dueDate: d.dueDate });
+    });
+
+    return {
+      debts: sorted,
+      order,
+      months: monthIndex,
+      totalInterest: Math.round(totalInterest),
+      monthlyNeeded,
+      totalDebt: Math.round(totalDebt),
+      strategy
+    };
+  }
+
+  // Estimate the date when a debt will be cleared
+  getPayoffDateLabel(months) {
+    if (!months) return '—';
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() + months, 1);
+    const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    return `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  renderDebtPlanner() {
+    const wrap = document.getElementById('debtPlannerWrap');
+    if (!wrap) return;
+
+    const unpaid = (this.data.debts || []).filter(d => d.totalAmount - d.paidAmount > 0.001);
+
+    if (unpaid.length === 0) {
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🎉</div>
+          مفيش ديون مسجلة — أنت حر! 💪
+        </div>
+      `;
+      return;
+    }
+
+    const strategy = this.data.settings.debtStrategy || 'avalanche';
+    const budget = this.data.settings.debtMonthlyBudget || 0;
+    const plan = this.getDebtPlan(strategy, budget);
+
+    const orderMap = {};
+    plan.order.forEach(o => { orderMap[o.creditor] = o; });
+
+    const rows = plan.debts.map((d, i) => {
+      const o = orderMap[d.creditor];
+      const isTarget = i === 0;
+      const badge = o && o.month
+        ? `<span class="dp-badge paid">✅ ينتهي ${this.getPayoffDateLabel(o.month)}</span>`
+        : `<span class="dp-badge late">⏳ محتاج وقت أكتر</span>`;
+
+      return `
+        <div class="dp-row ${isTarget ? 'target' : ''}">
+          <div class="dp-order">${i + 1}</div>
+          <div class="dp-info">
+            <div class="dp-name">${d.creditor} ${isTarget ? '<span class="dp-target-tag">الأولوية</span>' : ''}</div>
+            <div class="dp-meta">${d.dueDate ? `استحقاق ${d.dueDate}` : 'بدون تاريخ استحقاق'} ${d.interest > 0 ? ` • فايدة ${d.interest}%` : ''}</div>
+            ${badge}
+          </div>
+          <div class="dp-amount">${d.remaining.toLocaleString()}<small>ج.م</small></div>
+        </div>
+      `;
+    }).join('');
+
+    const timeline = plan.order.filter(o => o.month).map(o => `
+      <div class="dp-timeline-item">
+        <div class="dp-timeline-dot"></div>
+        <div class="dp-timeline-text">
+          <strong>${o.creditor}</strong> — خلصته في <span class="dp-tl-month">${this.getPayoffDateLabel(o.month)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    const maxDebt = Math.max(...plan.debts.map(d => d.remaining));
+    const bars = plan.debts.map(d => {
+      const pct = Math.max(6, Math.round((d.remaining / maxDebt) * 100));
+      return `
+        <div class="dp-bar-row">
+          <span class="dp-bar-label">${d.creditor}</span>
+          <div class="dp-bar-track">
+            <div class="dp-bar-fill" style="width:${pct}%"></div>
+          </div>
+          <span class="dp-bar-val">${d.remaining.toLocaleString()}</span>
+        </div>
+      `;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="dp-controls">
+        <div class="dp-strategies">
+          <button class="dp-strat ${strategy === 'avalanche' ? 'active' : ''}" onclick="app.setDebtStrategy('avalanche')">🏔️ الأعلى أولاً</button>
+          <button class="dp-strat ${strategy === 'snowball' ? 'active' : ''}" onclick="app.setDebtStrategy('snowball')">⛄ الأصغر أولاً</button>
+        </div>
+        <div class="dp-budget-row">
+          <label class="dp-budget-label">💰 اللي تقدر تسدده شهرياً:</label>
+          <input type="number" id="dpMonthlyBudget" class="form-control" value="${budget || plan.monthlyNeeded}" oninput="app.updateDebtBudget()">
+          <span class="dp-budget-unit">ج.م</span>
+        </div>
+      </div>
+
+      <div class="dp-summary">
+        <div class="dp-summary-item">
+          <span class="dp-sum-label">إجمالي الديون</span>
+          <span class="dp-sum-val val-danger">${plan.totalDebt.toLocaleString()} ج.م</span>
+        </div>
+        <div class="dp-summary-item">
+          <span class="dp-sum-label">تنهيها في</span>
+          <span class="dp-sum-val">${plan.months} شهر</span>
+        </div>
+        <div class="dp-summary-item">
+          <span class="dp-sum-label">آخر موعد</span>
+          <span class="dp-sum-val val-savings">${this.getPayoffDateLabel(plan.months)}</span>
+        </div>
+        <div class="dp-summary-item">
+          <span class="dp-sum-label">سداد شهري</span>
+          <span class="dp-sum-val val-outings">${plan.monthlyNeeded.toLocaleString()} ج.م</span>
+        </div>
+      </div>
+
+      <div class="dp-section-title">📋 ترتيب السداد الأفضل</div>
+      <div class="dp-rows">${rows}</div>
+
+      <div class="dp-section-title">📅 خط زمني الخلاص</div>
+      <div class="dp-timeline">${timeline || '<div class="dp-hint">زد المبلغ الشهري عشان الخطة تظهر</div>'}</div>
+
+      <div class="dp-section-title">📊 مقارنة الديون</div>
+      <div class="dp-bars">${bars}</div>
+
+      ${plan.totalInterest > 0 ? `<div class="dp-interest-note">💸 لو سددت كل الديون بالترتيب ده، الفايدة الإجمالية ≈ <strong>${plan.totalInterest.toLocaleString()} ج.م</strong></div>` : ''}
+
+      <button class="btn btn-primary btn-full" onclick="app.payDebtPlan()">⚡ سدد أول دين في الترتيب دلوقتي</button>
+    `;
+  }
+
+  setDebtStrategy(strategy) {
+    this.data.settings.debtStrategy = strategy;
+    this.saveData();
+    this.renderDebtPlanner();
+    this.showToast(strategy === 'avalanche' ? '🏔️ تم اختيار: الأعلى أولاً' : '⛄ تم اختيار: الأصغر أولاً');
+  }
+
+  updateDebtBudget() {
+    const el = document.getElementById('dpMonthlyBudget');
+    if (!el) return;
+    const val = parseFloat(el.value);
+    if (isNaN(val) || val < 0) return;
+    this.data.settings.debtMonthlyBudget = val;
+    this.saveData();
+    const wrap = document.getElementById('debtPlannerWrap');
+    if (wrap) {
+      const wasBudget = document.activeElement === el;
+      this.renderDebtPlanner();
+      if (wasBudget) {
+        const next = document.getElementById('dpMonthlyBudget');
+        if (next) { next.focus(); next.setSelectionRange(next.value.length, next.value.length); }
+      }
+    }
+  }
+
+  // Pay the first debt in the plan using the current spendable balance
+  payDebtPlan() {
+    const strategy = this.data.settings.debtStrategy || 'avalanche';
+    const plan = this.getDebtPlan(strategy, this.data.settings.debtMonthlyBudget || 0);
+    if (plan.debts.length === 0) {
+      this.showToast('🎉 مفيش ديون متبقية');
+      return;
+    }
+    this.payDebt(plan.debts[0].id);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  SHARE TARGET  (شارك → BH)
+  //  Parse shared text like "50 بنزين" into an expense
+  // ═══════════════════════════════════════════════════════════
+
+  // Keyword → category mapping (Arabic + English)
+  getCategoryKeywords() {
+    return {
+      'مواصلات': ['بنزين', 'بزين', 'مواصلات', 'سولار', 'تاكسي', 'أوبر', 'uber', 'petrol', 'fuel', 'ذهاب', 'راجعة', 'تذكرة'],
+      'أكل': ['اكل', 'أكل', 'سناكس', 'قهوة', 'شاي', 'فول', 'عشا', 'غدا', 'ساندوتش', 'عصير', 'وجبة', 'food', 'مطعم', 'بيتزا', 'برجر', 'كول', 'وجبة'],
+      'خروجة': ['خروجه', 'خروج', 'سهرة', 'سينما', 'movic', 'movie', 'حفل', 'bara'],
+      'سما': ['سما', 'سيجارة', 'سجائر', 'تبغ', 'cigarette'],
+      'شغل': ['صيانه', 'صيانة', 'اطارات', 'إطارات', 'زيت', 'قطع', 'قطع غيار', 'maintenance', 'اطار'],
+      'موبايل/إنترنت': ['موبايل', 'نت', 'انترنت', 'إنترنت', 'شحن', 'فودافون', 'أورانج', 'etisalat', 'we', 'espresso'],
+      'ديون': ['دين', 'سداد', 'قسط', 'installment'],
+      'أخرى': ['']
+    };
+  }
+
+  // Parse shared text → { amount, category, note, type }
+  parseSharedText(raw) {
+    const text = (raw || '').trim();
+    if (!text) return null;
+
+    // ── 1. Find the amount ──
+    // Look for "number + currency" or "currency + number"
+    const amountPatterns = [
+      /(\d+(?:[.,]\d+)?)\s*(?:ج\.?\s*م|جنيه|egy|£|\$|لير|ريال|دولار)?/,
+      /(?:ج\.?\s*م|جنيه|£|\$)\s*(\d+(?:[.,]\d+)?)/
+    ];
+
+    let amount = null;
+    for (const re of amountPatterns) {
+      const m = text.match(re);
+      if (m) {
+        const v = parseFloat(String(m[1]).replace(/,/g, ''));
+        if (!isNaN(v) && v > 0) { amount = v; break; }
+      }
+    }
+    if (!amount) return null;
+
+    // ── 2. Detect category from keywords ──
+    const lower = text.toLowerCase();
+    const kw = this.getCategoryKeywords();
+    let category = 'أخرى';
+    let bestLen = 0;
+
+    for (const [cat, words] of Object.entries(kw)) {
+      for (const w of words) {
+        if (!w) continue;
+        if (lower.includes(w.toLowerCase()) && w.length > bestLen) {
+          bestLen = w.length;
+          category = cat;
+        }
+      }
+    }
+
+    // ── 3. Detect income keywords ──
+    const incomeWords = ['قبض', 'دخل', 'ايراد', 'أرباح', 'ربح', 'استلام', 'تحويل', 'payout', 'income', 'bonus', 'بونص'];
+    const isIncome = incomeWords.some(w => lower.includes(w.toLowerCase()));
+    const isExpense = !isIncome;
+
+    // ── 4. Clean note (strip the number + matched keyword) ──
+    let note = text.replace(amountPatterns[0], '').trim();
+    note = note.replace(/^[\s\-–—:،,]+|[\s\-–—:،,]+$/g, '');
+    for (const [cat, words] of Object.entries(kw)) {
+      for (const w of words) {
+        if (w && note.toLowerCase().includes(w.toLowerCase())) {
+          note = note.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').trim();
+        }
+      }
+    }
+    for (const w of incomeWords) {
+      if (note.toLowerCase().includes(w.toLowerCase())) {
+        note = note.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').trim();
+      }
+    }
+    note = note.replace(/^[\s\-–—:،,]+|[\s\-–—:،,]+$/g, '');
+    if (!note) note = 'مشاركة من تطبيق آخر';
+
+    return {
+      amount: Math.round(amount * 100) / 100,
+      category: isExpense ? category : 'طلبات',
+      note: note.slice(0, 60),
+      type: isIncome ? 'income' : 'expense',
+      raw: text
+    };
+  }
+
+  // Handle a share intent (text + title + url from the URL params)
+  handleShareTarget() {
+    const params = new URLSearchParams(window.location.search);
+    const text = params.get('text') || params.get('title') || '';
+    const url = params.get('url') || '';
+    const combined = [text, url].filter(Boolean).join(' ').trim();
+
+    // Clean up the URL params so a refresh doesn't re-trigger
+    if (combined) {
+      window.history.replaceState({}, '', './index.html');
+    }
+
+    if (!combined) return;
+
+    const parsed = this.parseSharedText(combined);
+    if (!parsed) {
+      this.showToast('⚠️ مقدرش أفهم المبلغ من النص ده — جرّب تكتب رقم مثل "50 بنزين"', 'error');
+      return;
+    }
+
+    // Show a confirmation modal with the parsed data
+    this.openSharePreview(parsed);
+  }
+
+  // Preview modal for a parsed shared entry
+  openSharePreview(parsed) {
+    const existing = document.getElementById('sharePreviewModal');
+    if (existing) existing.remove();
+
+    const isIncome = parsed.type === 'income';
+    const el = document.createElement('div');
+    el.id = 'sharePreviewModal';
+    el.className = 'modal-overlay active';
+    el.innerHTML = `
+      <div class="modal-container">
+        <div class="modal-header">
+          <span class="modal-title">📥 ${isIncome ? 'قبض' : 'مصروف'} من مشاركة</span>
+          <button class="close-btn" onclick="document.getElementById('sharePreviewModal').remove()">✕</button>
+        </div>
+
+        <div class="share-raw">${parsed.raw.replace(/[<>&]/g, '')}</div>
+
+        <form onsubmit="app.confirmSharedEntry(event)">
+          <div class="form-group">
+            <label class="form-label">المبلغ (ج.م)</label>
+            <input type="number" id="shareAmount" class="form-control" value="${parsed.amount}" step="0.01" required>
+          </div>
+
+          ${isIncome ? '' : `
+          <div class="form-group">
+            <label class="form-label">نوع المصروف</label>
+            <select id="shareCategory" class="form-control">
+              ${['أكل','مواصلات','خروجة','سما','موبايل/إنترنت','شغل','ديون','أخرى'].map(c =>
+                `<option value="${c}" ${c === parsed.category ? 'selected' : ''}>${c}</option>`
+              ).join('')}
+            </select>
+          </div>`}
+
+          <div class="form-group">
+            <label class="form-label">ملاحظة</label>
+            <input type="text" id="shareNote" class="form-control" value="${parsed.note.replace(/"/g, '&quot;')}">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">التاريخ</label>
+            <input type="date" id="shareDate" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+
+          <button type="submit" class="btn ${isIncome ? 'btn-savings' : 'btn-danger'} btn-full">
+            ✅ تأكيد الحفظ
+          </button>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(el);
+
+    this.showToast(`📥 تم قراءة المبلغ: ${parsed.amount} ج.م`, 'info');
+  }
+
+  // Save the confirmed shared entry
+  confirmSharedEntry(e) {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('shareAmount').value);
+    const date = document.getElementById('shareDate').value || new Date().toISOString().split('T')[0];
+    const note = document.getElementById('shareNote').value || '';
+    const catEl = document.getElementById('shareCategory');
+    const category = catEl ? catEl.value : 'طلبات';
+
+    if (isNaN(amount) || amount <= 0) {
+      this.showToast('⚠️ مبلغ غير صحيح');
+      return;
+    }
+
+    const modal = document.getElementById('sharePreviewModal');
+    const isIncome = !catEl; // no category select → it was an income
+
+    if (isIncome) {
+      // Save as income with the standard split
+      const sRatio = this.data.settings.savingsRatio / 100;
+      const eRatio = this.data.settings.essentialsRatio / 100;
+      const oRatio = this.data.settings.outingsRatio / 100;
+      const savingsAmt = Math.round(amount * sRatio);
+      const essentialsAmt = Math.round(amount * eRatio);
+      const outingsAmt = Math.round(amount * oRatio);
+
+      this.data.balances.reservedSavings += savingsAmt;
+      this.data.balances.spendableBalance += (essentialsAmt + outingsAmt);
+      this.data.incomes.unshift({
+        id: 'inc_' + Date.now(),
+        amount, savingsAmt, essentialsAmt, outingsAmt,
+        date, source: 'طلبات', notes: note
+      });
+    } else {
+      this.data.balances.spendableBalance -= amount;
+      this.data.expenses.unshift({
+        id: 'exp_' + Date.now(),
+        amount, category, note, date
+      });
+    }
+
+    this.saveData();
+    if (modal) modal.remove();
+    this.renderAll();
+    this.showToast(`✅ تم حفظ ${amount} ج.م بنجاح`, 'success');
+  }
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }
   get GITHUB_RAW()  { return 'https://raw.githubusercontent.com/mhmoudmohmed269-cmd/-bh/main'; }
