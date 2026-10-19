@@ -240,6 +240,42 @@
               </div>
             </div>
 
+            <!-- Shift start time & date (for the work heat map) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <div class="form-group">
+                <label class="form-label">🕐 بداية الشفت (الساعة)</label>
+                <select id="shiftStartHour" class="form-control">
+                  <option value="6">6 الصبح</option>
+                  <option value="7">7 الصبح</option>
+                  <option value="8">8 الصبح</option>
+                  <option value="9">9 الصبح</option>
+                  <option value="10">10 الصبح</option>
+                  <option value="11">11 الصبح</option>
+                  <option value="12">12 الضهر</option>
+                  <option value="13">1 بعد الضهر</option>
+                  <option value="14">2 بعد الضهر</option>
+                  <option value="15">3 بعد الضهر</option>
+                  <option value="16">4 العصر</option>
+                  <option value="17">5 العصر</option>
+                  <option value="18">6 المغرب</option>
+                  <option value="19">7 المغرب</option>
+                  <option value="20">8 بالليل</option>
+                  <option value="21">9 بالليل</option>
+                  <option value="22">10 بالليل</option>
+                  <option value="23">11 بالليل</option>
+                  <option value="0">12 بالليل</option>
+                  <option value="1">1 الفجر</option>
+                  <option value="2">2 الفجر</option>
+                  <option value="3">3 الفجر</option>
+                  <option value="4">4 الفجر</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">📅 تاريخ الوردية</label>
+                <input type="date" id="shiftDate" class="form-control">
+              </div>
+            </div>
+
             <!-- Smart Shift Efficiency Metrics Grid -->
             <div class="stats-grid" style="margin-bottom: 12px;">
               <div class="stat-box">
@@ -272,6 +308,19 @@
             <span class="card-title"><span class="card-icon">💵</span> سجل القبض والدخل</span>
           </div>
           <div id="incomeHistoryList" class="history-list"></div>
+        </div>
+
+        <!-- 🗺️ Work Heatmap (خريطة شغلك) -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🗺️</span> خريطة شغلك</span>
+            <span class="sub-balance-label">أيام × ساعات</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+            بتوريك إمتى بيشتغل وإمتى بتكسب أكتر — عشان تخطّط شغلك صح.
+          </p>
+          <div id="heatmapWrap"></div>
+          <div id="heatmapStats" class="heat-stats"></div>
         </div>
 
       </section>
@@ -334,7 +383,30 @@
 
       </section>
 
-      <!-- ================= 5. MORE / TOOLS VIEW ================= -->
+      <!-- ================= 5. CHALLENGES & BADGES VIEW ================= -->
+      <section id="challengesView" class="view-page">
+
+        <!-- Challenges -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🎯</span> التحديات</span>
+            <span class="sub-balance-label">فعّل اللي يناسبك</span>
+          </div>
+          <div id="challengesList" class="challenge-list"></div>
+        </div>
+
+        <!-- Badges -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🏅</span> الشارات</span>
+            <span class="streak-badge" id="badgeCounter">0 / 0</span>
+          </div>
+          <div id="badgesGrid" class="badges-grid"></div>
+        </div>
+
+      </section>
+
+      <!-- ================= 6. MORE / TOOLS VIEW ================= -->
       <section id="moreView" class="view-page">
         
         <!-- "Can I Spend?" Tool -->
@@ -597,6 +669,10 @@
       <div class="nav-item" onclick="app.switchTab('goalsView', this)">
         <span class="nav-icon">🎯</span>
         <span>الأهداف</span>
+      </div>
+      <div class="nav-item" onclick="app.switchTab('challengesView', this)">
+        <span class="nav-icon">🏆</span>
+        <span>التحديات</span>
       </div>
       <div class="nav-item" onclick="app.switchTab('moreView', this)">
         <span class="nav-icon">⚙️</span>

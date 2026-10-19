@@ -25,7 +25,9 @@ class BHApp {
         weeklyOutingsBudget: 300,
         lastSavingsWithdrawalDate: today,
         savingsStreakDays: 0,
-        bigNumbersMode: false
+        bigNumbersMode: false,
+        challenges: {},
+        badges: {}
       },
       balances: {
         reservedSavings: 0,
@@ -44,6 +46,7 @@ class BHApp {
       ],
       debts: [],
       riderShifts: [],
+      workSessions: [],
       pendingIncomes: []
     };
   }
@@ -55,7 +58,12 @@ class BHApp {
       if (!raw) return this.getDefaultData();
       const parsed = JSON.parse(raw);
       // Merge with defaults in case of missing keys
-      return { ...this.getDefaultData(), ...parsed, pendingIncomes: parsed.pendingIncomes || [] };
+      const merged = { ...this.getDefaultData(), ...parsed, pendingIncomes: parsed.pendingIncomes || [] };
+      merged.workSessions = parsed.workSessions || [];
+      merged.settings = { ...this.getDefaultData().settings, ...(parsed.settings || {}) };
+      merged.settings.challenges = merged.settings.challenges || {};
+      merged.settings.badges = merged.settings.badges || {};
+      return merged;
     } catch (e) {
       console.error('Error loading LocalStorage data', e);
       return this.getDefaultData();
@@ -76,6 +84,7 @@ class BHApp {
   init() {
     this.applyBigNumbersMode();
     this.updateStreakCount();
+    this.pruneWorkSessions();
     this.renderAll();
     this.calculateShiftNet();
     this.checkDebtDueNotifications();
@@ -166,7 +175,7 @@ class BHApp {
   // Set default dates to today
   initDateInputs() {
     const today = new Date().toISOString().split('T')[0];
-    ['incomeDate', 'expenseDate'].forEach(id => {
+    ['incomeDate', 'expenseDate', 'shiftDate'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = today;
     });
@@ -588,13 +597,36 @@ class BHApp {
       return;
     }
 
+    // ── Save the shift as a work session (for the heat map) ──
+    const orders = parseFloat(document.getElementById('shiftOrders').value) || 0;
+    const rate = parseFloat(document.getElementById('shiftRate').value) || 0;
+    const bonus = parseFloat(document.getElementById('shiftBonus').value) || 0;
+    const tips = parseFloat(document.getElementById('shiftTips').value) || 0;
+    const expenses = parseFloat(document.getElementById('shiftExpenses').value) || 0;
+    const hours = parseFloat(document.getElementById('shiftHours').value) || 0;
+    const km = parseFloat(document.getElementById('shiftKm').value) || 0;
+    const hour = parseInt(document.getElementById('shiftStartHour').value, 10);
+    const shiftDate = document.getElementById('shiftDate').value || new Date().toISOString().split('T')[0];
+
+    if (!this.data.workSessions) this.data.workSessions = [];
+    this.data.workSessions.unshift({
+      id: 'ws_' + Date.now(),
+      date: shiftDate,
+      hour: isNaN(hour) ? 12 : hour,
+      orders, rate, bonus, tips, expenses, hours, km,
+      net,
+      createdAt: Date.now()
+    });
+    this.saveData();
+
     // Pre-fill Income Modal with shift net
     document.getElementById('incomeAmount').value = net;
     document.getElementById('incomeSource').value = 'طلبات';
-    const orders = document.getElementById('shiftOrders').value;
     document.getElementById('incomeNote').value = `صافي وردية دليفري (${orders} أوردر)`;
+    document.getElementById('incomeDate').value = shiftDate;
 
     this.openModal('newIncomeModal');
+    this.renderAll();
   }
 
   // Outings Weekly Spent Calculation
@@ -818,6 +850,17 @@ class BHApp {
     }
   }
 
+  // Keep only the last 90 days of work sessions (keeps the heat map meaningful)
+  pruneWorkSessions() {
+    if (!this.data.workSessions) return;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffKey = cutoff.toISOString().split('T')[0];
+    const before = this.data.workSessions.length;
+    this.data.workSessions = this.data.workSessions.filter(w => w.date >= cutoffKey);
+    if (this.data.workSessions.length !== before) this.saveData();
+  }
+
   // Render Master Logic
   renderAll() {
     this.renderBalances();
@@ -833,6 +876,9 @@ class BHApp {
     this.renderDebts();
     this.calculateFutureSimulation();
     this.renderMonthComparison();
+    this.renderHeatmap();
+    this.checkBadges();
+    this.renderChallenges();
   }
 
   // ── Month-over-Month Comparison ──────────────────────────────
@@ -1442,9 +1488,382 @@ class BHApp {
     });
   }
 
-  // ═══════════════════════════════════════════
-  // GitHub Update System
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  //  CHALLENGES & BADGES  (نظام التحديات والشارات)
+  // ═══════════════════════════════════════════════════════════
+
+  getChallenges() {
+    const self = this;
+    return [
+      {
+        id: 'ch_streak30', icon: '🔥',
+        title: '30 يوم بدون لمس التحويش',
+        desc: 'متسحبش ولا جنيه من التحويش لمدة 30 يوم ورا بعض.',
+        target: 30, unit: 'يوم',
+        progress: () => Math.min(30, self.data.settings.savingsStreakDays || 0)
+      },
+      {
+        id: 'ch_save5k', icon: '🏦',
+        title: 'اجمع 5,000 تحويش',
+        desc: 'خلي رصيد التحويش يوصل 5,000 ج.م.',
+        target: 5000, unit: 'ج.م',
+        progress: () => Math.min(5000, Math.round(self.data.balances.reservedSavings))
+      },
+      {
+        id: 'ch_10days', icon: '📅',
+        title: '10 أيام متتالية فيها قبض',
+        desc: 'سجّل قبض كل يوم لمدة 10 أيام ورا بعض.',
+        target: 10, unit: 'يوم',
+        progress: () => Math.min(10, self.calcIncomeStreak())
+      },
+      {
+        id: 'ch_noouting', icon: '🚫',
+        title: 'أسبوع بدون خروجات',
+        desc: '7 أيام متتالية من غير أي مصروف خروجات أو سما.',
+        target: 7, unit: 'يوم',
+        progress: () => Math.min(7, self.calcNoOutingStreak())
+      },
+      {
+        id: 'ch_income10k', icon: '💎',
+        title: 'دخل 10,000 في الشهر',
+        desc: 'اجمع 10,000 ج.م قبض خلال الشهر الحالي.',
+        target: 10000, unit: 'ج.م',
+        progress: () => Math.min(10000, self.calcMonthIncome())
+      },
+      {
+        id: 'ch_shift10', icon: '🚴',
+        title: '10 ورديات مسجلة',
+        desc: 'سجّل ورديات في حاسبة الكفاءة عشان تاخد إحصائياتك.',
+        target: 10, unit: 'وردية',
+        progress: () => Math.min(10, (self.data.workSessions || []).length)
+      },
+      {
+        id: 'ch_debtfree', icon: '🧾',
+        title: 'تخلص من كل الديون',
+        desc: 'سدّد كل الديون المسجلة بالكامل.',
+        target: 1, unit: 'دين',
+        progress: () => {
+          const debts = self.data.debts || [];
+          if (debts.length === 0) return 0;
+          return debts.every(d => d.paidAmount >= d.totalAmount) ? 1 : 0;
+        }
+      },
+      {
+        id: 'ch_goal', icon: '🎯',
+        title: 'حقق هدف مالي',
+        desc: 'وصلت لأحد أهدافك المالية بالكامل.',
+        target: 1, unit: 'هدف',
+        progress: () => {
+          const goals = self.data.goals || [];
+          return goals.some(g => g.currentAmount >= g.targetAmount && g.targetAmount > 0) ? 1 : 0;
+        }
+      }
+    ];
+  }
+
+  // Consecutive days (ending today) with at least one recorded income
+  calcIncomeStreak() {
+    const dates = new Set((this.data.incomes || []).map(i => i.date));
+    let streak = 0;
+    const d = new Date();
+    for (let i = 0; i < 400; i++) {
+      const key = d.toISOString().split('T')[0];
+      if (dates.has(key)) {
+        streak++;
+        d.setDate(d.getDate() - 1);
+      } else if (i === 0) {
+        d.setDate(d.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  // Consecutive days (ending today) with no outings / smoking expenses
+  calcNoOutingStreak() {
+    const dates = new Set(
+      (this.data.expenses || [])
+        .filter(e => e.category === 'خروجة' || e.category === 'سما')
+        .map(e => e.date)
+    );
+    let streak = 0;
+    const d = new Date();
+    for (let i = 0; i < 400; i++) {
+      const key = d.toISOString().split('T')[0];
+      if (dates.has(key)) break;
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  }
+
+  // Total income in the current month
+  calcMonthIncome() {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    return Math.round(
+      (this.data.incomes || [])
+        .filter(i => {
+          const d = new Date(i.date);
+          return d.getFullYear() === y && d.getMonth() === m;
+        })
+        .reduce((s, i) => s + (i.amount || 0), 0)
+    );
+  }
+
+  getBadges() {
+    const self = this;
+    const earnedMap = this.data.settings.badges || {};
+
+    const defs = [
+      { id: 'bd_first_income', icon: '🎉', title: 'أول قبض', desc: 'سجّلت أول دخل ليك', check: () => (self.data.incomes || []).length >= 1 },
+      { id: 'bd_10_incomes', icon: '💵', title: '10 قبوض', desc: 'سجّلت 10 عمليات قبض', check: () => (self.data.incomes || []).length >= 10 },
+      { id: 'bd_50_incomes', icon: '💎', title: 'محترف', desc: 'سجّلت 50 عملية قبض', check: () => (self.data.incomes || []).length >= 50 },
+      { id: 'bd_100_incomes', icon: '👑', title: 'أسطورة', desc: 'سجّلت 100 عملية قبض', check: () => (self.data.incomes || []).length >= 100 },
+      { id: 'bd_sav_1k', icon: '🔒', title: 'أول 1000', desc: 'جمّعت 1000 ج.م تحويش', check: () => self.data.balances.reservedSavings >= 1000 },
+      { id: 'bd_sav_5k', icon: '🏦', title: '5000 محفوظة', desc: 'جمّعت 5000 ج.م تحويش', check: () => self.data.balances.reservedSavings >= 5000 },
+      { id: 'bd_sav_10k', icon: '💰', title: 'عشرة آلاف', desc: 'جمّعت 10,000 ج.م تحويش', check: () => self.data.balances.reservedSavings >= 10000 },
+      { id: 'bd_streak_3', icon: '✨', title: '3 أيام تماسك', desc: '3 أيام بدون لمس التحويش', check: () => (self.data.settings.savingsStreakDays || 0) >= 3 },
+      { id: 'bd_streak_7', icon: '🔥', title: 'أسبوع كامل', desc: '7 أيام بدون لمس التحويش', check: () => (self.data.settings.savingsStreakDays || 0) >= 7 },
+      { id: 'bd_streak_30', icon: '🏆', title: 'شهر كامل', desc: '30 يوم بدون لمس التحويش', check: () => (self.data.settings.savingsStreakDays || 0) >= 30 },
+      { id: 'bd_streak_100', icon: '👑', title: '100 يوم', desc: '100 يوم بدون لمس التحويش', check: () => (self.data.settings.savingsStreakDays || 0) >= 100 },
+      { id: 'bd_first_expense', icon: '💸', title: 'أول مصروف', desc: 'سجّلت أول مصروف ليك', check: () => (self.data.expenses || []).length >= 1 },
+      { id: 'bd_income_streak_7', icon: '📅', title: 'أسبوع نشط', desc: '7 أيام متتالية فيها قبض', check: () => self.calcIncomeStreak() >= 7 },
+      { id: 'bd_no_outing_7', icon: '🚫', title: 'صفر خروجات', desc: 'أسبوع كامل بدون خروجات', check: () => self.calcNoOutingStreak() >= 7 },
+      { id: 'bd_goal_done', icon: '🎯', title: 'هدف محقق', desc: 'حققّت هدف مالي بالكامل', check: () => (self.data.goals || []).some(g => g.currentAmount >= g.targetAmount && g.targetAmount > 0) },
+      { id: 'bd_debt_free', icon: '🧾', title: 'خالص من الديون', desc: 'سدّدت كل الديون', check: () => { const d = self.data.debts || []; return d.length > 0 && d.every(x => x.paidAmount >= x.totalAmount); } },
+      { id: 'bd_shift_10', icon: '🚴', title: '10 ورديات', desc: 'سجّلت 10 ورديات', check: () => (self.data.workSessions || []).length >= 10 },
+      { id: 'bd_early_bird', icon: '🌅', title: 'الصبحي', desc: 'سجّلت وردية قبل 10 الصبح', check: () => (self.data.workSessions || []).some(w => (w.hour || 12) < 10) },
+      { id: 'bd_night_owl', icon: '🌙', title: 'الليلي', desc: 'سجّلت وردية بعد 8 بالليل', check: () => (self.data.workSessions || []).some(w => (w.hour || 12) >= 20) }
+    ];
+
+    return defs.map(b => ({ ...b, earned: !!earnedMap[b.id] }));
+  }
+
+  checkBadges() {
+    if (!this.data.settings.badges) this.data.settings.badges = {};
+    const newly = [];
+    this.getBadges().forEach(b => {
+      if (!b.earned && b.check()) {
+        this.data.settings.badges[b.id] = Date.now();
+        newly.push(b);
+      }
+    });
+    if (newly.length > 0) {
+      this.saveData();
+      newly.forEach((b, i) => {
+        setTimeout(() => this.celebrateBadge(b), i * 700);
+      });
+    }
+    return newly;
+  }
+
+  celebrateBadge(badge) {
+    const el = document.createElement('div');
+    el.className = 'badge-celebration';
+    el.innerHTML = `
+      <div class="badge-celeb-inner">
+        <div class="badge-celeb-icon">${badge.icon}</div>
+        <div class="badge-celeb-title">شارة جديدة!</div>
+        <div class="badge-celeb-name">${badge.title}</div>
+        <div class="badge-celeb-desc">${badge.desc}</div>
+      </div>
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => {
+      el.classList.add('hide');
+      setTimeout(() => el.remove(), 500);
+    }, 2400);
+  }
+
+  toggleChallenge(chId) {
+    if (!this.data.settings.challenges) this.data.settings.challenges = {};
+    if (this.data.settings.challenges[chId]) {
+      delete this.data.settings.challenges[chId];
+      this.showToast('↩️ تم إلغاء تفعيل التحدي');
+    } else {
+      this.data.settings.challenges[chId] = Date.now();
+      this.showToast('🎯 تم تفعيل التحدي — بالتوفيق!');
+    }
+    this.saveData();
+    this.renderAll();
+  }
+
+  renderChallenges() {
+    const list = document.getElementById('challengesList');
+    if (!list) return;
+
+    const active = this.data.settings.challenges || {};
+    const challenges = this.getChallenges();
+
+    list.innerHTML = challenges.map(c => {
+      const isActive = !!active[c.id];
+      const val = c.progress();
+      const pct = Math.min(100, Math.round((val / c.target) * 100));
+      const done = val >= c.target;
+      const isMoney = c.unit === 'ج.م';
+
+      return `
+        <div class="challenge-item ${done ? 'done' : ''} ${isActive ? 'active' : ''}">
+          <div class="challenge-head">
+            <div class="challenge-icon">${c.icon}</div>
+            <div class="challenge-info">
+              <div class="challenge-title">${c.title}</div>
+              <div class="challenge-desc">${c.desc}</div>
+            </div>
+            <button class="challenge-toggle ${isActive ? 'on' : ''}" onclick="app.toggleChallenge('${c.id}')" title="${isActive ? 'إلغاء' : 'تفعيل'}">
+              ${isActive ? '✓' : '○'}
+            </button>
+          </div>
+          <div class="challenge-progress-row">
+            <div class="challenge-progress">
+              <div class="challenge-fill ${done ? 'complete' : ''}" style="width: ${pct}%"></div>
+            </div>
+            <span class="challenge-val">${isMoney ? val.toLocaleString() : val} / ${isMoney ? c.target.toLocaleString() : c.target} ${c.unit}</span>
+          </div>
+          ${done ? '<div class="challenge-done-badge">🎉 تم الإنجاز</div>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    const grid = document.getElementById('badgesGrid');
+    if (!grid) return;
+    const badges = this.getBadges();
+    const earnedCount = badges.filter(b => b.earned).length;
+
+    grid.innerHTML = badges.map(b => `
+      <div class="badge-item ${b.earned ? 'earned' : 'locked'}" title="${b.desc}">
+        <div class="badge-icon">${b.earned ? b.icon : '🔒'}</div>
+        <div class="badge-name">${b.title}</div>
+        ${b.earned ? '<div class="badge-check">✓</div>' : ''}
+      </div>
+    `).join('');
+
+    const counter = document.getElementById('badgeCounter');
+    if (counter) counter.textContent = `${earnedCount} / ${badges.length}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  WORK HEATMAP  (خريطة أيام وساعات الشغل)
+  // ═══════════════════════════════════════════════════════════
+
+  getHeatmapData() {
+    const DAY_KEYS = ['ي', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج']; // Sun..Sat
+    const DAY_FULL = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const BUCKETS = 6;
+
+    const grid = DAY_KEYS.map(() => new Array(BUCKETS).fill(0));
+    let total = 0;
+    let maxCell = 0;
+    let bestDay = { idx: -1, val: 0 };
+    let bestBucket = { idx: -1, val: 0 };
+
+    (this.data.workSessions || []).forEach(w => {
+      const d = new Date(w.date);
+      if (isNaN(d)) return;
+      const dayIdx = d.getDay();
+      const hour = Number(w.hour) || 0;
+      const bucket = Math.min(BUCKETS - 1, Math.max(0, Math.floor(hour / 4)));
+      const val = Number(w.net) || 0;
+
+      grid[dayIdx][bucket] += val;
+      total += val;
+      if (val > maxCell) maxCell = val;
+
+      const daySum = grid[dayIdx].reduce((s, v) => s + v, 0);
+      if (daySum > bestDay.val) bestDay = { idx: dayIdx, val: daySum };
+      if (val > bestBucket.val) bestBucket = { idx: bucket, val };
+    });
+
+    return { grid, DAY_KEYS, DAY_FULL, BUCKETS, total, maxCell, bestDay, bestBucket };
+  }
+
+  renderHeatmap() {
+    const wrap = document.getElementById('heatmapWrap');
+    if (!wrap) return;
+
+    const h = this.getHeatmapData();
+
+    if ((this.data.workSessions || []).length === 0) {
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🗺️</div>
+          سجّل وردياتك في حاسبة الكفاءة (صفحة القبض) عشان تشوف خريطة شغلك
+        </div>
+      `;
+      const stats = document.getElementById('heatmapStats');
+      if (stats) stats.innerHTML = '';
+      return;
+    }
+
+    const BUCKET_LABELS = ['12-4 فجر', '4-8 ص', '8-12 ظ', '12-4 م', '4-8 م', '8-12 ل'];
+
+    const header = `<div class="heat-cell heat-head heat-corner"></div>` +
+      BUCKET_LABELS.map(b => `<div class="heat-cell heat-head">${b}</div>`).join('');
+
+    const rows = h.DAY_KEYS.map((dayLetter, dayIdx) => {
+      const cells = h.grid[dayIdx].map((val, bIdx) => {
+        const ratio = h.maxCell > 0 ? val / h.maxCell : 0;
+        const level = val === 0 ? 0 : ratio > 0.75 ? 4 : ratio > 0.5 ? 3 : ratio > 0.25 ? 2 : 1;
+        const isBest = h.bestDay.idx === dayIdx && h.bestBucket.idx === bIdx && val > 0;
+        const title = `${h.DAY_FULL[dayIdx]} — ${BUCKET_LABELS[bIdx]}: ${val.toLocaleString()} ج.م`;
+        return `<div class="heat-cell lvl-${level} ${isBest ? 'best' : ''}" title="${title}">${val > 0 ? val.toLocaleString() : ''}</div>`;
+      }).join('');
+      const dayTotal = h.grid[dayIdx].reduce((s, v) => s + v, 0);
+      return `<div class="heat-cell heat-day ${h.bestDay.idx === dayIdx ? 'best' : ''}">${dayLetter}</div>${cells}<div class="heat-cell heat-total">${dayTotal > 0 ? dayTotal.toLocaleString() : ''}</div>`;
+    }).join('');
+
+    const legend = `
+      <div class="heat-legend">
+        <span class="heat-legend-title">الأقل</span>
+        <span class="heat-cell lvl-0"></span>
+        <span class="heat-cell lvl-1"></span>
+        <span class="heat-cell lvl-2"></span>
+        <span class="heat-cell lvl-3"></span>
+        <span class="heat-cell lvl-4"></span>
+        <span class="heat-legend-title">الأكثر</span>
+      </div>
+    `;
+
+    wrap.innerHTML = `<div class="heat-grid">${header}${rows}</div>${legend}`;
+
+    const stats = document.getElementById('heatmapStats');
+    if (stats) {
+      const BUCKET_FULL = ['من 12 لـ 4 الفجر', 'من 4 لـ 8 الصبح', 'من 8 لـ 12 الضهر', 'من 12 لـ 4 العصر', 'من 4 لـ 8 المغرب', 'من 8 لـ 12 بالليل'];
+      const totalShifts = (this.data.workSessions || []).length;
+      const avgShift = totalShifts > 0 ? Math.round(h.total / totalShifts) : 0;
+
+      stats.innerHTML = `
+        <div class="heat-stat">
+          <span class="heat-stat-label">💰 إجمالي الأرباح المسجلة</span>
+          <span class="heat-stat-val val-savings">${h.total.toLocaleString()} ج.م</span>
+        </div>
+        <div class="heat-stat">
+          <span class="heat-stat-label">🚴 عدد الورديات</span>
+          <span class="heat-stat-val val-spendable">${totalShifts}</span>
+        </div>
+        <div class="heat-stat">
+          <span class="heat-stat-label">📈 متوسط الوردية</span>
+          <span class="heat-stat-val">${avgShift.toLocaleString()} ج.م</span>
+        </div>
+        <div class="heat-stat">
+          <span class="heat-stat-label">🏆 أحسن يوم</span>
+          <span class="heat-stat-val val-outings">${h.bestDay.idx >= 0 ? h.DAY_FULL[h.bestDay.idx] : '—'}</span>
+        </div>
+        <div class="heat-stat">
+          <span class="heat-stat-label">⏰ أحسن وقت</span>
+          <span class="heat-stat-val val-outings">${h.bestBucket.idx >= 0 ? BUCKET_FULL[h.bestBucket.idx] : '—'}</span>
+        </div>
+        <div class="heat-tip">
+          💡 ${h.bestDay.idx >= 0
+            ? `أعلى دخل ليك بيكون ${h.DAY_FULL[h.bestDay.idx]} — ركّز شغلك عليه وطمّع أيامك كمان.`
+            : 'سجّل وردياتك عشان نعرف أحسن يوم وأحسن وقت عندك.'}
+        </div>
+      `;
+    }
+  }
+
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }
   get GITHUB_RAW()  { return 'https://raw.githubusercontent.com/mhmoudmohmed269-cmd/-bh/main'; }
