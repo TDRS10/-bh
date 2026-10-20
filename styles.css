@@ -2330,6 +2330,80 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
   border-radius: var(--r-ctrl);
 }
 
+/* ── Direct console links ── */
+.cloud-links {
+  background: rgba(0, 217, 255, 0.06);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--r-ctrl);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.cloud-links-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 9px;
+}
+
+.cloud-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 10px 11px;
+  margin-bottom: 6px;
+  text-decoration: none;
+  transition: var(--trans-fast);
+}
+
+.cloud-link:active {
+  background: rgba(0, 217, 255, 0.14);
+  transform: scale(0.99);
+}
+
+.cloud-link-num {
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  font-size: 0.68rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cloud-link strong {
+  display: block;
+  font-size: 0.8rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+.cloud-link small {
+  display: block;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.5;
+  direction: ltr;
+  text-align: left;
+}
+
+.cloud-links-foot {
+  font-size: 0.7rem;
+  color: var(--accent);
+  text-align: center;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
 /* ═══════════════════════════════════════════════════════════
    SHARE TARGET  (شارك → BH)
 ════════════════════════════════════════════════════════════ */

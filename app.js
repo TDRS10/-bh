@@ -257,6 +257,43 @@ class BHApp {
     }
   }
 
+  // Direct links to the exact Firebase console pages for THIS project
+  renderConsoleLinks() {
+    const cfg = window.BH_FIREBASE_CONFIG;
+    if (!cfg || !cfg.projectId) return '';
+
+    const pid = cfg.projectId;
+    const dbId = (cfg.databaseURL || '').split('//')[1] ? cfg.databaseURL.split('//')[1].split('.')[0] : pid + '-default-rtdb';
+
+    return `
+      <div class="cloud-links">
+        <div class="cloud-links-title">🔧 افتح الإعدادات الأول (3 كليكات):</div>
+        <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/auth/providers" target="_blank" rel="noopener">
+          <span class="cloud-link-num">1</span>
+          <span>
+            <strong>فعّل Anonymous</strong>
+            <small>Authentication → Sign-in method → Anonymous → Enable</small>
+          </span>
+        </a>
+        <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/authentication/settings" target="_blank" rel="noopener">
+          <span class="cloud-link-num">2</span>
+          <span>
+            <strong>ضيف الدومين</strong>
+            <small>Authorized domains → mhmoudmohmed269-cmd.github.io</small>
+          </span>
+        </a>
+        <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/database/${dbId}/rules" target="_blank" rel="noopener">
+          <span class="cloud-link-num">3</span>
+          <span>
+            <strong>حط الـ Rules</strong>
+            <small>Realtime Database → Rules (الصق القواعد من ملف firebase-config.js)</small>
+          </span>
+        </a>
+        <div class="cloud-links-foot">بعد ما تخلص الـ 3 خطوات، ارجع للتطبيق واضغط "دخول سريع".</div>
+      </div>
+    `;
+  }
+
   // Friendly Arabic message for common Firebase errors
   cloudErrorText(msg) {
     const m = (msg || '').toLowerCase();
@@ -366,6 +403,7 @@ class BHApp {
             <div class="cloud-status-sub">${this.cloudErrorText(st.lastError || '')}</div>
           </div>
         </div>
+        ${this.renderConsoleLinks()}
         <div class="cloud-actions">
           <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع</button>
           <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
