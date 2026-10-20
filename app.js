@@ -4,6 +4,8 @@
  */
 
 const STORAGE_KEY = 'BH_APP_DATA_V1';
+const SNAPSHOT_KEY = 'BH_APP_SNAPSHOTS';
+const BACKUP_TIME_KEY = 'BH_LAST_BACKUP_TIME';
 
 class BHApp {
   constructor() {
@@ -68,18 +70,249 @@ class BHApp {
       return merged;
     } catch (e) {
       console.error('Error loading LocalStorage data', e);
+      // 🔄 Auto-recover from the newest valid snapshot
+      const recovered = this.recoverFromSnapshot();
+      if (recovered) {
+        setTimeout(() => this.showToast('🔄 اتعطل تحميل البيانات — استرجعنا آخر نسخة سليمة تلقائياً', 'success'), 1200);
+        return recovered;
+      }
       return this.getDefaultData();
     }
   }
 
-  // Save State to LocalStorage
+  // Try to recover data from the rolling snapshots (corrupt / lost main data)
+  recoverFromSnapshot() {
+    const snaps = this.getSnapshots();
+    for (const s of snaps) {
+      try {
+        const parsed = JSON.parse(s.payload);
+        if (parsed && parsed.balances && Array.isArray(parsed.incomes)) {
+          console.log('Recovered data from snapshot');
+          return parsed;
+        }
+      } catch (e) { /* try the next one */ }
+    }
+    return null;
+  }
+
+  // Save State to LocalStorage (+ rolling auto-snapshots for safety)
   saveData() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+      this._saveSnapshot();
     } catch (e) {
       console.error('Error saving data to LocalStorage', e);
       this.showToast('⚠️ تعذر حفظ البيانات في الذاكرة المحلية');
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  DATA PROTECTION  (حماية البيانات)
+  // ═══════════════════════════════════════════════════════════
+
+  // Keep the last N snapshots so a corrupt/accidental state can be recovered
+  _saveSnapshot() {
+    try {
+      const snaps = this.getSnapshots();
+      // Skip if nothing changed since the last snapshot
+      const payload = JSON.stringify(this.data);
+      if (snaps.length && snaps[0].payload === payload) return;
+
+      snaps.unshift({
+        ts: Date.now(),
+        payload
+      });
+      while (snaps.length > 6) snaps.pop();
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snaps));
+    } catch (e) {
+      // Snapshots are best-effort — never block a normal save
+      console.warn('Snapshot failed:', e);
+    }
+  }
+
+  getSnapshots() {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Restore the data from one of the rolling snapshots
+  restoreSnapshot(index) {
+    const snaps = this.getSnapshots();
+    const snap = snaps[index];
+    if (!snap) {
+      this.showToast('⚠️ النسخة دي مش موجودة');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(snap.payload);
+      if (!parsed.balances || !parsed.incomes) throw new Error('invalid');
+      this.data = parsed;
+      this.saveData();
+      this.renderAll();
+      this.showToast('🎉 تم استرجاع النسخة الاحتياطية بنجاح!', 'success');
+    } catch (e) {
+      this.showToast('⚠️ النسخة دي تالفة — جرّب نسخة تانية', 'error');
+    }
+  }
+
+  // Download a backup file to the device (Downloads folder)
+  downloadBackup(silent) {
+    try {
+      const jsonStr = JSON.stringify(this.data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `BH_Backup_${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      localStorage.setItem(BACKUP_TIME_KEY, String(Date.now()));
+      if (!silent) this.showToast('📦 تم تحميل النسخة الاحتياطية — هتلاقيها في فولدر Downloads', 'success');
+      this.renderProtection();
+      return true;
+    } catch (e) {
+      console.error('Backup download failed:', e);
+      if (!silent) this.showToast('⚠️ فشل تحميل النسخة الاحتياطية', 'error');
+      return false;
+    }
+  }
+
+  // Auto-backup: download a copy every 3 days (and warn if too long)
+  autoBackupCheck() {
+    const last = parseInt(localStorage.getItem(BACKUP_TIME_KEY) || '0', 10);
+    const days = last ? Math.floor((Date.now() - last) / 86400000) : 999;
+
+    if (days >= 3) {
+      // Only auto-download when the page is visible and the user isn't in a hurry
+      this.downloadBackup(true);
+      this._autoBackupDone = true;
+    }
+    this._daysSinceBackup = days;
+  }
+
+  // Render the data protection card
+  renderProtection() {
+    const box = document.getElementById('protectionBox');
+    if (!box) return;
+
+    const snaps = this.getSnapshots();
+    const lastBackup = parseInt(localStorage.getItem(BACKUP_TIME_KEY) || '0', 10);
+    const daysSince = lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : null;
+
+    // Storage size
+    let sizeKB = 0;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY) || '';
+      sizeKB = Math.round((raw.length + (localStorage.getItem(SNAPSHOT_KEY) || '').length) / 1024);
+    } catch (e) { /* ignore */ }
+
+    // Health checks
+    const checks = [];
+    let health = 100;
+
+    if (daysSince === null) {
+      checks.push({ ok: false, text: 'لسه مفيش نسخة احتياطية محفوظة على الجهاز' });
+      health -= 40;
+    } else if (daysSince > 7) {
+      checks.push({ ok: false, text: `آخر نسخة احتياطية من ${daysSince} يوم — يفضل تعمل واحد جديد` });
+      health -= 25;
+    } else {
+      checks.push({ ok: true, text: `آخر نسخة احتياطية: من ${daysSince} ${daysSince === 0 ? 'يوم' : 'أيام'}` });
+    }
+
+    if (snaps.length > 0) {
+      checks.push({ ok: true, text: `${snaps.length} نسخة تلقائية محفوظة (استرجاع فوري لو حصل خطأ)` });
+    } else {
+      checks.push({ ok: false, text: 'مفيش نسخ تلقائية محفوظة' });
+      health -= 20;
+    }
+
+    // localStorage availability
+    let storageOk = true;
+    try {
+      localStorage.setItem('__test__', '1');
+      localStorage.removeItem('__test__');
+    } catch (e) {
+      storageOk = false;
+    }
+    if (!storageOk) {
+      checks.push({ ok: false, text: '⚠️ المتصفح بيمنع التخزين — البيانات مش هتتحفظ! (غالباً وضع التصفح الخاص)' });
+      health -= 60;
+    } else {
+      checks.push({ ok: true, text: 'التخزين شغال بشكل طبيعي' });
+    }
+
+    health = Math.max(0, health);
+    const healthColor = health >= 80 ? 'var(--savings)' : health >= 50 ? '#fbbf24' : 'var(--danger)';
+
+    // Snapshots list
+    const snapList = snaps.length > 0 ? `
+      <div class="prot-snapshots">
+        <div class="prot-sub-title">النسخ التلقائية المحفوظة</div>
+        ${snaps.map((s, i) => {
+          const d = new Date(s.ts);
+          const label = d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ' — ' +
+                        d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+          let summary = '';
+          try {
+            const p = JSON.parse(s.payload);
+            summary = `رصيد ${((p.balances.reservedSavings || 0) + (p.balances.spendableBalance || 0)).toLocaleString()} ج.م`;
+          } catch (e) { /* ignore */ }
+          return `
+            <div class="prot-snap-row">
+              <span class="prot-snap-info">
+                <strong>${label}</strong>
+                <small>${summary}</small>
+              </span>
+              <button class="btn btn-secondary btn-sm" onclick="app.restoreSnapshot(${i})">استرجاع</button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : '';
+
+    box.innerHTML = `
+      <div class="prot-health">
+        <div class="prot-health-ring" style="border-color: ${healthColor}">
+          <span style="color:${healthColor}">${health}%</span>
+        </div>
+        <div class="prot-health-text">
+          <div class="prot-health-title">حالة حماية بياناتك</div>
+          <div class="prot-health-sub">${health >= 80 ? '🟢 ممتاز — بياناتك محفوظة كويس' : health >= 50 ? '🟡 مقبول — بس اعمل نسخة احتياطية' : '🔴 خطر — بياناتك ممكن تضيع!'}</div>
+        </div>
+      </div>
+
+      <div class="prot-checks">
+        ${checks.map(c => `<div class="prot-check ${c.ok ? 'ok' : 'warn'}">${c.ok ? '✅' : '⚠️'} ${c.text}</div>`).join('')}
+      </div>
+
+      <div class="prot-actions">
+        <button class="btn btn-primary btn-sm" onclick="app.downloadBackup()">📦 نسخة احتياطية الآن</button>
+        <button class="btn btn-secondary btn-sm" onclick="app.exportData()">📤 تصدير (Backup)</button>
+      </div>
+
+      <div class="prot-size">💽 حجم البيانات المحفوظة: <strong>${sizeKB} كيلوبايت</strong></div>
+
+      ${snapList}
+    `;
+  }
+
+  // Ask before closing if there is unsaved work (protects against accidental loss)
+  installUnloadGuard() {
+    window.addEventListener('beforeunload', (e) => {
+      if (this._hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
   }
 
   // App Initialization
@@ -92,6 +325,9 @@ class BHApp {
     this.checkDebtDueNotifications();
     this.initSplash();
     this.handleLaunchIntent();
+    this.autoBackupCheck();
+    this.renderProtection();
+    this.installUnloadGuard();
   }
 
   // Handle ?action=income / ?action=expense shortcuts AND share target params
@@ -852,34 +1088,84 @@ class BHApp {
     a.download = `BH_Finance_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    localStorage.setItem(BACKUP_TIME_KEY, String(Date.now()));
     this.showToast('📦 تم تصدير النسخة الاحتياطية بنجاح');
+    this.renderProtection();
   }
 
   importData(event) {
     const file = event.target.files[0];
     if (!file) return;
+    const input = event.target;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const imported = JSON.parse(e.target.result);
-        if (imported.balances && imported.incomes) {
+        if (!imported.balances || !imported.incomes) {
+          this.showToast('⚠️ ملف البيانات غير صالح');
+          return;
+        }
+
+        // Offer merge vs replace — never silently wipe existing data
+        const curIncomes = (this.data.incomes || []).length;
+        const newIncomes = (imported.incomes || []).length;
+
+        const choice = confirm(
+          `📥 الملف فيه ${newIncomes} عملية قبض.\n\n` +
+          `✅ OK = دمج مع بياناتك الحالية (${curIncomes} قبض) — الأنسب\n` +
+          `❌ Cancel = استبدال كل البيانات بالملف`
+        );
+
+        if (choice) {
+          this.mergeImported(imported);
+          this.showToast('🎉 تم دمج البيانات بنجاح!', 'success');
+        } else {
           this.data = imported;
           this.saveData();
-          this.renderAll();
-          this.showToast('🎉 تم استعادة البيانات بنجاح!');
-        } else {
-          this.showToast('⚠️ ملف البيانات غير صالح');
+          this.showToast('🎉 تم استعادة البيانات بنجاح!', 'success');
         }
+
+        this.renderAll();
+        this.renderProtection();
       } catch (err) {
         this.showToast('⚠️ حدث خطأ أثناء قراءة الملف');
+      } finally {
+        input.value = '';
       }
     };
     reader.readAsText(file);
   }
 
+  // Merge imported data into the current data (keeps everything, dedupes by id)
+  mergeImported(imported) {
+    const mergeList = (cur, inc, key) => {
+      const seen = new Set((cur || []).map(x => x.id));
+      const add = (inc || []).filter(x => !x.id || !seen.has(x.id));
+      return [...add, ...(cur || [])];
+    };
+
+    this.data.incomes = mergeList(this.data.incomes, imported.incomes);
+    this.data.expenses = mergeList(this.data.expenses, imported.expenses);
+    this.data.goals = mergeList(this.data.goals, imported.goals);
+    this.data.debts = mergeList(this.data.debts, imported.debts);
+    this.data.pendingIncomes = mergeList(this.data.pendingIncomes, imported.pendingIncomes);
+    this.data.workSessions = mergeList(this.data.workSessions, imported.workSessions);
+    this.data.adjustments = mergeList(this.data.adjustments, imported.adjustments);
+
+    // Balances: take the newer/highest sensible values
+    this.data.balances = {
+      reservedSavings: Math.max(this.data.balances.reservedSavings || 0, imported.balances?.reservedSavings || 0),
+      spendableBalance: Math.max(this.data.balances.spendableBalance || 0, imported.balances?.spendableBalance || 0)
+    };
+
+    this.saveData();
+  }
+
   confirmResetData() {
     if (confirm('⚠️ هل أنت متأكد تماماً من تصفير وحذف جميع بيانات التطبيق؟ لا يمكن التراجع عن هذا الإجراء!')) {
+      // 🛡️ Keep a snapshot so the user can restore if it was a mistake
+      this._saveSnapshot();
       localStorage.removeItem(STORAGE_KEY);
       this.data = this.getDefaultData();
       this.saveData();

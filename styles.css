@@ -2076,6 +2076,136 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 }
 
 /* ═══════════════════════════════════════════════════════════
+   DATA PROTECTION  (حماية البيانات)
+════════════════════════════════════════════════════════════ */
+.prot-health {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.prot-health-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid var(--savings);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.prot-health-ring span {
+  font-family: var(--font-disp);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.prot-health-text { flex: 1; min-width: 0; }
+
+.prot-health-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 3px;
+}
+
+.prot-health-sub {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.prot-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.prot-check {
+  font-size: 0.74rem;
+  padding: 8px 10px;
+  border-radius: var(--r-ctrl);
+  line-height: 1.5;
+}
+
+.prot-check.ok {
+  background: rgba(0, 200, 122, 0.08);
+  border: 1px solid rgba(0, 200, 122, 0.22);
+  color: var(--text-secondary);
+}
+
+.prot-check.warn {
+  background: rgba(245, 158, 11, 0.09);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: #fcd34d;
+  font-weight: 600;
+}
+
+.prot-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.prot-size {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.prot-size strong { color: var(--text-secondary); }
+
+.prot-sub-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.prot-snapshots {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.prot-snap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+
+.prot-snap-info { flex: 1; min-width: 0; }
+
+.prot-snap-info strong {
+  display: block;
+  font-size: 0.75rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+.prot-snap-info small {
+  display: block;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════
    SHARE TARGET  (شارك → BH)
 ════════════════════════════════════════════════════════════ */
 .share-raw {
