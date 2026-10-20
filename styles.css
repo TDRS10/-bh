@@ -188,6 +188,54 @@ body {
   color: var(--accent);
 }
 
+/* ── Header balance chip (always visible) ── */
+.balance-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.16), rgba(0, 200, 122, 0.10));
+  border: 1px solid var(--border-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--trans-fast);
+  max-width: 130px;
+  overflow: hidden;
+}
+.balance-chip:active {
+  background: rgba(0, 217, 255, 0.24);
+  transform: scale(0.97);
+}
+
+.balance-chip-icon {
+  font-size: 0.78rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.balance-chip-val {
+  font-family: var(--font-disp);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Big numbers mode — enlarge the chip too */
+body.big-numbers-mode .balance-chip-val {
+  font-size: 1rem;
+}
+
+/* Tight screens: hide the streak badge, keep the balance chip */
+@media (max-width: 400px) {
+  .balance-chip { max-width: 105px; padding: 0 9px; }
+  .balance-chip-val { font-size: 0.76rem; }
+}
+
 /* ── Streak Badge ── */
 .streak-badge {
   font-family: var(--font-disp);

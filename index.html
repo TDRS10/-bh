@@ -39,6 +39,11 @@
         <div class="brand-title"><span>BH</span><span class="sub-title"> — إدارة الفلوس</span></div>
       </div>
       <div class="header-actions">
+        <!-- Always-visible balance chip (available on every tab) -->
+        <button class="balance-chip" onclick="app.switchTab('dashboardView')" title="رصيدك الحالي — اضغط للتفاصيل">
+          <span class="balance-chip-icon">💰</span>
+          <span class="balance-chip-val" id="headerBalanceVal">0</span>
+        </button>
         <div class="streak-badge" id="headerStreakBadge">🔥 0 أيام تحويش</div>
         <button class="icon-btn" onclick="app.toggleBigNumbers()" title="تكبير الأرقام (Big Numbers)">👁️</button>
         <button class="icon-btn" onclick="app.switchTab('moreView')" title="الإعدادات">⚙️</button>

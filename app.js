@@ -1036,6 +1036,10 @@ class BHApp {
     document.getElementById('totalBalanceVal').textContent = total.toLocaleString();
     document.getElementById('reservedSavingsVal').textContent = reserved.toLocaleString();
     document.getElementById('spendableBalanceVal').textContent = spendable.toLocaleString();
+
+    // Header balance chip — always visible on every tab
+    const headerVal = document.getElementById('headerBalanceVal');
+    if (headerVal) headerVal.textContent = total.toLocaleString();
   }
 
   renderOutingsWidget() {
