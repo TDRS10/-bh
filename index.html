@@ -47,6 +47,35 @@
         <div class="streak-badge" id="headerStreakBadge">🔥 0 أيام تحويش</div>
         <button class="icon-btn" onclick="app.toggleBigNumbers()" title="تكبير الأرقام (Big Numbers)">👁️</button>
         <button class="icon-btn" onclick="app.switchTab('moreView')" title="الإعدادات">⚙️</button>
+
+        <!-- User account avatar -->
+        <button class="user-avatar" id="userAvatarBtn" onclick="app.toggleUserMenu(event)" title="حسابي">
+          <img id="userAvatarImg" src="" alt="" style="display:none;" onerror="app.avatarFallback()">
+          <span id="userAvatarFallback" class="avatar-fallback">👤</span>
+        </button>
+      </div>
+
+      <!-- User dropdown menu -->
+      <div class="user-menu" id="userMenu">
+        <div class="user-menu-head">
+          <div class="user-menu-avatar">
+            <img id="menuAvatarImg" src="" alt="" style="display:none;" onerror="app.avatarFallback()">
+            <span id="menuAvatarFallback" class="avatar-fallback">👤</span>
+          </div>
+          <div class="user-menu-info">
+            <div class="user-menu-name" id="userMenuName">مستخدم مجهول</div>
+            <div class="user-menu-email" id="userMenuEmail">—</div>
+          </div>
+        </div>
+        <div class="user-menu-sync" id="userMenuSync">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="userMenuSyncText">غير متزامن</span>
+        </div>
+        <div class="user-menu-actions">
+          <button class="user-menu-btn" onclick="app.manualSync(); app.closeUserMenu();">🔄 مزامنة دلوقتي</button>
+          <button class="user-menu-btn" onclick="app.switchTab('moreView'); app.closeUserMenu();">⚙️ إعدادات المزامنة</button>
+          <button class="user-menu-btn danger" onclick="app.cloudSignOut(); app.closeUserMenu();">👋 تسجيل الخروج</button>
+        </div>
       </div>
     </header>
 

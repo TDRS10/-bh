@@ -31,7 +31,8 @@ class BHApp {
         savingsStreakDays: 0,
         bigNumbersMode: false,
         challenges: {},
-        badges: {}
+        badges: {},
+        welcomeSeen: false
       },
       balances: {
         reservedSavings: 0,
@@ -130,6 +131,7 @@ class BHApp {
       window.BHFirebase.onStatusChange((st) => {
         this._cloudState = st;
         this.renderCloudCard();
+        this.updateUserAvatar();
       });
 
       if (window.BHFirebase.getUser()) {
@@ -922,6 +924,19 @@ class BHApp {
     this.renderProtection();
     this.installUnloadGuard();
     this.initCloudSync();
+    this.updateUserAvatar();
+    this.maybeShowWelcome();
+
+    // Close the user menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('userMenu');
+      const btn = document.getElementById('userAvatarBtn');
+      if (menu && menu.classList.contains('open')) {
+        if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+          this.closeUserMenu();
+        }
+      }
+    });
   }
 
   // Handle ?action=income / ?action=expense shortcuts AND share target params
@@ -3442,6 +3457,178 @@ class BHApp {
         </div>
       </div>
     `).join('');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  USER ACCOUNT  (حساب المستخدم + صورة البروفايل)
+  // ═══════════════════════════════════════════════════════════
+
+  updateUserAvatar() {
+    const user = (typeof window.BHFirebase !== 'undefined') ? window.BHFirebase.getUser() : null;
+    const photo = (user && user.photoURL) ? user.photoURL : null;
+    const name = (user && (user.displayName || user.email)) || 'مستخدم مجهول';
+    const isAnon = !user || user.isAnonymous;
+
+    const img = document.getElementById('userAvatarImg');
+    const fb = document.getElementById('userAvatarFallback');
+    if (img && fb) {
+      if (photo) {
+        img.src = photo;
+        img.style.display = 'block';
+        fb.style.display = 'none';
+      } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+        fb.style.display = 'flex';
+        fb.textContent = isAnon ? '👤' : (name.charAt(0) || '👤').toUpperCase();
+      }
+    }
+
+    const mImg = document.getElementById('menuAvatarImg');
+    const mFb = document.getElementById('menuAvatarFallback');
+    if (mImg && mFb) {
+      if (photo) {
+        mImg.src = photo;
+        mImg.style.display = 'block';
+        mFb.style.display = 'none';
+      } else {
+        mImg.removeAttribute('src');
+        mImg.style.display = 'none';
+        mFb.style.display = 'flex';
+        mFb.textContent = isAnon ? '👤' : (name.charAt(0) || '👤').toUpperCase();
+      }
+    }
+
+    const mName = document.getElementById('userMenuName');
+    const mEmail = document.getElementById('userMenuEmail');
+    if (mName) mName.textContent = isAnon ? 'مستخدم مجهول' : name;
+    if (mEmail) mEmail.textContent = user && user.email ? user.email : (isAnon ? 'هذا الجهاز بس' : '—');
+
+    const st = (typeof window.BHFirebase !== 'undefined') ? window.BHFirebase.getState() : null;
+    const dot = document.getElementById('syncDot');
+    const syncTxt = document.getElementById('userMenuSyncText');
+    if (dot && syncTxt && st) {
+      const map = {
+        'synced': ['ok', 'متزامن مع السحابة'],
+        'syncing': ['busy', 'جاري المزامنة...'],
+        'offline': ['warn', 'مفيش نت'],
+        'error': ['bad', 'مشكلة في المزامنة'],
+        'signed-out': ['idle', 'غير مسجّل دخول'],
+        'not-configured': ['idle', 'المزامنة مش مفعّلة'],
+        'sdk-missing': ['warn', 'مكتبة Firebase مش محمّلة']
+      };
+      const m = map[st.status] || ['idle', st.status];
+      dot.className = 'sync-dot ' + m[0];
+      syncTxt.textContent = m[1];
+    }
+
+    const btn = document.getElementById('userAvatarBtn');
+    if (btn) btn.classList.toggle('signed-in', !!user && !isAnon);
+  }
+
+  avatarFallback() {
+    ['userAvatarImg', 'menuAvatarImg'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    ['userAvatarFallback', 'menuAvatarFallback'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'flex';
+    });
+  }
+
+  toggleUserMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('userMenu');
+    if (!menu) return;
+    const isOpen = menu.classList.contains('open');
+    this.closeUserMenu();
+    if (!isOpen) {
+      menu.classList.add('open');
+      this.updateUserAvatar();
+    }
+  }
+
+  closeUserMenu() {
+    const menu = document.getElementById('userMenu');
+    if (menu) menu.classList.remove('open');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  FIRST-RUN WELCOME  (تسجيل دخول Google أول ما تفتح)
+  // ═══════════════════════════════════════════════════════════
+
+  maybeShowWelcome() {
+    if (this.data.settings.welcomeSeen) return;
+    if (typeof window.BHFirebase === 'undefined' || !window.BHFirebase.isConfigured()) return;
+    if (window.BHFirebase.getUser()) {
+      this.data.settings.welcomeSeen = true;
+      this.saveData();
+      return;
+    }
+    setTimeout(() => this.showWelcomeModal(), 700);
+  }
+
+  showWelcomeModal() {
+    const existing = document.getElementById('welcomeModal');
+    if (existing) existing.remove();
+
+    const el = document.createElement('div');
+    el.id = 'welcomeModal';
+    el.className = 'modal-overlay active welcome-overlay';
+    el.innerHTML = `
+      <div class="modal-container welcome-box">
+        <div class="welcome-logo">💰</div>
+        <h2 class="welcome-title">أهلاً بيك في BH 👋</h2>
+        <p class="welcome-sub">
+          سجّل دخول بـ Google مرة واحدة، وم بعدها<b> بياناتك هتتنزّل على السحابة</b> وتتفتح من أي جهاز — ومن غير ما تضيع أبداً.
+        </p>
+
+        <div class="welcome-benefits">
+          <div class="welcome-benefit"><span>☁️</span><span>مزامنة تلقائية بين كل أجهزتك</span></div>
+          <div class="welcome-benefit"><span>🛡️</span><span>بياناتك محفوظة لو مسحت المتصفح</span></div>
+          <div class="welcome-benefit"><span>⚡</span><span>تفتح التطبيق وبياناتك جاهزة</span></div>
+        </div>
+
+        <button class="btn btn-primary btn-full welcome-google" onclick="app.welcomeGoogle()">
+          <span class="google-g">G</span> المتابعة بحساب Google
+        </button>
+        <div class="welcome-alt">
+          <button class="btn btn-secondary btn-sm" onclick="app.welcomeAnon()">🔓 دخول سريع (هذا الجهاز بس)</button>
+        </div>
+        <button class="welcome-skip" onclick="app.skipWelcome()">تخطي — أعمله بعدين</button>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+
+  async welcomeGoogle() {
+    const btn = document.querySelector('.welcome-google');
+    if (btn) { btn.innerHTML = '⏳ جاري فتح Google...'; btn.disabled = true; }
+    await this.cloudSignInGoogle();
+    this.closeWelcome();
+  }
+
+  async welcomeAnon() {
+    const btn = document.querySelector('.welcome-alt .btn');
+    if (btn) { btn.innerHTML = '⏳ جاري الدخول...'; btn.disabled = true; }
+    await this.cloudSignInAnon();
+    this.closeWelcome();
+  }
+
+  skipWelcome() {
+    this.closeWelcome();
+  }
+
+  closeWelcome() {
+    this.data.settings.welcomeSeen = true;
+    this.saveData();
+    const el = document.getElementById('welcomeModal');
+    if (el) {
+      el.classList.remove('active');
+      setTimeout(() => el.remove(), 250);
+    }
+    this.updateUserAvatar();
   }
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }
