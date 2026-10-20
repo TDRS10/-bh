@@ -131,33 +131,59 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
   flex-shrink: 1;
 }
 
 .brand-icon-img {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
   object-fit: cover;
-  border: 1px solid var(--border-accent);
-  filter: drop-shadow(0 0 6px rgba(0,217,255,.3));
+  border: 1px solid rgba(0, 200, 122, 0.35);
+  box-shadow:
+    0 0 18px rgba(0, 200, 122, 0.22),
+    0 0 10px rgba(0, 217, 255, 0.14),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4);
   flex-shrink: 0;
+  transition: var(--trans-fast);
+}
+
+.brand:active .brand-icon-img {
+  transform: scale(0.95);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
 }
 
 .brand-title {
   font-family: var(--font-disp);
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -.3px;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .01em;
+  line-height: 1.15;
+  text-shadow: 0 0 16px rgba(0, 217, 255, 0.4);
+  white-space: nowrap;
+}
+
+.brand-title span { color: var(--accent); }
+
+.brand-sub {
+  font-size: .58rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: .05em;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.brand-title span { color: var(--accent); }
 
 .header-actions {
   display: flex;
@@ -700,10 +726,16 @@ body.big-numbers-mode .balance-chip-val {
   flex-shrink: 0;
 }
 
+/* Streak badge is not shown in the header (it lives in the motivation banner) */
+.app-header .streak-badge { display: none !important; }
+
 /* Media Query for Small Screens */
-@media (max-width: 380px) {
-  .brand-title .sub-title { display: none; }
-  .streak-badge#headerStreakBadge { display: none; }
+@media (max-width: 360px) {
+  .brand-sub { display: none; }
+  .brand-icon-img { width: 34px; height: 34px; border-radius: 10px; }
+  .brand-title { font-size: .98rem; }
+  .brand { gap: 7px; }
+  .balance-chip { max-width: 95px; }
 }
 
 /* ═══════════════════════════════════════════════════

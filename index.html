@@ -36,7 +36,10 @@
     <header class="app-header">
       <div class="brand">
         <img src="logo.jpg" alt="BH Logo" class="brand-icon-img">
-        <div class="brand-title"><span>BH</span><span class="sub-title"> — إدارة الفلوس</span></div>
+        <div class="brand-text">
+          <div class="brand-title"><span>B</span>H</div>
+          <div class="brand-sub">إدارة الفلوس</div>
+        </div>
       </div>
       <div class="header-actions">
         <!-- Always-visible balance chip (available on every tab) -->
@@ -44,8 +47,7 @@
           <span class="balance-chip-icon">💰</span>
           <span class="balance-chip-val" id="headerBalanceVal">0</span>
         </button>
-        <div class="streak-badge" id="headerStreakBadge">🔥 0 أيام تحويش</div>
-        <button class="icon-btn" onclick="app.toggleBigNumbers()" title="تكبير الأرقام (Big Numbers)">👁️</button>
+        <div class="streak-badge" id="headerStreakBadge" style="display:none;">🔥 0 أيام تحويش</div>
         <button class="icon-btn" onclick="app.switchTab('moreView')" title="الإعدادات">⚙️</button>
 
         <!-- User account avatar -->
