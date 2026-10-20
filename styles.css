@@ -530,6 +530,160 @@ body.big-numbers-mode .balance-chip-val {
 
 .welcome-skip:active { color: var(--text-secondary); }
 
+/* ═══════════════════════════════════════════════════════════
+   SMART ALERTS  (التنبيهات الذكية)
+════════════════════════════════════════════════════════════ */
+.sa-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-right: 3px solid var(--text-muted);
+  border-radius: var(--r-ctrl);
+  padding: 11px;
+  margin-bottom: 8px;
+}
+
+.sa-item.red {
+  background: rgba(255, 59, 92, 0.08);
+  border-color: rgba(255, 59, 92, 0.28);
+  border-right-color: var(--danger);
+}
+
+.sa-item.yellow {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.28);
+  border-right-color: #fbbf24;
+}
+
+.sa-item.green {
+  background: rgba(0, 200, 122, 0.08);
+  border-color: rgba(0, 200, 122, 0.28);
+  border-right-color: var(--savings);
+}
+
+.sa-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sa-body { flex: 1; min-width: 0; }
+
+.sa-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 3px;
+}
+
+.sa-text {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.sa-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: stretch;
+}
+
+.sa-btn {
+  background: rgba(0, 217, 255, 0.12);
+  border: 1px solid var(--border-accent);
+  color: var(--accent);
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--trans-fast);
+}
+
+.sa-btn:active { background: rgba(0, 217, 255, 0.24); }
+
+.sa-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.sa-dismiss:active { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+/* ── Settings rows ── */
+.sa-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sa-settings-row:last-child { border-bottom: none; }
+
+.sa-settings-row strong {
+  display: block;
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+.sa-settings-row small {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+.sa-settings-sub.disabled { opacity: 0.4; pointer-events: none; }
+
+.sa-toggle {
+  width: 38px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--trans-fast);
+}
+
+.sa-toggle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.3);
+}
+
+.sa-current {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 10px 12px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.sa-current strong { color: #fff; }
+
 /* ── Streak Badge ── */
 .streak-badge {
   font-family: var(--font-disp);

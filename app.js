@@ -926,6 +926,7 @@ class BHApp {
     this.initCloudSync();
     this.updateUserAvatar();
     this.maybeShowWelcome();
+    this.scheduleSmartNotification();
 
     // Close the user menu when clicking outside
     document.addEventListener('click', (e) => {
@@ -1814,6 +1815,8 @@ class BHApp {
     this.renderChallenges();
     this.renderDebtPlanner();
     this.renderAdjustHistory();
+    this.renderSmartAlerts();
+    this.renderSmartAlertSettings();
   }
 
   // ── Month-over-Month Comparison ──────────────────────────────
@@ -3629,6 +3632,326 @@ class BHApp {
       setTimeout(() => el.remove(), 250);
     }
     this.updateUserAvatar();
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  SMART ALERTS  (التنبيهات الذكية)
+  // ═══════════════════════════════════════════════════════════
+
+  getSmartAlertSettings() {
+    const s = this.data.settings.smartAlerts || {};
+    return {
+      enabled: s.enabled !== false,
+      lowBalanceEnabled: s.lowBalanceEnabled !== false,
+      lowBalanceThreshold: Number(s.lowBalanceThreshold) || 200,
+      forgotShiftEnabled: s.forgotShiftEnabled !== false,
+      goalCloseEnabled: s.goalCloseEnabled !== false,
+      outingsBudgetEnabled: s.outingsBudgetEnabled !== false,
+      lastShown: s.lastShown || {}
+    };
+  }
+
+  // Evaluate every condition and return the active alerts
+  getSmartAlerts() {
+    const cfg = this.getSmartAlertSettings();
+    if (!cfg.enabled) return [];
+
+    const alerts = [];
+    const spendable = this.data.balances.spendableBalance;
+
+    // 1) Low balance
+    if (cfg.lowBalanceEnabled && spendable > 0 && spendable <= cfg.lowBalanceThreshold) {
+      alerts.push({
+        id: 'low_balance',
+        icon: '💸',
+        level: spendable <= cfg.lowBalanceThreshold / 2 ? 'red' : 'yellow',
+        title: 'رصيدك المتاح قارب يعمل',
+        body: `فاضل ${spendable.toLocaleString()} ج.م بس — خلّي بالك قبل ما تصرف.`,
+        action: 'سجّل مصروف'
+      });
+    } else if (cfg.lowBalanceEnabled && spendable <= 0) {
+      alerts.push({
+        id: 'no_balance',
+        icon: '🚨',
+        level: 'red',
+        title: 'رصيدك المتاح خلص',
+        body: 'مفيش فلوس للصرف دلوقتي — السحب من التحويش يبقى خطر.',
+        action: 'شوف التحويش'
+      });
+    }
+
+    // 2) Forgot to log yesterday's shift
+    if (cfg.forgotShiftEnabled) {
+      const sessions = this.data.workSessions || [];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yKey = yesterday.toISOString().split('T')[0];
+      const loggedYesterday = sessions.some(w => w.date === yKey);
+      const loggedToday = sessions.some(w => w.date === new Date().toISOString().split('T')[0]);
+      // Only nag if the user normally works (logged at least once in the last 7 days)
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const recentCount = sessions.filter(w => new Date(w.date) >= weekAgo).length;
+
+      if (!loggedYesterday && !loggedToday && recentCount >= 2) {
+        alerts.push({
+          id: 'forgot_shift',
+          icon: '📋',
+          level: 'yellow',
+          title: 'مفيش وردية مسجلة امبارح',
+          body: 'سجّل وردية امبارح عشان خريطة شغلك وأرقامك تفضل دقيقة.',
+          action: 'سجّل وردية'
+        });
+      }
+    }
+
+    // 3) A goal is close to completion
+    if (cfg.goalCloseEnabled) {
+      (this.data.goals || []).forEach(g => {
+        if (!g.targetAmount || g.currentAmount >= g.targetAmount) return;
+        const remaining = g.targetAmount - g.currentAmount;
+        const pct = (g.currentAmount / g.targetAmount) * 100;
+        if (pct >= 80 && remaining > 0) {
+          alerts.push({
+            id: 'goal_close_' + g.id,
+            icon: '🎯',
+            level: 'green',
+            title: `هدف "${g.title}" قارب يتحقق`,
+            body: `فاضل ${remaining.toLocaleString()} ج.م بس (${Math.round(pct)}% خلص).`,
+            action: 'الأهداف'
+          });
+        }
+      });
+    }
+
+    // 4) Weekly outings budget nearly gone
+    if (cfg.outingsBudgetEnabled) {
+      const budget = this.data.settings.weeklyOutingsBudget || 0;
+      const spent = this.getWeeklyOutingsSpent();
+      if (budget > 0 && spent >= budget * 0.9 && spent < budget) {
+        alerts.push({
+          id: 'outings_close',
+          icon: '❤️',
+          level: 'yellow',
+          title: 'ميزانية الخروجات أوشكت',
+          body: `فاضل ${(budget - spent).toLocaleString()} ج.م من ${budget.toLocaleString()} ج.م هذا الأسبوع.`,
+          action: 'المصاريف'
+        });
+      }
+    }
+
+    return alerts;
+  }
+
+  // Handle tapping an alert action
+  handleAlertAction(alertId) {
+    const alerts = this.getSmartAlerts();
+    const a = alerts.find(x => x.id === alertId);
+    if (!a) return;
+    if (a.id === 'low_balance' || a.id === 'no_balance') {
+      this.switchTab('moreView');
+      this.showToast('💡 اسحب من التحويش لو محتاج — بس ده هيكسر الـ Streak', 'info');
+    } else if (a.id === 'forgot_shift') {
+      this.switchTab('incomesView');
+      setTimeout(() => {
+        const el = document.getElementById('shiftOrders');
+        if (el) el.scrollIntoView({ block: 'center' });
+      }, 300);
+    } else if (a.id === 'goal_close_' + a.id.split('goal_close_')[1]) {
+      this.switchTab('goalsView');
+    } else if (a.id === 'outings_close') {
+      this.switchTab('expensesView');
+    }
+    this.dismissAlert(a.id);
+  }
+
+  // Mark an alert as seen (don't show it again today)
+  dismissAlert(alertId) {
+    const cfg = this.getSmartAlertSettings();
+    cfg.lastShown[alertId] = new Date().toISOString().split('T')[0];
+    this.data.settings.smartAlerts = Object.assign({}, this.data.settings.smartAlerts, cfg);
+    this.saveData();
+    this.renderSmartAlerts();
+  }
+
+  // Render the in-app alert card on the dashboard
+  renderSmartAlerts() {
+    const card = document.getElementById('smartAlertsCard');
+    if (!card) return;
+
+    const all = this.getSmartAlerts();
+    const cfg = this.getSmartAlertSettings();
+    const today = new Date().toISOString().split('T')[0];
+    // Hide alerts already dismissed today
+    const alerts = all.filter(a => cfg.lastShown[a.id] !== today);
+
+    if (alerts.length === 0) {
+      card.style.display = 'none';
+      card.innerHTML = '';
+      return;
+    }
+
+    card.style.display = 'block';
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title"><span class="card-icon">🔔</span> تنبيهات تحتاج انتباه</span>
+        <span class="sub-balance-label">${alerts.length}</span>
+      </div>
+      ${alerts.map(a => `
+        <div class="sa-item ${a.level}">
+          <div class="sa-icon">${a.icon}</div>
+          <div class="sa-body">
+            <div class="sa-title">${a.title}</div>
+            <div class="sa-text">${a.body}</div>
+          </div>
+          <div class="sa-actions">
+            <button class="sa-btn" onclick="app.handleAlertAction('${a.id}')">${a.action}</button>
+            <button class="sa-dismiss" onclick="app.dismissAlert('${a.id}')" title="إخفاء">✕</button>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  // Schedule a system notification for the next morning (via the Service Worker)
+  scheduleSmartNotification() {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+
+    const cfg = this.getSmartAlertSettings();
+    if (!cfg.enabled) return;
+
+    // Next check: tomorrow 9:00 AM
+    const when = new Date();
+    when.setDate(when.getDate() + 1);
+    when.setHours(9, 0, 0, 0);
+
+    const alerts = this.getSmartAlerts();
+    const top = alerts[0];
+    const title = top ? top.title : 'صباح الفلوس ☀️';
+    const body = top ? top.body : 'افتح BH وشوف رصيدك ووردية امبارح.';
+
+    try {
+      navigator.serviceWorker.controller.postMessage({
+        action: 'SCHEDULE_SMART_ALERT',
+        timestamp: when.getTime(),
+        title,
+        body,
+        tag: 'bh-smart-alert'
+      });
+    } catch (e) { /* non-critical */ }
+  }
+
+  // Render the smart alerts settings card
+  renderSmartAlertSettings() {
+    const box = document.getElementById('smartAlertSettings');
+    if (!box) return;
+
+    const cfg = this.getSmartAlertSettings();
+    const alerts = this.getSmartAlerts();
+
+    box.innerHTML = `
+      <div class="sa-settings-row">
+        <div>
+          <strong>🔔 التنبيهات الذكية</strong>
+          <small>تنبيهات على الرصيد والورديات والأهداف</small>
+        </div>
+        <button class="sa-toggle ${cfg.enabled ? 'on' : ''}" onclick="app.toggleSmartAlert('enabled')">${cfg.enabled ? '✓' : '○'}</button>
+      </div>
+
+      <div class="sa-settings-sub ${cfg.enabled ? '' : 'disabled'}">
+        <div class="sa-settings-row">
+          <div>
+            <strong>💸 رصيدك قارب يعمل</strong>
+            <small>ينبهك لما المتاح للصرف يقل عن</small>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="number" id="saThreshold" class="form-control" value="${cfg.lowBalanceThreshold}" min="0" step="10" oninput="app.saveSmartAlertThreshold()" style="width:78px; padding:6px 8px !important; text-align:center; font-size:.82rem;">
+            <span style="font-size:.7rem; color:var(--text-muted);">ج.م</span>
+          </div>
+        </div>
+
+        <div class="sa-settings-row">
+          <div>
+            <strong>📋 نسيت تسجّل وردية</strong>
+            <small>لو مفيش وردية مسجلة امبارح</small>
+          </div>
+          <button class="sa-toggle ${cfg.forgotShiftEnabled ? 'on' : ''}" onclick="app.toggleSmartAlert('forgotShiftEnabled')">${cfg.forgotShiftEnabled ? '✓' : '○'}</button>
+        </div>
+
+        <div class="sa-settings-row">
+          <div>
+            <strong>🎯 هدفك قارب يتحقق</strong>
+            <small>لما توصل 80% من أي هدف</small>
+          </div>
+          <button class="sa-toggle ${cfg.goalCloseEnabled ? 'on' : ''}" onclick="app.toggleSmartAlert('goalCloseEnabled')">${cfg.goalCloseEnabled ? '✓' : '○'}</button>
+        </div>
+
+        <div class="sa-settings-row">
+          <div>
+            <strong>❤️ ميزانية الخروجات أوشكت</strong>
+            <small>لما توصل 90% من ميزانية الأسبوع</small>
+          </div>
+          <button class="sa-toggle ${cfg.outingsBudgetEnabled ? 'on' : ''}" onclick="app.toggleSmartAlert('outingsBudgetEnabled')">${cfg.outingsBudgetEnabled ? '✓' : '○'}</button>
+        </div>
+      </div>
+
+      <div class="sa-current">
+        التنبيهات النشطة دلوقتي: <strong>${alerts.length}</strong>
+        ${alerts.length ? '<br>' + alerts.map(a => a.icon + ' ' + a.title).join('<br>') : ''}
+      </div>
+
+      <button class="btn btn-secondary btn-full btn-sm" onclick="app.testSmartNotification()" style="margin-top:10px;">
+        🔔 اختبر إشعار دلوقتي
+      </button>
+    `;
+  }
+
+  toggleSmartAlert(key) {
+    const cfg = this.getSmartAlertSettings();
+    const stored = this.data.settings.smartAlerts || {};
+    stored[key] = !cfg[key];
+    this.data.settings.smartAlerts = stored;
+    this.saveData();
+    this.renderSmartAlertSettings();
+    this.renderSmartAlerts();
+  }
+
+  saveSmartAlertThreshold() {
+    const el = document.getElementById('saThreshold');
+    if (!el) return;
+    const v = parseFloat(el.value);
+    if (isNaN(v) || v < 0) return;
+    const stored = this.data.settings.smartAlerts || {};
+    stored.lowBalanceThreshold = v;
+    this.data.settings.smartAlerts = stored;
+    this.saveData();
+    this.renderSmartAlerts();
+  }
+
+  // Fire a test notification right now
+  async testSmartNotification() {
+    const alerts = this.getSmartAlerts();
+    const title = alerts.length ? alerts[0].title : '🔔 تنبيه تجريبي من BH';
+    const body = alerts.length ? alerts[0].body : 'ده إشعار تجريبي — التنبيهات شغالة تمام!';
+
+    // In-app toast (always works)
+    this.showToast(title + ' — ' + body, 'info');
+
+    // System notification (if allowed)
+    try {
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification(title, { body, icon: 'icon-192.png', tag: 'bh-smart-test' });
+        } else if (Notification.permission === 'default') {
+          const p = await Notification.requestPermission();
+          if (p === 'granted') {
+            new Notification(title, { body, icon: 'icon-192.png', tag: 'bh-smart-test' });
+          } else {
+            this.showToast('⚠️ الإشعارات مسموحةش — فعّلها من إعدادات المتصفح', 'error');
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }

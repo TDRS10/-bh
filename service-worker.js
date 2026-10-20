@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v5';
+const CACHE_NAME = 'bh-finance-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -121,6 +121,79 @@ self.addEventListener('message', (event) => {
   if (event.data.action === 'CANCEL_ALARM') {
     cancelScheduledAlarms();
   }
+
+  if (event.data.action === 'SCHEDULE_SMART_ALERT') {
+    const { timestamp, title, body, tag } = event.data;
+    scheduleSmartAlert(timestamp, title, body, tag);
+  }
+});
+
+/**
+ * Schedule a smart alert notification for a future time.
+ * Uses the Notification Triggers API when available (works when the app is closed).
+ */
+async function scheduleSmartAlert(timestamp, title, body, tag) {
+  if (!('showNotification' in self.registration)) return;
+  try { await cancelSmartAlerts(); } catch (e) { /* non-critical */ }
+
+  const delay = timestamp - Date.now();
+  if (delay < 0) return;
+
+  const options = {
+    body: body,
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    tag: tag || 'bh-smart-alert',
+    requireInteraction: false,
+    data: { url: './' }
+  };
+
+  try {
+    if (typeof TimestampTrigger !== 'undefined') {
+      options.showTrigger = new TimestampTrigger(timestamp);
+      await self.registration.showNotification(title || 'BH', options);
+    } else {
+      // Fallback: show it now if we can't schedule (still useful info)
+      await self.registration.showNotification(title || 'BH', options);
+    }
+  } catch (err) {
+    console.warn('[SW] Could not schedule smart alert:', err);
+  }
+}
+
+async function cancelSmartAlerts() {
+  try {
+    if (!('getNotifications' in self.registration)) return;
+    const all = await self.registration.getNotifications();
+    for (const n of all) {
+      if (n.tag && n.tag.startsWith('bh-smart')) n.close();
+    }
+  } catch (e) { /* non-critical */ }
+}
+
+/**
+ * Real push messages (Firebase Cloud Messaging / Web Push).
+ * Ready for a Cloud Function or any server that can send FCM web pushes.
+ */
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {
+    payload = { title: 'BH', body: event.data ? event.data.text() : 'لديك إشعار جديد' };
+  }
+
+  const title = payload.title || 'BH';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || './icon-192.png',
+    badge: './icon-192.png',
+    tag: payload.tag || 'bh-push',
+    data: { url: payload.url || './' },
+    requireInteraction: !!payload.requireInteraction
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 /**

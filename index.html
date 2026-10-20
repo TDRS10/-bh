@@ -88,6 +88,11 @@
     <!-- Main Content Pages Container -->
     <main class="app-content">
 
+      <!-- 🔔 Smart Alerts Card -->
+      <div class="card" id="smartAlertsCard" style="display:none; border-top: 2px solid #fbbf24;">
+        <!-- populated by renderSmartAlerts() -->
+      </div>
+
       <!-- ================= 1. DASHBOARD VIEW ================= -->
       <section id="dashboardView" class="view-page active">
         
@@ -689,6 +694,17 @@
           <div style="margin-top: 10px;">
             <button class="btn btn-secondary btn-full btn-sm" onclick="app.toggleNotifications()" id="notifyPermissionBtn">🔔 تفعيل إشعارات التحديثات</button>
           </div>
+        </div>
+
+        <!-- 🔔 Smart Alerts Settings Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🔔</span> التنبيهات الذكية</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+            ينبهك قبل ما تحصل مشكلة: رصيدك قارب يعمل، نسيت تسجّل وردية، أو هدفك قارب يتحقق.
+          </p>
+          <div id="smartAlertSettings"></div>
         </div>
 
         <!-- ☁️ Cloud Sync Card -->
