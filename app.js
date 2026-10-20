@@ -7,6 +7,7 @@ const STORAGE_KEY = 'BH_APP_DATA_V1';
 const SNAPSHOT_KEY = 'BH_APP_SNAPSHOTS';
 const BACKUP_TIME_KEY = 'BH_LAST_BACKUP_TIME';
 const SYNC_TIME_KEY = 'BH_LAST_SYNC_TIME';
+const LOCAL_TIME_KEY = 'BH_LOCAL_UPDATED_AT';
 
 class BHApp {
   constructor() {
@@ -100,6 +101,8 @@ class BHApp {
   saveData() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+      // Track WHEN the local data actually changed (used for conflict resolution)
+      localStorage.setItem(LOCAL_TIME_KEY, String(Date.now()));
       this._saveSnapshot();
       this._scheduleCloudPush();
     } catch (e) {
@@ -176,14 +179,15 @@ class BHApp {
     }, 2500);
   }
 
-  // Pull remote data — adopt it if it's newer than ours
+  // Pull remote data — merge it with ours (never delete anything)
   pullFromCloud() {
     if (typeof window.BHFirebase === 'undefined') return;
-    const localUpdatedAt = parseInt(localStorage.getItem(SYNC_TIME_KEY) || '0', 10);
+    // The REAL age of our local data (not the sign-in time!)
+    const localUpdatedAt = parseInt(localStorage.getItem(LOCAL_TIME_KEY) || '0', 10);
 
     window.BHFirebase.pull().then((envelope) => {
       if (!envelope) {
-        // Nothing remote yet → push ours
+        // Nothing in the cloud yet → upload ours
         window.BHFirebase.push(this.data).then((ok) => {
           if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
           this.renderCloudCard();
@@ -191,22 +195,79 @@ class BHApp {
         return;
       }
 
-      if (envelope.updatedAt > localUpdatedAt && envelope.data && envelope.data.balances) {
-        // Remote is newer → adopt it
-        this.data = envelope.data;
-        this.saveData();
-        this.renderAll();
-        localStorage.setItem(SYNC_TIME_KEY, String(envelope.updatedAt));
+      const remote = envelope.data;
+      if (!remote || !remote.balances) return;
+
+      // 🔐 SAFETY: merge instead of replace — no entry is ever lost
+      const merged = this.mergeCloudData(this.data, remote, envelope.updatedAt, localUpdatedAt);
+      const changed = merged.__changed;
+
+      this.data = merged;
+      delete this.data.__changed;
+      this.saveData();
+
+      if (changed) {
+        this.showToast('☁️ اتحدّثت البيانات من السحابة', 'info');
+      } else if (envelope.updatedAt > localUpdatedAt) {
         this.showToast('☁️ اتحدّثت البيانات من جهاز تاني', 'info');
-      } else {
-        // Ours is newer → push
-        window.BHFirebase.push(this.data).then((ok) => {
-          if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
-          this.renderCloudCard();
-        });
       }
+
+      // Push the merged result back so every device converges
+      window.BHFirebase.push(this.data).then((ok) => {
+        if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+        this.renderCloudCard();
+      });
+      this.renderAll();
       this.renderCloudCard();
     });
+  }
+
+  // Merge cloud data with local data — union of all entries, nothing deleted
+  mergeCloudData(local, remote, remoteUpdatedAt, localUpdatedAt) {
+    const out = JSON.parse(JSON.stringify(local || {}));
+    let changed = false;
+
+    const union = (a, b) => {
+      const res = [...(a || [])];
+      const seen = new Set(res.map(x => x.id));
+      let added = 0;
+      (b || []).forEach(x => {
+        if (!x.id || !seen.has(x.id)) {
+          res.push(x);
+          seen.add(x.id);
+          added++;
+        }
+      });
+      // Newest entries first
+      res.sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+      if (added > 0) changed = true;
+      return res;
+    };
+
+    out.incomes = union(local.incomes, remote.incomes);
+    out.expenses = union(local.expenses, remote.expenses);
+    out.goals = union(local.goals, remote.goals);
+    out.debts = union(local.debts, remote.debts);
+    out.pendingIncomes = union(local.pendingIncomes, remote.pendingIncomes);
+    out.workSessions = union(local.workSessions, remote.workSessions);
+    out.adjustments = union(local.adjustments, remote.adjustments);
+
+    // Balances: the newer side wins
+    const remoteIsNewer = remoteUpdatedAt > (localUpdatedAt || 0);
+    const src = remoteIsNewer ? remote : local;
+    out.balances = {
+      reservedSavings: (src.balances && src.balances.reservedSavings) || 0,
+      spendableBalance: (src.balances && src.balances.spendableBalance) || 0
+    };
+
+    // Settings: merge (challenges / badges from both)
+    out.settings = Object.assign({}, local.settings || {}, remote.settings || {}, {
+      challenges: Object.assign({}, (local.settings||{}).challenges, (remote.settings||{}).challenges),
+      badges: Object.assign({}, (local.settings||{}).badges, (remote.settings||{}).badges)
+    });
+
+    out.__changed = changed;
+    return out;
   }
 
   // Manual sync button
@@ -226,7 +287,6 @@ class BHApp {
     try {
       await window.BHFirebase.signInAnonymously();
       this._cloudReady = true;
-      localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
       this.showToast('☁️ تم تسجيل الدخول — المزامنة شغالة!', 'success');
       this.pullFromCloud();
       this.renderCloudCard();
@@ -242,7 +302,6 @@ class BHApp {
     try {
       await window.BHFirebase.signInWithGoogle();
       this._cloudReady = true;
-      localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
       this.showToast('☁️ تم تسجيل الدخول بـ Google — مزامنة كل أجهزتك!', 'success');
       this.pullFromCloud();
       this.renderCloudCard();
