@@ -662,6 +662,17 @@
           </div>
         </div>
 
+        <!-- ☁️ Cloud Sync Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">☁️</span> المزامنة السحابية</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+            خزّن بياناتك على السحابة — تفتحها من أي جهاز وبياناتك ماتضيعش.
+          </p>
+          <div id="cloudBox"></div>
+        </div>
+
         <!-- 🛡️ Data Protection Card -->
         <div class="card">
           <div class="card-header">
@@ -1051,6 +1062,48 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // ── Firebase (optional — app works without it) ──
+    // Loaded after app.js so BHFirebase is defined before init runs
+  </script>
+  <script src="firebase-config.js"></script>
+  <script>
+    // Load the Firebase SDK with a fallback CDN (if one is blocked, try the other).
+    // The app works normally even if BOTH fail — cloud sync is simply disabled.
+    (function () {
+      var CDNS = [
+        'https://www.gstatic.com/firebasejs/10.12.2/',
+        'https://cdn.jsdelivr.net/npm/firebase@10.12.2/'
+      ];
+      var FILES = ['firebase-app-compat.js', 'firebase-database-compat.js', 'firebase-auth-compat.js'];
+      var loaded = 0;
+
+      function loadNext(cdnIdx) {
+        if (loaded >= FILES.length) {
+          console.warn('[BH] Firebase SDK unavailable — cloud sync disabled, app works normally');
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = CDNS[cdnIdx % CDNS.length] + FILES[loaded];
+        s.async = false;
+        s.onload = function () {
+          loaded++;
+          loadNext(cdnIdx);
+        };
+        s.onerror = function () {
+          s.remove();
+          if (cdnIdx + 1 >= CDNS.length) {
+            console.warn('[BH] Firebase SDK could not be loaded from any CDN');
+            return;
+          }
+          loadNext(cdnIdx + 1);
+        };
+        document.head.appendChild(s);
+      }
+      loadNext(0);
+    })();
+  </script>
+  <script src="firebase-service.js"></script>
   <script>
     // Register Service Worker for Offline PWA
     if ('serviceWorker' in navigator) {

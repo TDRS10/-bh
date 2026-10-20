@@ -6,6 +6,7 @@
 const STORAGE_KEY = 'BH_APP_DATA_V1';
 const SNAPSHOT_KEY = 'BH_APP_SNAPSHOTS';
 const BACKUP_TIME_KEY = 'BH_LAST_BACKUP_TIME';
+const SYNC_TIME_KEY = 'BH_LAST_SYNC_TIME';
 
 class BHApp {
   constructor() {
@@ -100,10 +101,266 @@ class BHApp {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
       this._saveSnapshot();
+      this._scheduleCloudPush();
     } catch (e) {
       console.error('Error saving data to LocalStorage', e);
       this.showToast('⚠️ تعذر حفظ البيانات في الذاكرة المحلية');
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  CLOUD SYNC  (المزامنة السحابية — Firebase)
+  // ═══════════════════════════════════════════════════════════
+
+  // Init Firebase (safe: does nothing when not configured)
+  initCloudSync() {
+    if (typeof window.BHFirebase === 'undefined') return;
+
+    // The SDK may still be loading (it's loaded async with a CDN fallback)
+    const tryInit = () => {
+      try {
+        window.BHFirebase.init();
+      } catch (e) {
+        console.warn('Cloud sync init failed (app keeps working locally):', e);
+      }
+
+      window.BHFirebase.onStatusChange((st) => {
+        this._cloudState = st;
+        this.renderCloudCard();
+      });
+
+      if (window.BHFirebase.getUser()) {
+        this.pullFromCloud();
+      }
+    };
+
+    if (window.BHFirebase.isConfigured()) {
+      // Wait for the SDK to be present (max ~6s), then init
+      let waited = 0;
+      const waitForSdk = () => {
+        if (typeof window.firebase !== 'undefined' && window.firebase && window.firebase.database) {
+          tryInit();
+        } else if (waited < 60) {
+          waited++;
+          setTimeout(waitForSdk, 100);
+        } else {
+          window.BHFirebase.onStatusChange((st) => { this._cloudState = st; this.renderCloudCard(); });
+          window.BHFirebase.getState().status = 'sdk-missing';
+          this.renderCloudCard();
+        }
+      };
+      waitForSdk();
+    } else {
+      tryInit();
+    }
+  }
+
+  // Push local data to the cloud (debounced so typing doesn't spam it)
+  _scheduleCloudPush() {
+    if (!this._cloudReady) return;
+    clearTimeout(this._cloudPushTimer);
+    this._cloudPushTimer = setTimeout(() => {
+      window.BHFirebase.push(this.data).then((ok) => {
+        if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+        this.renderCloudCard();
+      });
+    }, 2500);
+  }
+
+  // Pull remote data — adopt it if it's newer than ours
+  pullFromCloud() {
+    if (typeof window.BHFirebase === 'undefined') return;
+    const localUpdatedAt = parseInt(localStorage.getItem(SYNC_TIME_KEY) || '0', 10);
+
+    window.BHFirebase.pull().then((envelope) => {
+      if (!envelope) {
+        // Nothing remote yet → push ours
+        window.BHFirebase.push(this.data).then((ok) => {
+          if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+          this.renderCloudCard();
+        });
+        return;
+      }
+
+      if (envelope.updatedAt > localUpdatedAt && envelope.data && envelope.data.balances) {
+        // Remote is newer → adopt it
+        this.data = envelope.data;
+        this.saveData();
+        this.renderAll();
+        localStorage.setItem(SYNC_TIME_KEY, String(envelope.updatedAt));
+        this.showToast('☁️ اتحدّثت البيانات من جهاز تاني', 'info');
+      } else {
+        // Ours is newer → push
+        window.BHFirebase.push(this.data).then((ok) => {
+          if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+          this.renderCloudCard();
+        });
+      }
+      this.renderCloudCard();
+    });
+  }
+
+  // Manual sync button
+  manualSync() {
+    if (typeof window.BHFirebase === 'undefined') return;
+    const user = window.BHFirebase.getUser();
+    if (!user) {
+      this.showToast('⚠️ سجل دخول الأول', 'error');
+      return;
+    }
+    this.showToast('☁️ جاري المزامنة...', 'info');
+    this.pullFromCloud();
+  }
+
+  // Sign in (anonymous — fastest, this device only)
+  async cloudSignInAnon() {
+    try {
+      await window.BHFirebase.signInAnonymously();
+      this._cloudReady = true;
+      localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+      this.showToast('☁️ تم تسجيل الدخول — المزامنة شغالة!', 'success');
+      this.pullFromCloud();
+      this.renderCloudCard();
+    } catch (e) {
+      this.showToast('⚠️ فشل تسجيل الدخول: ' + (e.message || e), 'error');
+    }
+  }
+
+  // Sign in with Google (sync across all your devices)
+  async cloudSignInGoogle() {
+    try {
+      await window.BHFirebase.signInWithGoogle();
+      this._cloudReady = true;
+      localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+      this.showToast('☁️ تم تسجيل الدخول بـ Google — مزامنة كل أجهزتك!', 'success');
+      this.pullFromCloud();
+      this.renderCloudCard();
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      if (msg.indexOf('popup') >= 0 || msg.indexOf('Popup') >= 0) {
+        this.showToast('⚠️ المتصفح منع النافذة — جرّب من الموبايل', 'error');
+      } else {
+        this.showToast('⚠️ فشل تسجيل الدخول: ' + msg, 'error');
+      }
+    }
+  }
+
+  async cloudSignOut() {
+    try {
+      await window.BHFirebase.signOut();
+      this._cloudReady = false;
+      this.showToast('👋 تم تسجيل الخروج — البيانات لسه محفوظة على الجهاز', 'info');
+      this.renderCloudCard();
+    } catch (e) { /* ignore */ }
+  }
+
+  // Render the cloud sync card
+  renderCloudCard() {
+    const box = document.getElementById('cloudBox');
+    if (!box) return;
+
+    const svc = window.BHFirebase;
+    if (!svc) {
+      box.innerHTML = '<div class="cloud-setup">ملف الخدمة غير موجود</div>';
+      return;
+    }
+
+    const st = svc.getState();
+    const user = svc.getUser();
+
+    const STATUS_UI = {
+      'not-configured': { icon: '⚙️', cls: 'idle', text: 'مش مفعّل — البيانات محفوظة على الجهاز بس' },
+      'sdk-missing':    { icon: '📦', cls: 'warn', text: 'مكتبة Firebase مش محمّلة (نت ضعيف؟)' },
+      'ready':          { icon: '⏳', cls: 'idle', text: 'جاهز' },
+      'signed-out':     { icon: '🔓', cls: 'idle', text: 'لسه داخلتش — سجّل دخول عشان المزامنة' },
+      'syncing':        { icon: '🔄', cls: 'busy', text: 'جاري المزامنة...' },
+      'synced':         { icon: '☁️', cls: 'ok',   text: 'متزامن مع السحابة' },
+      'offline':        { icon: '📴', cls: 'warn', text: 'مفيش نت — البيانات محفوظة محلياً' },
+      'error':          { icon: '❌', cls: 'bad',  text: 'خطأ: ' + (st.lastError || '') }
+    };
+
+    const s = STATUS_UI[st.status] || STATUS_UI['idle'];
+    const lastSync = st.lastSync ? new Date(st.lastSync) : null;
+    const lastSyncTxt = lastSync
+      ? lastSync.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ' — ' +
+        lastSync.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+      : 'لسه ما التزامنش';
+
+    if (st.status === 'sdk-missing') {
+      box.innerHTML = `
+        <div class="cloud-status warn">
+          <span class="cloud-status-icon">📦</span>
+          <div>
+            <div class="cloud-status-text">مكتبة Firebase مش محمّلة</div>
+            <div class="cloud-status-sub">Internet ضعيف أو محجوب. بياناتك محفوظة على الجهاز عادي — المزامنة هتشتغل أول ما النت improves.</div>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-full btn-sm" onclick="location.reload()">🔄 إعادة المحاولة</button>
+      `;
+      return;
+    }
+
+    if (!svc.isConfigured()) {
+      box.innerHTML = `
+        <div class="cloud-status idle">
+          <span class="cloud-status-icon">⚙️</span>
+          <div>
+            <div class="cloud-status-text">المزامنة السحابية مش مفعّلة</div>
+            <div class="cloud-status-sub">البيانات محفوظة على جهازك بس — افتح الملف <code>firebase-config.js</code> وحط إعدادات Firebase عشان تفعّلها.</div>
+          </div>
+        </div>
+        <div class="cloud-steps">
+          <div class="cloud-step"><span>1</span> افتح console.firebase.google.com واعمل مشروع مجاني</div>
+          <div class="cloud-step"><span>2</span> أنشئ Realtime Database (LOCKED mode)</div>
+          <div class="cloud-step"><span>3</span> من Project Settings انسخ الـ config والصقه في <code>firebase-config.js</code></div>
+          <div class="cloud-step"><span>4</span> فعّل Anonymous في Authentication + ضيف الدومين في Authorized domains</div>
+          <div class="cloud-step"><span>5</span> حدّث التطبيق وارجع هنا</div>
+        </div>
+        <div class="cloud-note">💡 لحد ما تفعّلها، كل المميزات شغالة عادي — النسخ التلقائية في كارت "حماية البيانات" بتحميك.</div>
+      `;
+      return;
+    }
+
+    if (!user) {
+      box.innerHTML = `
+        <div class="cloud-status idle">
+          <span class="cloud-status-icon">${s.icon}</span>
+          <div>
+            <div class="cloud-status-text">${s.text}</div>
+            <div class="cloud-status-sub">سجّل دخول عشان بياناتك تنحفظ على السحابة وتتظبط من أي جهاز.</div>
+          </div>
+        </div>
+        <div class="cloud-actions">
+          <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع (هذا الجهاز)</button>
+          <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
+        </div>
+        <div class="cloud-note">💡 "دخول سريع" = بيانات على هذا الجهاز بس. "Google" = مزامنة كل أجهزتك (لازم تضيف الدومين في Authorized domains).</div>
+      `;
+      return;
+    }
+
+    // Signed in
+    const isAnon = user.isAnonymous;
+    box.innerHTML = `
+      <div class="cloud-status ${s.cls}">
+        <span class="cloud-status-icon">${s.icon}</span>
+        <div style="min-width:0;">
+          <div class="cloud-status-text">${s.text}</div>
+          <div class="cloud-status-sub">
+            ${isAnon ? 'مستخدم مجهول — هذا الجهاز بس' : (user.email || 'متصل بـ Google')}
+            &nbsp;•&nbsp; آخر مزامنة: ${lastSyncTxt}
+          </div>
+        </div>
+      </div>
+      <div class="cloud-actions">
+        <button class="btn btn-primary btn-sm" onclick="app.manualSync()">🔄 مزامنة دلوقتي</button>
+        <button class="btn btn-secondary btn-sm" onclick="app.cloudSignOut()">👋 خروج</button>
+      </div>
+      <div class="cloud-note">
+        🔒 بياناتك <strong>لا تُعرض</strong> لأي حد غيرك — كل مستخدم عنده مساحة منفصلة في القاعدة.
+        ${isAnon ? '<br>⚠️ لو مسحت بيانات المتصفح، الدخول المجهول هيروح. سجّل بـ Google أو نزّل نسخة احتياطية.' : ''}
+      </div>
+    `;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -328,6 +585,7 @@ class BHApp {
     this.autoBackupCheck();
     this.renderProtection();
     this.installUnloadGuard();
+    this.initCloudSync();
   }
 
   // Handle ?action=income / ?action=expense shortcuts AND share target params
