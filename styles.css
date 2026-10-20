@@ -1922,6 +1922,160 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 .dp-interest-note strong { color: var(--danger); }
 
 /* ═══════════════════════════════════════════════════════════
+   BALANCE ADJUSTMENT  (تسوية الرصيد الحقيقي)
+════════════════════════════════════════════════════════════ */
+.balance-edit-btn {
+  display: block;
+  width: 100%;
+  margin: -6px 0 14px;
+  padding: 9px 12px;
+  border-radius: var(--r-ctrl);
+  border: 1px dashed rgba(0, 217, 255, 0.4);
+  background: rgba(0, 217, 255, 0.07);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: var(--trans-fast);
+}
+
+.balance-edit-btn:active {
+  background: rgba(0, 217, 255, 0.16);
+  transform: scale(0.99);
+}
+
+.adjust-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.adjust-mode {
+  padding: 10px 8px;
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--trans-fast);
+  font-family: var(--font-body);
+}
+
+.adjust-mode.active {
+  background: rgba(0, 217, 255, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.18);
+}
+
+.adjust-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.adjust-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.adjust-check strong { color: #fff; }
+
+.adjust-preview {
+  background: rgba(0, 217, 255, 0.06);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--r-ctrl);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.ap-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.8rem;
+}
+
+.ap-label { color: var(--text-muted); font-weight: 600; }
+
+.ap-val {
+  font-family: var(--font-disp);
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.ap-new { color: #fff; font-size: 0.95rem; }
+
+.ap-same { color: var(--text-muted); font-weight: 700; font-size: 0.78rem; }
+.ap-up { color: var(--savings); font-weight: 800; font-size: 0.8rem; }
+.ap-down { color: #fbbf24; font-weight: 800; font-size: 0.8rem; }
+
+.ap-split {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.ap-split strong { color: #fff; }
+
+.adjust-history {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.adjust-empty {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--r-ctrl);
+  line-height: 1.6;
+}
+
+.adjust-item {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 9px 11px;
+}
+
+.adjust-item-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.adjust-item-sub {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
    SHARE TARGET  (شارك → BH)
 ════════════════════════════════════════════════════════════ */
 .share-raw {

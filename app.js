@@ -47,6 +47,7 @@ class BHApp {
       debts: [],
       riderShifts: [],
       workSessions: [],
+      adjustments: [],
       pendingIncomes: []
     };
   }
@@ -60,6 +61,7 @@ class BHApp {
       // Merge with defaults in case of missing keys
       const merged = { ...this.getDefaultData(), ...parsed, pendingIncomes: parsed.pendingIncomes || [] };
       merged.workSessions = parsed.workSessions || [];
+      merged.adjustments = parsed.adjustments || [];
       merged.settings = { ...this.getDefaultData().settings, ...(parsed.settings || {}) };
       merged.settings.challenges = merged.settings.challenges || {};
       merged.settings.badges = merged.settings.badges || {};
@@ -246,6 +248,15 @@ class BHApp {
     const modal = document.getElementById(modalId);
     if (modal) {
       modal.classList.remove('active');
+    }
+  }
+
+  // Close and fully remove a modal from the DOM (used by the balance adjust modal)
+  destroyModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('active');
+      setTimeout(() => modal.remove(), 220);
     }
   }
 
@@ -907,6 +918,7 @@ class BHApp {
     this.checkBadges();
     this.renderChallenges();
     this.renderDebtPlanner();
+    this.renderAdjustHistory();
   }
 
   // ── Month-over-Month Comparison ──────────────────────────────
@@ -2356,6 +2368,200 @@ class BHApp {
     if (modal) modal.remove();
     this.renderAll();
     this.showToast(`✅ تم حفظ ${amount} ج.م بنجاح`, 'success');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  BALANCE ADJUSTMENT  (تسوية الرصيد الحقيقي)
+  //  Sets the real balances WITHOUT creating an income/expense
+  // ═══════════════════════════════════════════════════════════
+
+  setAdjustMode(mode) {
+    this._adjustMode = mode || 'total';
+    const isTotal = this._adjustMode === 'total';
+
+    const btnTotal = document.getElementById('modeTotal');
+    const btnDetail = document.getElementById('modeDetail');
+    const fTotal = document.getElementById('modeTotalFields');
+    const fDetail = document.getElementById('modeDetailFields');
+
+    if (btnTotal) btnTotal.classList.toggle('active', isTotal);
+    if (btnDetail) btnDetail.classList.toggle('active', !isTotal);
+    if (fTotal) fTotal.style.display = isTotal ? 'block' : 'none';
+    if (fDetail) fDetail.style.display = isTotal ? 'none' : 'block';
+
+    this.updateAdjustPreview();
+  }
+
+  openBalanceAdjust() {
+    const reserved = this.data.balances.reservedSavings;
+    const spendable = this.data.balances.spendableBalance;
+
+    const elSpend = document.getElementById('adjustSpendable');
+    const elSpend2 = document.getElementById('adjustSpendable2');
+    const elRes = document.getElementById('adjustReserved');
+    if (elSpend) elSpend.value = spendable;
+    if (elSpend2) elSpend2.value = spendable;
+    if (elRes) elRes.value = reserved;
+
+    const note = document.getElementById('adjustNote');
+    if (note) note.value = '';
+
+    this.setAdjustMode('total');
+    this.openModal('balanceAdjustModal');
+  }
+
+  // Compute + show the before/after preview
+  updateAdjustPreview() {
+    const preview = document.getElementById('adjustPreview');
+    if (!preview) return;
+
+    const curReserved = this.data.balances.reservedSavings;
+    const curSpendable = this.data.balances.spendableBalance;
+
+    const splitEnabled = document.getElementById('adjustSplitEnabled');
+    const splitPct = document.getElementById('adjustSplitPct');
+    const pctLabel = document.getElementById('adjustSplitPctLabel');
+    const splitGroup = document.getElementById('adjustSplitGroup');
+
+    const isSplit = splitEnabled ? splitEnabled.checked : false;
+    if (splitGroup) splitGroup.style.display = isSplit ? 'block' : 'none';
+
+    const pct = splitPct ? parseInt(splitPct.value, 10) || 0 : 0;
+    if (pctLabel) pctLabel.textContent = pct + '%';
+
+    let newReserved, newSpendable;
+
+    if (this._adjustMode === 'detail') {
+      const r = parseFloat(document.getElementById('adjustReserved').value) || 0;
+      const s = parseFloat(document.getElementById('adjustSpendable2').value) || 0;
+      newReserved = r;
+      newSpendable = s;
+    } else {
+      const total = parseFloat(document.getElementById('adjustSpendable').value) || 0;
+      if (isSplit) {
+        newReserved = Math.round(total * (pct / 100));
+        newSpendable = total - newReserved;
+      } else {
+        newReserved = curReserved;
+        newSpendable = total;
+      }
+    }
+
+    const curTotal = curReserved + curSpendable;
+    const newTotal = newReserved + newSpendable;
+    const diff = newTotal - curTotal;
+
+    const diffHtml = diff === 0
+      ? `<span class="ap-same">بدون تغيير</span>`
+      : diff > 0
+        ? `<span class="ap-up">+${diff.toLocaleString()} ج.م زيادة</span>`
+        : `<span class="ap-down">${diff.toLocaleString()} ج.م فرق</span>`;
+
+    preview.innerHTML = `
+      <div class="ap-row">
+        <span class="ap-label">الرصيد دلوقتي</span>
+        <span class="ap-val">${curTotal.toLocaleString()} ج.م</span>
+      </div>
+      <div class="ap-row">
+        <span class="ap-label">بعد الضبط</span>
+        <span class="ap-val ap-new">${newTotal.toLocaleString()} ج.م</span>
+      </div>
+      <div class="ap-row">
+        <span class="ap-label">الفرق</span>
+        ${diffHtml}
+      </div>
+      <div class="ap-split">
+        🔒 تحويش: <strong>${newReserved.toLocaleString()}</strong> &nbsp;•&nbsp;
+        💳 صرف: <strong>${newSpendable.toLocaleString()}</strong>
+      </div>
+    `;
+  }
+
+  confirmBalanceAdjust(e) {
+    e.preventDefault();
+
+    const splitEnabled = document.getElementById('adjustSplitEnabled');
+    const splitPct = document.getElementById('adjustSplitPct');
+    const isSplit = splitEnabled ? splitEnabled.checked : false;
+    const pct = splitPct ? parseInt(splitPct.value, 10) || 0 : 0;
+
+    let newReserved, newSpendable;
+
+    if (this._adjustMode === 'detail') {
+      newReserved = Math.max(0, parseFloat(document.getElementById('adjustReserved').value) || 0);
+      newSpendable = Math.max(0, parseFloat(document.getElementById('adjustSpendable2').value) || 0);
+    } else {
+      const total = Math.max(0, parseFloat(document.getElementById('adjustSpendable').value) || 0);
+      if (isSplit) {
+        newReserved = Math.round(total * (pct / 100));
+        newSpendable = total - newReserved;
+      } else {
+        newReserved = this.data.balances.reservedSavings;
+        newSpendable = total;
+      }
+    }
+
+    const oldReserved = this.data.balances.reservedSavings;
+    const oldSpendable = this.data.balances.spendableBalance;
+    const oldTotal = oldReserved + oldSpendable;
+    const newTotal = newReserved + newSpendable;
+    const diff = newTotal - oldTotal;
+
+    if (oldReserved === newReserved && oldSpendable === newSpendable) {
+      this.showToast('ℹ️ مفيش تغيير في الرصيد');
+      this.closeModal('balanceAdjustModal');
+      return;
+    }
+
+    // Apply
+    this.data.balances.reservedSavings = newReserved;
+    this.data.balances.spendableBalance = newSpendable;
+
+    // Keep an audit log of adjustments (not counted as income/expenses)
+    if (!this.data.adjustments) this.data.adjustments = [];
+    const noteEl = document.getElementById('adjustNote');
+    this.data.adjustments.unshift({
+      id: 'adj_' + Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      oldTotal, newTotal, diff,
+      oldReserved, oldSpendable,
+      newReserved, newSpendable,
+      note: noteEl ? noteEl.value : ''
+    });
+    if (this.data.adjustments.length > 50) this.data.adjustments.length = 50;
+
+    this.saveData();
+    this.closeModal('balanceAdjustModal');
+    this.renderAll();
+    if (diff > 0) {
+      this.showToast(`✅ تم ضبط الرصيد — زيادة ${diff.toLocaleString()} ج.م (بدون قيد قبض)`, 'success');
+    } else {
+      this.showToast(`✅ تم ضبط الرصيد — فرق ${Math.abs(diff).toLocaleString()} ج.م (بدون قيد مصروف)`, 'info');
+    }
+  }
+
+  // Show the adjustment history
+  renderAdjustHistory() {
+    const box = document.getElementById('adjustHistoryBox');
+    if (!box) return;
+
+    const list = this.data.adjustments || [];
+    if (list.length === 0) {
+      box.innerHTML = '<div class="adjust-empty">لسه مفيش تسويات — اضبط رصيدك أول مرة عشان التطبيق يبدأ من رقم صح</div>';
+      return;
+    }
+
+    box.innerHTML = list.slice(0, 8).map(a => `
+      <div class="adjust-item">
+        <div class="adjust-item-main">
+          <span class="adjust-item-title">
+            ${a.diff >= 0 ? '📈' : '📉'}
+            ${a.diff >= 0 ? '+' : ''}${a.diff.toLocaleString()} ج.م
+          </span>
+          <span class="adjust-item-sub">${a.date} • ${a.oldTotal.toLocaleString()} ← ${a.newTotal.toLocaleString()}${a.note ? ' • ' + a.note : ''}</span>
+        </div>
+      </div>
+    `).join('');
   }
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }
