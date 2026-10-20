@@ -347,8 +347,7 @@ class BHApp {
   }
 }</pre>
           <button class="btn btn-secondary btn-full btn-sm" onclick="app.copyRules()">📋 انسخ القواعد</button>
-        </div>
-        <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/auth/providers" target="_blank" rel="noopener">
+        </div>        <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/auth/providers" target="_blank" rel="noopener">
           <span class="cloud-link-num">1</span>
           <span>
             <strong>فعّل Anonymous</strong>

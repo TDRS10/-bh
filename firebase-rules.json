@@ -1,18 +1,19 @@
 /* ============================================================
    BH — Firebase Realtime Database Rules
    ============================================================
-   📋 انسخ كل المحتوى اللي تحت ده → Firebase Console →
-      Realtime Database → Rules → استبدل كل اللي موجود → Publish
+   📋 انسخ الـ JSON اللي تحت → Realtime Database → Rules
+      → استبدل كل المحتوى القديم → Publish
 
-   أو (الطريقة السهلة): افتح الرابط ده وهيفتحلك الصفحة جاهزة:
+   الصفحة الجاهزة:
    https://console.firebase.google.com/project/bhxx-2a3be/database/bhxx-2a3be-default-rtdb/rules
 
-   ------------------------------------------------------------
-   القواعد:
+   ⚠️ لازم تستبدل القديم كله — لا تسيب أي ".read": false فوق.
+
+   📖 الشرح:
    • كل مستخدم عنده مساحة خاصة: users/{uid}
-   • يقدر يقرا ويكتب بس في مساحته هو
+   • يقدر يقرا ويكتب في مساحته هو بس
    • محدش يقدر يقرا أو يعدّل بيانات حد تاني
-   • مفيش قراءة عامة للـ root
+   • أي حاجة بره users/ مقفولة تماماً
    ============================================================ */
 
 {
@@ -20,15 +21,7 @@
     "users": {
       "$uid": {
         ".read":  "$uid === auth.uid",
-        ".write": "$uid === auth.uid",
-
-        "app": {
-          ".validate": "newData.hasChildren(['balances', 'incomes'])"
-        },
-
-        "meta": {
-          ".validate": "newData.hasChildren(['lastSync'])"
-        }
+        ".write": "$uid === auth.uid"
       }
     }
   }
