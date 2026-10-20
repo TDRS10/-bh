@@ -326,7 +326,28 @@ class BHApp {
 
     return `
       <div class="cloud-links">
-        <div class="cloud-links-title">🔧 افتح الإعدادات الأول (3 كليكات):</div>
+        <div class="cloud-links-title">🔧 المشكلة: الـ Rules مقفولة. افتح الرابط ده واضغط Publish:</div>
+        <a class="cloud-link cloud-link-primary" href="https://console.firebase.google.com/project/${pid}/database/${dbId}/rules" target="_blank" rel="noopener">
+          <span class="cloud-link-num">✎</span>
+          <span>
+            <strong>افتح صفحة Rules</strong>
+            <small>Realtime Database → Rules → Publish</small>
+          </span>
+        </a>
+        <div class="cloud-rules-box">
+          <div class="cloud-rules-title">📋 انسخ ده والصقه في صفحة Rules:</div>
+          <pre class="cloud-rules-code">{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read":  "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}</pre>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.copyRules()">📋 انسخ القواعد</button>
+        </div>
         <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/auth/providers" target="_blank" rel="noopener">
           <span class="cloud-link-num">1</span>
           <span>
@@ -341,16 +362,169 @@ class BHApp {
             <small>Authorized domains → mhmoudmohmed269-cmd.github.io</small>
           </span>
         </a>
-        <a class="cloud-link" href="https://console.firebase.google.com/project/${pid}/database/${dbId}/rules" target="_blank" rel="noopener">
-          <span class="cloud-link-num">3</span>
-          <span>
-            <strong>حط الـ Rules</strong>
-            <small>Realtime Database → Rules (الصق القواعد من ملف firebase-config.js)</small>
-          </span>
-        </a>
-        <div class="cloud-links-foot">بعد ما تخلص الـ 3 خطوات، ارجع للتطبيق واضغط "دخول سريع".</div>
+        <div class="cloud-links-foot">بعد Publish → ارجع للتطبيق واضغط "شخّص المشكلة" ثم "دخول سريع".</div>
       </div>
     `;
+  }
+
+  // Copy the rules JSON to the clipboard
+  copyRules() {
+    const rules = `{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read":  "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}`;
+    const done = () => this.showToast('📋 تم نسخ القواعد — الصقها في صفحة Rules', 'success');
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(rules).then(done).catch(() => this.fallbackCopy(rules, done));
+    } else {
+      this.fallbackCopy(rules, done);
+    }
+  }
+
+  fallbackCopy(text, cb) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); cb(); }
+    catch (e) { this.showToast('⚠️ انسخ القواعد يدوياً', 'error'); }
+    ta.remove();
+  }
+
+  // ── Diagnostics: find out exactly what's broken ──────────
+  async runCloudDiagnostics() {
+    const results = [];
+    const add = (name, ok, detail) => results.push({ name, ok, detail: detail || '' });
+
+    const cfg = window.BH_FIREBASE_CONFIG;
+    if (!cfg || !cfg.apiKey) {
+      add('الإعدادات', false, 'ملف firebase-config.js فاضي');
+      this.renderDiagnostics(results);
+      return;
+    }
+    add('الإعدادات', true, 'apiKey: ' + cfg.apiKey.slice(0, 12) + '… / ' + cfg.projectId);
+
+    // 1. SDK
+    if (typeof window.firebase === 'undefined' || !window.firebase) {
+      add('مكتبة Firebase', false, 'مش محمّلة — Internet ضعيف؟');
+      this.renderDiagnostics(results);
+      return;
+    }
+    const hasAuth = typeof window.firebase.auth === 'function';
+    const hasDb = typeof window.firebase.database === 'function';
+    add('مكتبة Firebase', hasAuth && hasDb,
+      hasAuth && hasDb ? 'محمّلة بالكامل' : 'ناقصة (auth: ' + hasAuth + ', database: ' + hasDb + ')');
+    if (!hasAuth || !hasDb) {
+      this.renderDiagnostics(results);
+      return;
+    }
+
+    // 2. Init
+    try {
+      if (!window.firebase.apps.length) window.firebase.initializeApp(cfg);
+      add('تهيئة المشروع', true, 'projectId: ' + cfg.projectId);
+    } catch (e) {
+      add('تهيئة المشروع', false, e.message);
+      this.renderDiagnostics(results);
+      return;
+    }
+
+    // 3. Sign in
+    let token = null;
+    let uid = null;
+    try {
+      const user = window.BHFirebase.getUser();
+      if (user) {
+        uid = user.uid;
+        token = await user.getIdToken();
+        add('تسجيل الدخول', true, 'مستخدم مجهول / ' + uid.slice(0, 10));
+      } else {
+        const cred = await window.firebase.auth().signInAnonymously();
+        uid = cred.user.uid;
+        token = await cred.user.getIdToken();
+        add('تسجيل الدخول', true, 'تم الدخول دلوقتي — ' + uid.slice(0, 10));
+      }
+    } catch (e) {
+      const code = e && e.code ? e.code : '';
+      add('تسجيل الدخول', false,
+        code === 'auth/configuration-not-found' ? 'Anonymous مفعّلش — Authentication → Sign-in method → Enable'
+        : code === 'auth/network-request-failed' ? 'مفيش نت — شوف الاتصال'
+        : (e.message || String(e)));
+      this.renderDiagnostics(results);
+      return;
+    }
+
+    // 4. Read / Write test against the real database
+    const dbUrl = cfg.databaseURL;
+    const testUrl = dbUrl + '/users/' + uid + '/app.json?auth=' + token;
+
+    try {
+      const res = await fetch(testUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updatedAt: Date.now(), data: { test: true } })
+      });
+      if (res.ok) {
+        add('الكتابة في القاعدة', true, 'نجحت — المسار: users/' + uid.slice(0, 8) + '/app');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        add('الكتابة في القاعدة', false,
+          res.status === 401 ? 'Permission denied — الـ Rules محتاجة تتحدّث (شوف firebase-rules.json)'
+          : ('HTTP ' + res.status + ' ' + (err.error || '')));
+        this.renderDiagnostics(results);
+        return;
+      }
+    } catch (e) {
+      add('الكتابة في القاعدة', false, 'الشبكة: ' + (e.message || e));
+      this.renderDiagnostics(results);
+      return;
+    }
+
+    try {
+      const res = await fetch(testUrl);
+      const data = await res.json();
+      if (res.ok) {
+        add('القراءة من القاعدة', true, 'نجحت');
+        // clean up the test node
+        fetch(dbUrl + '/users/' + uid + '/app.json?auth=' + token, { method: 'DELETE' }).catch(() => {});
+      } else {
+        add('القراءة من القاعدة', false, 'HTTP ' + res.status);
+      }
+    } catch (e) {
+      add('القراءة من القاعدة', false, e.message || String(e));
+    }
+
+    this.renderDiagnostics(results);
+  }
+
+  renderDiagnostics(results) {
+    let box = document.getElementById('diagBox');
+    if (!box) {
+      // Create the box if the card variant doesn't include one
+      const cloudBox = document.getElementById('cloudBox');
+      if (!cloudBox) return;
+      box = document.createElement('div');
+      box.id = 'diagBox';
+      box.className = 'diag-box';
+      cloudBox.appendChild(box);
+    }
+    box.innerHTML = results.map(r => `
+      <div class="diag-row ${r.ok ? 'ok' : 'fail'}">
+        <span class="diag-icon">${r.ok ? '✅' : '❌'}</span>
+        <span class="diag-name">${r.name}</span>
+        <span class="diag-detail">${r.detail}</span>
+      </div>
+    `).join('');
+    box.style.display = 'block';
   }
 
   // Friendly Arabic message for common Firebase errors
@@ -462,6 +636,10 @@ class BHApp {
             <div class="cloud-status-sub">${this.cloudErrorText(st.lastError || '')}</div>
           </div>
         </div>
+        <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
+          🔍 شخّص المشكلة بالتفصيل
+        </button>
+        <div id="diagBox" class="diag-box"></div>
         ${this.renderConsoleLinks()}
         <div class="cloud-actions">
           <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع</button>
@@ -485,6 +663,10 @@ class BHApp {
           <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع (هذا الجهاز)</button>
           <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
         </div>
+        <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
+          🔍 شخّص المشكلة بالتفصيل
+        </button>
+        <div id="diagBox" class="diag-box"></div>
         <div class="cloud-note">💡 "دخول سريع" = بيانات على هذا الجهاز بس. "Google" = مزامنة كل أجهزتك (لازم تضيف الدومين في Authorized domains).</div>
       `;
       return;
@@ -507,6 +689,10 @@ class BHApp {
         <button class="btn btn-primary btn-sm" onclick="app.manualSync()">🔄 مزامنة دلوقتي</button>
         <button class="btn btn-secondary btn-sm" onclick="app.cloudSignOut()">👋 خروج</button>
       </div>
+      <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
+        🔍 شخّص الاتصال
+      </button>
+      <div id="diagBox" class="diag-box"></div>
       <div class="cloud-note">
         🔒 بياناتك <strong>لا تُعرض</strong> لأي حد غيرك — كل مستخدم عنده مساحة منفصلة في القاعدة.
         ${isAnon ? '<br>⚠️ لو مسحت بيانات المتصفح، الدخول المجهول هيروح. سجّل بـ Google أو نزّل نسخة احتياطية.' : ''}

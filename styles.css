@@ -2404,6 +2404,86 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
   font-weight: 600;
 }
 
+/* ── Diagnostics panel ── */
+.diag-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.diag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-ctrl);
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.diag-row.ok {
+  background: rgba(0, 200, 122, 0.08);
+  border: 1px solid rgba(0, 200, 122, 0.22);
+}
+
+.diag-row.fail {
+  background: rgba(255, 59, 92, 0.08);
+  border: 1px solid rgba(255, 59, 92, 0.28);
+}
+
+.diag-icon { flex-shrink: 0; }
+
+.diag-name {
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.diag-detail {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Rules snippet box ── */
+.cloud-link-primary {
+  background: rgba(255, 59, 92, 0.08);
+  border-color: rgba(255, 59, 92, 0.3);
+}
+
+.cloud-rules-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  padding: 11px;
+  margin: 8px 0;
+}
+
+.cloud-rules-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 7px;
+}
+
+.cloud-rules-code {
+  background: rgba(0, 217, 255, 0.07);
+  border: 1px solid var(--border-accent);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: #a5f3fc;
+  overflow-x: auto;
+  direction: ltr;
+  text-align: left;
+  margin: 0 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+}
+
 /* ═══════════════════════════════════════════════════════════
    SHARE TARGET  (شارك → BH)
 ════════════════════════════════════════════════════════════ */
