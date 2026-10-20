@@ -44,13 +44,25 @@ window.BHFirebase = (function () {
   }
 
   /* ── Init ─────────────────────────────────────────────── */
-  function init() {
+  function init(attempt) {
+    attempt = attempt || 0;
+
     if (!isConfigured()) {
       setStatus('not-configured');
       return false;
     }
 
-    if (typeof firebase === 'undefined' || !firebase || !firebase.database) {
+    if (typeof firebase === 'undefined' || !firebase || !firebase.initializeApp) {
+      setStatus('sdk-missing');
+      return false;
+    }
+
+    // The auth / database libraries load as separate scripts — wait for them.
+    if (typeof firebase.database !== 'function' || typeof firebase.auth !== 'function') {
+      if (attempt < 40) {
+        setTimeout(function () { init(attempt + 1); }, 100);
+        return false;
+      }
       setStatus('sdk-missing');
       return false;
     }
@@ -65,16 +77,9 @@ window.BHFirebase = (function () {
       state.configured = true;
       state.ready = true;
 
-      // Enable offline persistence so the app keeps working with no internet
-      try {
-        state.db.app && state.db.app.options && null;
-        if (state.db.ref) state.db.ref('.info/connected');
-      } catch (e) { /* non-critical */ }
-
       state.auth.onAuthStateChanged(function (user) {
         state.user = user;
         if (user) {
-          state.lastSync = state.lastSync || null;
           setStatus('synced');
         } else {
           setStatus('signed-out');

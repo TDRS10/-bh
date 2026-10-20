@@ -135,12 +135,21 @@ class BHApp {
     };
 
     if (window.BHFirebase.isConfigured()) {
-      // Wait for the SDK to be present (max ~6s), then init
+      // Wait for the SDK to be fully present (max ~8s), then init.
+      // firebase.auth / firebase.database are added by their own scripts —
+      // they may not be ready yet when the page scripts first run.
       let waited = 0;
+      const sdkReady = () =>
+        typeof window.firebase !== 'undefined' &&
+        window.firebase &&
+        typeof window.firebase.initializeApp === 'function' &&
+        typeof window.firebase.database === 'function' &&
+        typeof window.firebase.auth === 'function';
+
       const waitForSdk = () => {
-        if (typeof window.firebase !== 'undefined' && window.firebase && window.firebase.database) {
+        if (sdkReady()) {
           tryInit();
-        } else if (waited < 60) {
+        } else if (waited < 80) {
           waited++;
           setTimeout(waitForSdk, 100);
         } else {
@@ -222,7 +231,9 @@ class BHApp {
       this.pullFromCloud();
       this.renderCloudCard();
     } catch (e) {
-      this.showToast('⚠️ فشل تسجيل الدخول: ' + (e.message || e), 'error');
+      const msg = (e && e.message) || String(e);
+      this.showToast(this.cloudErrorText(msg), 'error');
+      this.renderCloudCard();
     }
   }
 
@@ -240,9 +251,34 @@ class BHApp {
       if (msg.indexOf('popup') >= 0 || msg.indexOf('Popup') >= 0) {
         this.showToast('⚠️ المتصفح منع النافذة — جرّب من الموبايل', 'error');
       } else {
-        this.showToast('⚠️ فشل تسجيل الدخول: ' + msg, 'error');
+        this.showToast(this.cloudErrorText(msg), 'error');
       }
+      this.renderCloudCard();
     }
+  }
+
+  // Friendly Arabic message for common Firebase errors
+  cloudErrorText(msg) {
+    const m = (msg || '').toLowerCase();
+    if (m.indexOf('configuration-not-found') >= 0) {
+      return '⚙️ لازم تفعّل "Anonymous" من Firebase → Authentication → Sign-in method → Anonymous → Enable';
+    }
+    if (m.indexOf('network-request-failed') >= 0 || m.indexOf('network') >= 0) {
+      return '📴 مفيش نت — اتأكد إن الإنترنت شغال وجرب تاني';
+    }
+    if (m.indexOf('operation-not-allowed') >= 0) {
+      return '⚙️ لازم تفعّل "Anonymous" في Firebase → Authentication → Sign-in method';
+    }
+    if (m.indexOf('api-key-not-valid') >= 0 || m.indexOf('api key') >= 0) {
+      return '⚙️ الـ API Key غلط — راجع firebase-config.js';
+    }
+    if (m.indexOf('permission-denied') >= 0) {
+      return '🔒 권한 مرفوض — راجع الـ Rules في Realtime Database';
+    }
+    if (m.indexOf('unauthorized-domain') >= 0) {
+      return '🌐 ضيف الدومين في Firebase → Authorized domains';
+    }
+    return '⚠️ ' + msg;
   }
 
   async cloudSignOut() {
@@ -317,6 +353,24 @@ class BHApp {
           <div class="cloud-step"><span>5</span> حدّث التطبيق وارجع هنا</div>
         </div>
         <div class="cloud-note">💡 لحد ما تفعّلها، كل المميزات شغالة عادي — النسخ التلقائية في كارت "حماية البيانات" بتحميك.</div>
+      `;
+      return;
+    }
+
+    if (st.status === 'error') {
+      box.innerHTML = `
+        <div class="cloud-status bad">
+          <span class="cloud-status-icon">❌</span>
+          <div style="min-width:0;">
+            <div class="cloud-status-text">مشكلة في الاتصال بـ Firebase</div>
+            <div class="cloud-status-sub">${this.cloudErrorText(st.lastError || '')}</div>
+          </div>
+        </div>
+        <div class="cloud-actions">
+          <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع</button>
+          <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
+        </div>
+        <div class="cloud-note">💡 بياناتك محفوظة على الجهاز عادي — المزامنة بس اللي متوقفة.</div>
       `;
       return;
     }
