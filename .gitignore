@@ -4,6 +4,7 @@ build/
 app/build/
 *.apk
 *.aab
+!BH-Finance-v1.0.0.apk
 
 # ── Signing keys (NEVER commit) ──
 *.keystore
