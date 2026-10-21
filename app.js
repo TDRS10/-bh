@@ -712,6 +712,13 @@ class BHApp {
     this.updateUserAvatar();
     this.maybeShowWelcome();
     this.scheduleSmartNotification();
+    this.scheduleNativeNotification();
+
+    // Native integration (Capacitor)
+    if (window.BHNative) {
+      window.BHNative.init();
+      window.BHNative.App.onBackButton(() => this.handleNativeBack());
+    }
 
     // Close the user menu when clicking outside
     document.addEventListener('click', (e) => {
@@ -906,6 +913,13 @@ class BHApp {
       toast.style.transform = 'translateY(-10px)';
       setTimeout(() => toast.remove(), 300);
     }, 3200);
+
+    // Native haptic feedback mirrors the toast type
+    if (window.BHNative) {
+      if (type === 'success') window.BHNative.Haptics.success();
+      else if (type === 'error') window.BHNative.Haptics.error();
+      else if (type === 'warning') window.BHNative.Haptics.warning();
+    }
   }
 
   // Streak Tracker Logic
@@ -998,6 +1012,9 @@ class BHApp {
     this.data.incomes.unshift(incomeEntry);
     this.saveData();
     this.closeModal('newIncomeModal');
+
+    // Native haptic on save
+    if (window.BHNative) window.BHNative.Haptics.medium();
 
     // Populate Celebration Screen
     document.getElementById('celebSavingsRatio').textContent = this.data.settings.savingsRatio;
@@ -1162,6 +1179,9 @@ class BHApp {
     this.saveData();
     this.closeModal('newExpenseModal');
     this.renderAll();
+
+    // Native haptic on save
+    if (window.BHNative) window.BHNative.Haptics.medium();
 
     this.showToast(`✅ تم خصم ${amount} ج.م بنجاح من المتاح للصرف`);
     
@@ -3725,6 +3745,61 @@ class BHApp {
         }
       }
     } catch (e) { /* ignore */ }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  NATIVE INTEGRATION  (Capacitor — يعمل في التطبيق الأصلي)
+  // ═══════════════════════════════════════════════════════════
+
+  // Share the app (native share sheet)
+  async shareApp() {
+    const url = window.location.origin + window.location.pathname;
+    const text = 'BH — تطبيق إدارة القبض والمصاريف لفرسان الدليفري. حمّله من هنا:';
+    if (window.BHNative) {
+      const ok = await window.BHNative.Share.share({ title: 'BH — إدارة الفلوس', text: text, url: url });
+      if (ok && window.BHNative.Haptics) window.BHNative.Haptics.success();
+      return;
+    }
+    if (navigator.share) {
+      try { await navigator.share({ title: 'BH — إدارة الفلوس', text: text, url: url }); } catch (e) { /* cancelled */ }
+      return;
+    }
+    // Fallback: copy the link
+    try {
+      await navigator.clipboard.writeText(url);
+      this.showToast('📋 تم نسخ الرابط', 'success');
+    } catch (e) {
+      this.showToast('📋 ' + url, 'info');
+    }
+  }
+
+  // Schedule a native notification for tomorrow morning
+  scheduleNativeNotification() {
+    if (!window.BHNative || !window.BHNative.Notifications) return;
+
+    const cfg = this.getSmartAlertSettings();
+    if (!cfg.enabled) return;
+
+    const when = new Date();
+    when.setDate(when.getDate() + 1);
+    when.setHours(9, 0, 0, 0);
+
+    const alerts = this.getSmartAlerts();
+    const top = alerts[0];
+    const title = top ? top.title : 'صباح الفلوس ☀️';
+    const body = top ? top.body : 'افتح BH وشوف رصيدك ووردية امبارح.';
+
+    window.BHNative.Notifications.schedule(1, title, body, when.getTime());
+  }
+
+  // Handle the Android back button (close the app when already on the dashboard)
+  handleNativeBack() {
+    if (this.currentTab !== 'dashboardView') {
+      this.switchTab('dashboardView');
+      return;
+    }
+    // On the dashboard → let the OS close the app
+    if (window.BHNative && window.BHNative.App) window.BHNative.App.exit();
   }
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }

@@ -74,6 +74,7 @@
           <span id="userMenuSyncText">غير متزامن</span>
         </div>
         <div class="user-menu-actions">
+          <button class="user-menu-btn" onclick="app.shareApp(); app.closeUserMenu();">📤 مشاركة التطبيق</button>
           <button class="user-menu-btn" id="menuCloudBtn" onclick="app.openCloudSetup(); app.closeUserMenu();">☁️ المزامنة السحابية</button>
           <button class="user-menu-btn" id="menuSyncBtn" onclick="app.manualSync(); app.closeUserMenu();">🔄 مزامنة دلوقتي</button>
           <button class="user-menu-btn danger" id="menuSignOutBtn" onclick="app.cloudSignOut(); app.closeUserMenu();" style="display:none;">👋 تسجيل الخروج</button>
@@ -1061,6 +1062,19 @@
     })();
   </script>
   <script src="firebase-service.js"></script>
+
+  <!-- Capacitor native bridge (no-op in a normal browser) -->
+  <script src="capacitor-bridge.js"></script>
+  <script>
+    // Load the Capacitor runtime only inside the native app
+    (function () {
+      if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) return;
+      var s = document.createElement('script');
+      s.src = 'capacitor.js';
+      s.onload = function () { if (window.BHNative) window.BHNative.init(); };
+      document.head.appendChild(s);
+    })();
+  </script>
   <script>
     // Register Service Worker for Offline PWA
     if ('serviceWorker' in navigator) {

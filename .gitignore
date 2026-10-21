@@ -1,23 +1,28 @@
-# ── Build output ──
+# â”€â”€ Build output â”€â”€
 build/
 .gradle/
-app/build/
+.kotlin/
+android/.kotlin/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
 *.apk
 *.aab
 !BH-Finance-v1.0.0.apk
 
-# ── Signing keys (NEVER commit) ──
+# â”€â”€ Signing keys (NEVER commit) â”€â”€
 *.keystore
 *.jks
-!android/bh-release.keystore
+!keystore-backup.keystore
 
-# ── Node ──
+# â”€â”€ Node â”€â”€
 node_modules/
 package-lock.json
 
-# ── OS / editor ──
+# â”€â”€ OS / editor â”€â”€
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.log
+build-log.txt
