@@ -138,21 +138,6 @@ window.BHFirebase = (function () {
       });
   }
 
-  function signInWithEmail(email, password) {
-    if (!state.auth) return Promise.reject(new Error('Firebase غير مفعّل'));
-    setStatus('syncing');
-    return state.auth.signInWithEmailAndPassword(email, password)
-      .then(function (cred) {
-        state.user = cred.user;
-        setStatus('synced');
-        return cred.user;
-      })
-      .catch(function (e) {
-        setStatus('error', e.message);
-        throw e;
-      });
-  }
-
   function signOut() {
     if (!state.auth) return Promise.resolve();
     return state.auth.signOut().then(function () {
@@ -219,22 +204,6 @@ window.BHFirebase = (function () {
       });
   }
 
-  // Two-way sync: whoever changed last wins
-  function sync(localData, localUpdatedAt) {
-    return pull().then(function (remote) {
-      if (!remote) {
-        // Nothing in the cloud yet → upload ours
-        return push(localData);
-      }
-      if (remote.updatedAt > (localUpdatedAt || 0)) {
-        return { direction: 'pull', envelope: remote };
-      }
-      return push(localData).then(function () {
-        return { direction: 'push' };
-      });
-    });
-  }
-
   function onStatusChange(fn) {
     state.listeners.push(fn);
     try { fn(state); } catch (e) { /* ignore */ }
@@ -249,11 +218,9 @@ window.BHFirebase = (function () {
     isConfigured: isConfigured,
     signInAnonymously: signInAnonymously,
     signInWithGoogle: signInWithGoogle,
-    signInWithEmail: signInWithEmail,
     signOut: signOut,
     pull: pull,
     push: push,
-    sync: sync,
     onStatusChange: onStatusChange,
     getState: function () { return state; },
     getUser: function () { return state.user; }

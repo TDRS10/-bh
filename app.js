@@ -9,6 +9,17 @@ const BACKUP_TIME_KEY = 'BH_LAST_BACKUP_TIME';
 const SYNC_TIME_KEY = 'BH_LAST_SYNC_TIME';
 const LOCAL_TIME_KEY = 'BH_LOCAL_UPDATED_AT';
 
+// Escape user-entered text before injecting it into innerHTML
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 class BHApp {
   constructor() {
     this.data = this.loadData();
@@ -50,7 +61,6 @@ class BHApp {
         }
       ],
       debts: [],
-      riderShifts: [],
       workSessions: [],
       adjustments: [],
       pendingIncomes: []
@@ -130,7 +140,6 @@ class BHApp {
 
       window.BHFirebase.onStatusChange((st) => {
         this._cloudState = st;
-        this.renderCloudCard();
         this.updateUserAvatar();
       });
 
@@ -158,9 +167,8 @@ class BHApp {
           waited++;
           setTimeout(waitForSdk, 100);
         } else {
-          window.BHFirebase.onStatusChange((st) => { this._cloudState = st; this.renderCloudCard(); });
+          window.BHFirebase.onStatusChange((st) => { this._cloudState = st; this.updateUserAvatar(); });
           window.BHFirebase.getState().status = 'sdk-missing';
-          this.renderCloudCard();
         }
       };
       waitForSdk();
@@ -176,7 +184,6 @@ class BHApp {
     this._cloudPushTimer = setTimeout(() => {
       window.BHFirebase.push(this.data).then((ok) => {
         if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
-        this.renderCloudCard();
       });
     }, 2500);
   }
@@ -192,7 +199,6 @@ class BHApp {
         // Nothing in the cloud yet → upload ours
         window.BHFirebase.push(this.data).then((ok) => {
           if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
-          this.renderCloudCard();
         });
         return;
       }
@@ -217,10 +223,8 @@ class BHApp {
       // Push the merged result back so every device converges
       window.BHFirebase.push(this.data).then((ok) => {
         if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
-        this.renderCloudCard();
       });
       this.renderAll();
-      this.renderCloudCard();
     });
   }
 
@@ -291,11 +295,9 @@ class BHApp {
       this._cloudReady = true;
       this.showToast('☁️ تم تسجيل الدخول — المزامنة شغالة!', 'success');
       this.pullFromCloud();
-      this.renderCloudCard();
     } catch (e) {
       const msg = (e && e.message) || String(e);
       this.showToast(this.cloudErrorText(msg), 'error');
-      this.renderCloudCard();
     }
   }
 
@@ -306,7 +308,6 @@ class BHApp {
       this._cloudReady = true;
       this.showToast('☁️ تم تسجيل الدخول بـ Google — مزامنة كل أجهزتك!', 'success');
       this.pullFromCloud();
-      this.renderCloudCard();
     } catch (e) {
       const msg = (e && e.message) || String(e);
       if (msg.indexOf('popup') >= 0 || msg.indexOf('Popup') >= 0) {
@@ -314,8 +315,64 @@ class BHApp {
       } else {
         this.showToast(this.cloudErrorText(msg), 'error');
       }
-      this.renderCloudCard();
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  CLOUD SETUP MODAL  (إعداد المزامنة السحابية)
+  // ═══════════════════════════════════════════════════════════
+
+  // Open the cloud setup / sign-in modal
+  openCloudSetup() {
+    const existing = document.getElementById('cloudSetupModal');
+    if (existing) existing.remove();
+
+    const svc = window.BHFirebase;
+    const st = svc ? svc.getState() : { status: 'not-configured' };
+    const user = svc ? svc.getUser() : null;
+    const configured = svc ? svc.isConfigured() : false;
+
+    const statusLine = configured
+      ? (user ? '☁️ متزامن مع السحابة' : '🔓 سجّل دخول عشان تبدأ المزامنة')
+      : '⚙️ المزامنة السحابية مش مفعّلة — البيانات محفوظة على الجهاز بس';
+
+    const el = document.createElement('div');
+    el.id = 'cloudSetupModal';
+    el.className = 'modal-overlay active';
+    el.innerHTML = `
+      <div class="modal-container">
+        <div class="modal-header">
+          <span class="modal-title">☁️ المزامنة السحابية</span>
+          <button class="close-btn" onclick="app.destroyModal('cloudSetupModal')">✕</button>
+        </div>
+
+        <div class="cloud-status ${user ? 'ok' : 'idle'}" style="margin-bottom:12px;">
+          <span class="cloud-status-icon">${user ? '☁️' : '⚙️'}</span>
+          <div style="min-width:0;">
+            <div class="cloud-status-text">${statusLine}</div>
+            <div class="cloud-status-sub">${user && user.email ? user.email : 'بياناتك تنحفظ على السحابة وتتظبط من أي جهاز'}</div>
+          </div>
+        </div>
+
+        ${configured ? `
+          <div class="cloud-actions" style="margin-bottom:10px;">
+            <button class="btn btn-primary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع</button>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
+            🔍 شخّص الاتصال
+          </button>
+          <div id="diagBox" class="diag-box"></div>
+        ` : ''}
+
+        ${this.renderConsoleLinks()}
+
+        <div class="cloud-note" style="margin-top:10px;">
+          💡 البيانات محفوظة على جهازك دايماً — المزامنة بس اللي إضافية.
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
   }
 
   // Direct links to the exact Firebase console pages for THIS project
@@ -557,174 +614,15 @@ class BHApp {
       await window.BHFirebase.signOut();
       this._cloudReady = false;
       this.showToast('👋 تم تسجيل الخروج — البيانات لسه محفوظة على الجهاز', 'info');
-      this.renderCloudCard();
+      this.updateUserAvatar();
     } catch (e) { /* ignore */ }
   }
 
-  // Render the cloud sync card
-  renderCloudCard() {
-    const box = document.getElementById('cloudBox');
-    if (!box) return;
-
-    const svc = window.BHFirebase;
-    if (!svc) {
-      box.innerHTML = '<div class="cloud-setup">ملف الخدمة غير موجود</div>';
-      return;
-    }
-
-    const st = svc.getState();
-    const user = svc.getUser();
-
-    const STATUS_UI = {
-      'not-configured': { icon: '⚙️', cls: 'idle', text: 'مش مفعّل — البيانات محفوظة على الجهاز بس' },
-      'sdk-missing':    { icon: '📦', cls: 'warn', text: 'مكتبة Firebase مش محمّلة (نت ضعيف؟)' },
-      'ready':          { icon: '⏳', cls: 'idle', text: 'جاهز' },
-      'signed-out':     { icon: '🔓', cls: 'idle', text: 'لسه داخلتش — سجّل دخول عشان المزامنة' },
-      'syncing':        { icon: '🔄', cls: 'busy', text: 'جاري المزامنة...' },
-      'synced':         { icon: '☁️', cls: 'ok',   text: 'متزامن مع السحابة' },
-      'offline':        { icon: '📴', cls: 'warn', text: 'مفيش نت — البيانات محفوظة محلياً' },
-      'error':          { icon: '❌', cls: 'bad',  text: 'خطأ: ' + (st.lastError || '') }
-    };
-
-    const s = STATUS_UI[st.status] || STATUS_UI['idle'];
-    const lastSync = st.lastSync ? new Date(st.lastSync) : null;
-    const lastSyncTxt = lastSync
-      ? lastSync.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ' — ' +
-        lastSync.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-      : 'لسه ما التزامنش';
-
-    if (st.status === 'sdk-missing') {
-      box.innerHTML = `
-        <div class="cloud-status warn">
-          <span class="cloud-status-icon">📦</span>
-          <div>
-            <div class="cloud-status-text">مكتبة Firebase مش محمّلة</div>
-            <div class="cloud-status-sub">Internet ضعيف أو محجوب. بياناتك محفوظة على الجهاز عادي — المزامنة هتشتغل أول ما النت improves.</div>
-          </div>
-        </div>
-        <button class="btn btn-secondary btn-full btn-sm" onclick="location.reload()">🔄 إعادة المحاولة</button>
-      `;
-      return;
-    }
-
-    if (!svc.isConfigured()) {
-      box.innerHTML = `
-        <div class="cloud-status idle">
-          <span class="cloud-status-icon">⚙️</span>
-          <div>
-            <div class="cloud-status-text">المزامنة السحابية مش مفعّلة</div>
-            <div class="cloud-status-sub">البيانات محفوظة على جهازك بس — افتح الملف <code>firebase-config.js</code> وحط إعدادات Firebase عشان تفعّلها.</div>
-          </div>
-        </div>
-        <div class="cloud-steps">
-          <div class="cloud-step"><span>1</span> افتح console.firebase.google.com واعمل مشروع مجاني</div>
-          <div class="cloud-step"><span>2</span> أنشئ Realtime Database (LOCKED mode)</div>
-          <div class="cloud-step"><span>3</span> من Project Settings انسخ الـ config والصقه في <code>firebase-config.js</code></div>
-          <div class="cloud-step"><span>4</span> فعّل Anonymous في Authentication + ضيف الدومين في Authorized domains</div>
-          <div class="cloud-step"><span>5</span> حدّث التطبيق وارجع هنا</div>
-        </div>
-        <div class="cloud-note">💡 لحد ما تفعّلها، كل المميزات شغالة عادي — النسخ التلقائية في كارت "حماية البيانات" بتحميك.</div>
-      `;
-      return;
-    }
-
-    if (st.status === 'error') {
-      box.innerHTML = `
-        <div class="cloud-status bad">
-          <span class="cloud-status-icon">❌</span>
-          <div style="min-width:0;">
-            <div class="cloud-status-text">مشكلة في الاتصال بـ Firebase</div>
-            <div class="cloud-status-sub">${this.cloudErrorText(st.lastError || '')}</div>
-          </div>
-        </div>
-        <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
-          🔍 شخّص المشكلة بالتفصيل
-        </button>
-        <div id="diagBox" class="diag-box"></div>
-        ${this.renderConsoleLinks()}
-        <div class="cloud-actions">
-          <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع</button>
-          <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
-        </div>
-        <div class="cloud-note">💡 بياناتك محفوظة على الجهاز عادي — المزامنة بس اللي متوقفة.</div>
-      `;
-      return;
-    }
-
-    if (!user) {
-      box.innerHTML = `
-        <div class="cloud-status idle">
-          <span class="cloud-status-icon">${s.icon}</span>
-          <div>
-            <div class="cloud-status-text">${s.text}</div>
-            <div class="cloud-status-sub">سجّل دخول عشان بياناتك تنحفظ على السحابة وتتظبط من أي جهاز.</div>
-          </div>
-        </div>
-        <div class="cloud-actions">
-          <button class="btn btn-primary btn-sm" onclick="app.cloudSignInAnon()">🔓 دخول سريع (هذا الجهاز)</button>
-          <button class="btn btn-secondary btn-sm" onclick="app.cloudSignInGoogle()">🔵 دخول بـ Google</button>
-        </div>
-        <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
-          🔍 شخّص المشكلة بالتفصيل
-        </button>
-        <div id="diagBox" class="diag-box"></div>
-        <div class="cloud-note">💡 "دخول سريع" = بيانات على هذا الجهاز بس. "Google" = مزامنة كل أجهزتك (لازم تضيف الدومين في Authorized domains).</div>
-      `;
-      return;
-    }
-
-    // Signed in
-    const isAnon = user.isAnonymous;
-    box.innerHTML = `
-      <div class="cloud-status ${s.cls}">
-        <span class="cloud-status-icon">${s.icon}</span>
-        <div style="min-width:0;">
-          <div class="cloud-status-text">${s.text}</div>
-          <div class="cloud-status-sub">
-            ${isAnon ? 'مستخدم مجهول — هذا الجهاز بس' : (user.email || 'متصل بـ Google')}
-            &nbsp;•&nbsp; آخر مزامنة: ${lastSyncTxt}
-          </div>
-        </div>
-      </div>
-      <div class="cloud-actions">
-        <button class="btn btn-primary btn-sm" onclick="app.manualSync()">🔄 مزامنة دلوقتي</button>
-        <button class="btn btn-secondary btn-sm" onclick="app.cloudSignOut()">👋 خروج</button>
-      </div>
-      <button class="btn btn-secondary btn-full btn-sm" onclick="app.runCloudDiagnostics()" style="margin-bottom:10px;">
-        🔍 شخّص الاتصال
-      </button>
-      <div id="diagBox" class="diag-box"></div>
-      <div class="cloud-note">
-        🔒 بياناتك <strong>لا تُعرض</strong> لأي حد غيرك — كل مستخدم عنده مساحة منفصلة في القاعدة.
-        ${isAnon ? '<br>⚠️ لو مسحت بيانات المتصفح، الدخول المجهول هيروح. سجّل بـ Google أو نزّل نسخة احتياطية.' : ''}
-      </div>
-    `;
-  }
-
   // ═══════════════════════════════════════════════════════════
-  //  DATA PROTECTION  (حماية البيانات)
+  //  AUTO BACKUP + SNAPSHOTS  (حماية البيانات — تعمل في الخلفية)
   // ═══════════════════════════════════════════════════════════
 
-  // Keep the last N snapshots so a corrupt/accidental state can be recovered
-  _saveSnapshot() {
-    try {
-      const snaps = this.getSnapshots();
-      // Skip if nothing changed since the last snapshot
-      const payload = JSON.stringify(this.data);
-      if (snaps.length && snaps[0].payload === payload) return;
-
-      snaps.unshift({
-        ts: Date.now(),
-        payload
-      });
-      while (snaps.length > 6) snaps.pop();
-      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snaps));
-    } catch (e) {
-      // Snapshots are best-effort — never block a normal save
-      console.warn('Snapshot failed:', e);
-    }
-  }
-
+  // Read the rolling snapshots
   getSnapshots() {
     try {
       const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -734,23 +632,18 @@ class BHApp {
     }
   }
 
-  // Restore the data from one of the rolling snapshots
-  restoreSnapshot(index) {
-    const snaps = this.getSnapshots();
-    const snap = snaps[index];
-    if (!snap) {
-      this.showToast('⚠️ النسخة دي مش موجودة');
-      return;
-    }
+  // Keep the last N snapshots so a corrupt/accidental state can be recovered
+  _saveSnapshot() {
     try {
-      const parsed = JSON.parse(snap.payload);
-      if (!parsed.balances || !parsed.incomes) throw new Error('invalid');
-      this.data = parsed;
-      this.saveData();
-      this.renderAll();
-      this.showToast('🎉 تم استرجاع النسخة الاحتياطية بنجاح!', 'success');
+      const snaps = this.getSnapshots();
+      const payload = JSON.stringify(this.data);
+      if (snaps.length && snaps[0].payload === payload) return;
+
+      snaps.unshift({ ts: Date.now(), payload });
+      while (snaps.length > 6) snaps.pop();
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snaps));
     } catch (e) {
-      this.showToast('⚠️ النسخة دي تالفة — جرّب نسخة تانية', 'error');
+      console.warn('Snapshot failed:', e);
     }
   }
 
@@ -771,7 +664,6 @@ class BHApp {
 
       localStorage.setItem(BACKUP_TIME_KEY, String(Date.now()));
       if (!silent) this.showToast('📦 تم تحميل النسخة الاحتياطية — هتلاقيها في فولدر Downloads', 'success');
-      this.renderProtection();
       return true;
     } catch (e) {
       console.error('Backup download failed:', e);
@@ -780,130 +672,24 @@ class BHApp {
     }
   }
 
-  // Auto-backup: download a copy every 3 days (and warn if too long)
+  // Auto-backup: download a copy every 3 days
   autoBackupCheck() {
     const last = parseInt(localStorage.getItem(BACKUP_TIME_KEY) || '0', 10);
     const days = last ? Math.floor((Date.now() - last) / 86400000) : 999;
-
-    if (days >= 3) {
-      // Only auto-download when the page is visible and the user isn't in a hurry
-      this.downloadBackup(true);
-      this._autoBackupDone = true;
-    }
-    this._daysSinceBackup = days;
+    if (days >= 3) this.downloadBackup(true);
   }
 
-  // Render the data protection card
-  renderProtection() {
-    const box = document.getElementById('protectionBox');
-    if (!box) return;
-
-    const snaps = this.getSnapshots();
-    const lastBackup = parseInt(localStorage.getItem(BACKUP_TIME_KEY) || '0', 10);
-    const daysSince = lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : null;
-
-    // Storage size
-    let sizeKB = 0;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY) || '';
-      sizeKB = Math.round((raw.length + (localStorage.getItem(SNAPSHOT_KEY) || '').length) / 1024);
-    } catch (e) { /* ignore */ }
-
-    // Health checks
-    const checks = [];
-    let health = 100;
-
-    if (daysSince === null) {
-      checks.push({ ok: false, text: 'لسه مفيش نسخة احتياطية محفوظة على الجهاز' });
-      health -= 40;
-    } else if (daysSince > 7) {
-      checks.push({ ok: false, text: `آخر نسخة احتياطية من ${daysSince} يوم — يفضل تعمل واحد جديد` });
-      health -= 25;
-    } else {
-      checks.push({ ok: true, text: `آخر نسخة احتياطية: من ${daysSince} ${daysSince === 0 ? 'يوم' : 'أيام'}` });
-    }
-
-    if (snaps.length > 0) {
-      checks.push({ ok: true, text: `${snaps.length} نسخة تلقائية محفوظة (استرجاع فوري لو حصل خطأ)` });
-    } else {
-      checks.push({ ok: false, text: 'مفيش نسخ تلقائية محفوظة' });
-      health -= 20;
-    }
-
-    // localStorage availability
-    let storageOk = true;
-    try {
-      localStorage.setItem('__test__', '1');
-      localStorage.removeItem('__test__');
-    } catch (e) {
-      storageOk = false;
-    }
-    if (!storageOk) {
-      checks.push({ ok: false, text: '⚠️ المتصفح بيمنع التخزين — البيانات مش هتتحفظ! (غالباً وضع التصفح الخاص)' });
-      health -= 60;
-    } else {
-      checks.push({ ok: true, text: 'التخزين شغال بشكل طبيعي' });
-    }
-
-    health = Math.max(0, health);
-    const healthColor = health >= 80 ? 'var(--savings)' : health >= 50 ? '#fbbf24' : 'var(--danger)';
-
-    // Snapshots list
-    const snapList = snaps.length > 0 ? `
-      <div class="prot-snapshots">
-        <div class="prot-sub-title">النسخ التلقائية المحفوظة</div>
-        ${snaps.map((s, i) => {
-          const d = new Date(s.ts);
-          const label = d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ' — ' +
-                        d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-          let summary = '';
-          try {
-            const p = JSON.parse(s.payload);
-            summary = `رصيد ${((p.balances.reservedSavings || 0) + (p.balances.spendableBalance || 0)).toLocaleString()} ج.م`;
-          } catch (e) { /* ignore */ }
-          return `
-            <div class="prot-snap-row">
-              <span class="prot-snap-info">
-                <strong>${label}</strong>
-                <small>${summary}</small>
-              </span>
-              <button class="btn btn-secondary btn-sm" onclick="app.restoreSnapshot(${i})">استرجاع</button>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    ` : '';
-
-    box.innerHTML = `
-      <div class="prot-health">
-        <div class="prot-health-ring" style="border-color: ${healthColor}">
-          <span style="color:${healthColor}">${health}%</span>
-        </div>
-        <div class="prot-health-text">
-          <div class="prot-health-title">حالة حماية بياناتك</div>
-          <div class="prot-health-sub">${health >= 80 ? '🟢 ممتاز — بياناتك محفوظة كويس' : health >= 50 ? '🟡 مقبول — بس اعمل نسخة احتياطية' : '🔴 خطر — بياناتك ممكن تضيع!'}</div>
-        </div>
-      </div>
-
-      <div class="prot-checks">
-        ${checks.map(c => `<div class="prot-check ${c.ok ? 'ok' : 'warn'}">${c.ok ? '✅' : '⚠️'} ${c.text}</div>`).join('')}
-      </div>
-
-      <div class="prot-actions">
-        <button class="btn btn-primary btn-sm" onclick="app.downloadBackup()">📦 نسخة احتياطية الآن</button>
-        <button class="btn btn-secondary btn-sm" onclick="app.exportData()">📤 تصدير (Backup)</button>
-      </div>
-
-      <div class="prot-size">💽 حجم البيانات المحفوظة: <strong>${sizeKB} كيلوبايت</strong></div>
-
-      ${snapList}
-    `;
-  }
-
-  // Ask before closing if there is unsaved work (protects against accidental loss)
   installUnloadGuard() {
     window.addEventListener('beforeunload', (e) => {
-      if (this._hasUnsavedChanges) {
+      // Only warn while a form has unsaved input
+      const form = document.querySelector('.modal-overlay.active form');
+      if (!form) return;
+      let dirty = false;
+      form.querySelectorAll('input, textarea, select').forEach((el) => {
+        if (el.type === 'checkbox' || el.type === 'radio') return;
+        if (el.value && el.value.trim() !== '') dirty = true;
+      });
+      if (dirty) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -921,7 +707,6 @@ class BHApp {
     this.initSplash();
     this.handleLaunchIntent();
     this.autoBackupCheck();
-    this.renderProtection();
     this.installUnloadGuard();
     this.initCloudSync();
     this.updateUserAvatar();
@@ -1627,7 +1412,7 @@ class BHApp {
     if (!debt) return;
 
     const remaining = debt.totalAmount - debt.paidAmount;
-    const amtStr = prompt(`أدخل مبلغ السداد للدين (${debt.creditor}) - المتبقي: ${remaining} ج.م:`, remaining);
+    const amtStr = prompt(`أدخل مبلغ السداد للدين (${esc(debt.creditor)}) - المتبقي: ${remaining} ج.م:`, remaining);
     const payAmt = parseFloat(amtStr);
 
     if (!isNaN(payAmt) && payAmt > 0) {
@@ -1644,7 +1429,7 @@ class BHApp {
         id: 'exp_' + Date.now(),
         amount: payAmt,
         category: 'ديون',
-        note: `سداد جزء من دين ${debt.creditor}`,
+        note: `سداد جزء من دين ${esc(debt.creditor)}`,
         date: new Date().toISOString().split('T')[0]
       });
 
@@ -1688,21 +1473,7 @@ class BHApp {
     this.showToast('✅ تم حفظ نسب تقسيم القبض بنجاح');
   }
 
-  // Data Import/Export/Reset
-  exportData() {
-    const jsonStr = JSON.stringify(this.data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `BH_Finance_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    localStorage.setItem(BACKUP_TIME_KEY, String(Date.now()));
-    this.showToast('📦 تم تصدير النسخة الاحتياطية بنجاح');
-    this.renderProtection();
-  }
-
+  // Data Import/Reset  (export lives in downloadBackup)
   importData(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1737,7 +1508,6 @@ class BHApp {
         }
 
         this.renderAll();
-        this.renderProtection();
       } catch (err) {
         this.showToast('⚠️ حدث خطأ أثناء قراءة الملف');
       } finally {
@@ -1926,8 +1696,8 @@ class BHApp {
         <div class="item-main">
           <div class="item-icon outing">⏳</div>
           <div class="item-details">
-            <span class="item-title">${item.source} — ${item.amount.toLocaleString()} ج.م</span>
-            <span class="item-sub">${item.notes || 'قبض منتظر'} • ${item.date}</span>
+            <span class="item-title">${esc(item.source)} — ${item.amount.toLocaleString()} ج.م</span>
+            <span class="item-sub">${esc(item.notes || 'قبض منتظر')} • ${item.date}</span>
           </div>
         </div>
         <div style="display: flex; gap: 6px; align-items: center;">
@@ -1942,6 +1712,14 @@ class BHApp {
     const reserved = this.data.balances.reservedSavings;
     const spendable = this.data.balances.spendableBalance;
     const total = reserved + spendable;
+
+    // Current month + year in the dashboard header
+    const dateEl = document.getElementById('dashboardDateText');
+    if (dateEl) {
+      const now = new Date();
+      const monthNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      dateEl.textContent = monthNames[now.getMonth()] + ' ' + now.getFullYear();
+    }
 
     document.getElementById('totalBalanceVal').textContent = total.toLocaleString();
     document.getElementById('reservedSavingsVal').textContent = reserved.toLocaleString();
@@ -2053,8 +1831,8 @@ class BHApp {
           <div class="item-main">
             <div class="item-icon ${iconClass}">${iconSymbol}</div>
             <div class="item-details">
-              <span class="item-title">${isInc ? 'قبض: ' + item.source : item.category}</span>
-              <span class="item-sub">${item.date} ${item.notes || item.note ? '• ' + (item.notes || item.note) : ''}</span>
+              <span class="item-title">${isInc ? 'قبض: ' + esc(item.source) : esc(item.category)}</span>
+              <span class="item-sub">${item.date} ${(item.notes || item.note) ? '• ' + esc(item.notes || item.note) : ''}</span>
             </div>
           </div>
           <div class="item-amount ${colorClass}">${amountSign}${item.amount.toLocaleString()} ج.م</div>
@@ -2077,7 +1855,7 @@ class BHApp {
         <div class="item-main">
           <div class="item-icon income">💵</div>
           <div class="item-details">
-            <span class="item-title">قبض (${inc.source})</span>
+            <span class="item-title">قبض (${esc(inc.source)})</span>
             <span class="item-sub">${inc.date} ${inc.notes ? '• ' + inc.notes : ''}</span>
             <small style="color: var(--text-muted); font-size: 0.72rem;">🔒تحويش: ${inc.savingsAmt} | 💳متاح: ${inc.essentialsAmt + inc.outingsAmt}</small>
           </div>
@@ -2104,7 +1882,7 @@ class BHApp {
         <div class="item-main">
           <div class="item-icon ${exp.category === 'خروجة' ? 'outing' : 'expense'}">${exp.category === 'خروجة' ? '❤️' : '💸'}</div>
           <div class="item-details">
-            <span class="item-title">${exp.category}</span>
+            <span class="item-title">${esc(exp.category)}</span>
             <span class="item-sub">${exp.date} ${exp.note ? '• ' + exp.note : ''}</span>
           </div>
         </div>
@@ -2132,7 +1910,7 @@ class BHApp {
       return `
         <div class="list-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #fff;">🎯 ${goal.title}</strong>
+            <strong style="color: #fff;">🎯 ${esc(goal.title)}</strong>
             <button class="delete-btn" onclick="app.deleteItem('goal', '${goal.id}')">🗑️</button>
           </div>
           <div class="progress-bar-container" style="margin: 2px 0;">
@@ -2177,7 +1955,7 @@ class BHApp {
       const urgency = this.getDebtUrgency(debt);
       const urgencyColor = !urgency ? ''
         : (urgency.level === 'overdue' || urgency.level === 'today') ? 'var(--danger)'
-        : urgency.level === 'soon' ? '#f59e0b'
+        : urgency.level === 'soon' ? 'var(--warning)'
         : 'var(--savings)';
       const urgencyHtml = urgency ? ` • <span style="color: ${urgencyColor}; font-weight: 800;">${urgency.label}</span>` : '';
       const isDanger = urgency && (urgency.level === 'overdue' || urgency.level === 'today');
@@ -2186,7 +1964,7 @@ class BHApp {
         <div class="list-item" style="flex-direction: column; align-items: stretch; gap: 8px; ${isDanger ? 'border-right: 3px solid var(--danger);' : ''}">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <strong style="color: #fff;">📌 ${debt.creditor}</strong>
+              <strong style="color: #fff;">📌 ${esc(debt.creditor)}</strong>
               <div style="font-size: 0.75rem; color: var(--text-muted);">استحقاق: ${debt.dueDate || 'غير محدد'}${urgencyHtml}</div>
             </div>
             <div style="display: flex; gap: 6px;">
@@ -2265,7 +2043,7 @@ class BHApp {
           <div class="item-main">
             <div class="item-icon expense">${urgency.icon}</div>
             <div class="item-details">
-              <span class="item-title">📌 ${debt.creditor}</span>
+              <span class="item-title">📌 ${esc(debt.creditor)}</span>
               <span class="item-sub">${urgency.label} • المتبقي: ${remaining.toLocaleString()} ج.م</span>
             </div>
           </div>
@@ -2300,7 +2078,7 @@ class BHApp {
 
     const lines = critical.map(({ debt, urgency }) => {
       const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
-      return `${urgency.icon} ${debt.creditor}: ${urgency.label} — المتبقي ${remaining.toLocaleString()} ج.م`;
+      return `${urgency.icon} ${esc(debt.creditor)}: ${urgency.label} — المتبقي ${remaining.toLocaleString()} ج.م`;
     });
 
     try {
@@ -2608,8 +2386,8 @@ class BHApp {
       <div class="badge-celeb-inner">
         <div class="badge-celeb-icon">${badge.icon}</div>
         <div class="badge-celeb-title">شارة جديدة!</div>
-        <div class="badge-celeb-name">${badge.title}</div>
-        <div class="badge-celeb-desc">${badge.desc}</div>
+        <div class="badge-celeb-name">${esc(badge.title)}</div>
+        <div class="badge-celeb-desc">${esc(badge.desc)}</div>
       </div>
     `;
     document.body.appendChild(el);
@@ -2651,8 +2429,8 @@ class BHApp {
           <div class="challenge-head">
             <div class="challenge-icon">${c.icon}</div>
             <div class="challenge-info">
-              <div class="challenge-title">${c.title}</div>
-              <div class="challenge-desc">${c.desc}</div>
+              <div class="challenge-title">${esc(c.title)}</div>
+              <div class="challenge-desc">${esc(c.desc)}</div>
             </div>
             <button class="challenge-toggle ${isActive ? 'on' : ''}" onclick="app.toggleChallenge('${c.id}')" title="${isActive ? 'إلغاء' : 'تفعيل'}">
               ${isActive ? '✓' : '○'}
@@ -2938,7 +2716,7 @@ class BHApp {
         <div class="dp-row ${isTarget ? 'target' : ''}">
           <div class="dp-order">${i + 1}</div>
           <div class="dp-info">
-            <div class="dp-name">${d.creditor} ${isTarget ? '<span class="dp-target-tag">الأولوية</span>' : ''}</div>
+            <div class="dp-name">${esc(d.creditor)} ${isTarget ? '<span class="dp-target-tag">الأولوية</span>' : ''}</div>
             <div class="dp-meta">${d.dueDate ? `استحقاق ${d.dueDate}` : 'بدون تاريخ استحقاق'} ${d.interest > 0 ? ` • فايدة ${d.interest}%` : ''}</div>
             ${badge}
           </div>
@@ -2951,7 +2729,7 @@ class BHApp {
       <div class="dp-timeline-item">
         <div class="dp-timeline-dot"></div>
         <div class="dp-timeline-text">
-          <strong>${o.creditor}</strong> — خلصته في <span class="dp-tl-month">${this.getPayoffDateLabel(o.month)}</span>
+          <strong>${esc(o.creditor)}</strong> — خلصته في <span class="dp-tl-month">${this.getPayoffDateLabel(o.month)}</span>
         </div>
       </div>
     `).join('');
@@ -2961,7 +2739,7 @@ class BHApp {
       const pct = Math.max(6, Math.round((d.remaining / maxDebt) * 100));
       return `
         <div class="dp-bar-row">
-          <span class="dp-bar-label">${d.creditor}</span>
+          <span class="dp-bar-label">${esc(d.creditor)}</span>
           <div class="dp-bar-track">
             <div class="dp-bar-fill" style="width:${pct}%"></div>
           </div>
@@ -3527,17 +3305,12 @@ class BHApp {
 
     const btn = document.getElementById('userAvatarBtn');
     if (btn) btn.classList.toggle('signed-in', !!user && !isAnon);
-  }
 
-  avatarFallback() {
-    ['userAvatarImg', 'menuAvatarImg'].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-    ['userAvatarFallback', 'menuAvatarFallback'].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'flex';
-    });
+    // Show / hide the sign-in vs sign-out buttons
+    const signOutBtn = document.getElementById('menuSignOutBtn');
+    const syncBtn = document.getElementById('menuSyncBtn');
+    if (signOutBtn) signOutBtn.style.display = user ? 'block' : 'none';
+    if (syncBtn) syncBtn.style.display = user ? 'block' : 'none';
   }
 
   toggleUserMenu(e) {
@@ -3801,7 +3574,7 @@ class BHApp {
         <div class="sa-item ${a.level}">
           <div class="sa-icon">${a.icon}</div>
           <div class="sa-body">
-            <div class="sa-title">${a.title}</div>
+            <div class="sa-title">${esc(a.title)}</div>
             <div class="sa-text">${a.body}</div>
           </div>
           <div class="sa-actions">
@@ -3955,7 +3728,6 @@ class BHApp {
   }
 
   get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }
-  get GITHUB_RAW()  { return 'https://raw.githubusercontent.com/mhmoudmohmed269-cmd/-bh/main'; }
   get UPDATE_KEY()  { return 'BH_LAST_COMMIT_SHA'; }
 
   initUpdateUI() {
@@ -4191,517 +3963,6 @@ class BHApp {
       }
     }
   }
-  // ============================================================
-  //  SMART FINANCIAL ALARM SYSTEM
-  // ============================================================
-
-  /**
-   * Load alarm settings from localStorage into the UI
-   */
-  initSmartAlarm() {
-    const alarm = this.data.settings.smartAlarm;
-    if (!alarm) return;
-
-    // Restore checkboxes
-    const cbLow = document.getElementById('condLowBalance');
-    const cbPending = document.getElementById('condPendingIncomes');
-    const cbAlways = document.getElementById('condAlwaysAlarm');
-    const timeEl = document.getElementById('alarmTime');
-    if (cbLow) cbLow.checked = !!alarm.condLowBalance;
-    if (cbPending) cbPending.checked = !!alarm.condPendingIncomes;
-    if (cbAlways) cbAlways.checked = !!alarm.condAlwaysAlarm;
-    if (timeEl && alarm.time) timeEl.value = alarm.time;
-    if (alarm.threshold != null) {
-      const tEl = document.getElementById('alarmLowBalanceThreshold');
-      if (tEl) tEl.value = alarm.threshold;
-    }
-
-    // Restore days
-    const activeDays = alarm.days || [0,1,2,3,4,5];
-    document.querySelectorAll('#alarmDaysRow .day-btn').forEach(btn => {
-      const day = parseInt(btn.getAttribute('data-day'));
-      btn.classList.toggle('active', activeDays.includes(day));
-    });
-
-    // Restore active state UI
-    if (alarm.active) {
-      this._showAlarmActiveUI(alarm);
-    }
-
-    this.updateAlarmPreview();
-
-    // Arm the ticker to fire the alarm if active
-    if (alarm.active) {
-      this._armAlarmTicker();
-    }
-  }
-
-  /**
-   * Toggle a day button on/off
-   */
-  toggleAlarmDay(btn) {
-    btn.classList.toggle('active');
-    this.updateAlarmPreview();
-  }
-
-  /**
-   * Collect selected days as an array of integers
-   */
-  _getSelectedDays() {
-    const days = [];
-    document.querySelectorAll('#alarmDaysRow .day-btn').forEach(btn => {
-      if (btn.classList.contains('active')) {
-        days.push(parseInt(btn.getAttribute('data-day')));
-      }
-    });
-    return days;
-  }
-
-  /**
-   * Live preview of the alarm description
-   */
-  updateAlarmPreview() {
-    const condLow = document.getElementById('condLowBalance')?.checked;
-    const condPending = document.getElementById('condPendingIncomes')?.checked;
-    const condAlways = document.getElementById('condAlwaysAlarm')?.checked;
-    const timeVal = document.getElementById('alarmTime')?.value || '06:00';
-    const threshold = parseFloat(document.getElementById('alarmLowBalanceThreshold')?.value || 200);
-
-    const banner = document.getElementById('alarmPreviewBanner');
-    const previewText = document.getElementById('alarmPreviewText');
-    if (!banner || !previewText) return;
-
-    const reasons = [];
-    if (condAlways) reasons.push('📅 يومياً بشكل ثابت');
-    if (condLow) reasons.push(`💳 لو الرصيد أقل من ${threshold} ج.م`);
-    if (condPending) reasons.push('⏳ لو عندك قبض منتظر');
-
-    if (reasons.length === 0) {
-      banner.style.display = 'none';
-      return;
-    }
-
-    const [h, m] = timeVal.split(':');
-    const hourNum = parseInt(h);
-    const period = hourNum < 12 ? 'صباحاً' : 'مساءً';
-    const displayH = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
-    const timeDisplay = `${displayH}:${m} ${period}`;
-
-    banner.style.display = 'block';
-    previewText.textContent = `📢 المنبه سيرن الساعة ${timeDisplay} — ${reasons.join(' / ')}`;
-  }
-
-  /**
-   * Check right now if alarm conditions are met
-   */
-  _checkAlarmConditions(alarm) {
-    if (alarm.condAlwaysAlarm) return { fire: true, reason: '📅 وقت الاستيقاظ اليومي المحدد' };
-
-    if (alarm.condLowBalance) {
-      const spendable = this.data.balances.spendableBalance || 0;
-      const threshold = parseFloat(alarm.threshold) || 200;
-      if (spendable < threshold) {
-        return { fire: true, reason: `💳 رصيدك المتاح (${spendable.toFixed(0)} ج.م) أقل من ${threshold} ج.م — وقت الشغل!` };
-      }
-    }
-
-    if (alarm.condPendingIncomes) {
-      const hasPending = this.data.pendingIncomes && this.data.pendingIncomes.length > 0;
-      if (hasPending) {
-        const total = this.data.pendingIncomes.reduce((s, p) => s + (p.amount || 0), 0);
-        return { fire: true, reason: `⏳ عندك ${this.data.pendingIncomes.length} قبض قيد الانتظار بإجمالي ${total.toFixed(0)} ج.م — اصحى واقبض فلوسك!` };
-      }
-    }
-
-    return { fire: false, reason: '' };
-  }
-
-  /**
-   * Arms a setInterval ticker that checks the time every minute
-   */
-  _armAlarmTicker() {
-    if (this._alarmInterval) clearInterval(this._alarmInterval);
-
-    this._alarmInterval = setInterval(() => {
-      const alarm = this.data.settings.smartAlarm;
-      if (!alarm || !alarm.active) {
-        clearInterval(this._alarmInterval);
-        return;
-      }
-
-      const now = new Date();
-      const currentDay = now.getDay();
-      const currentH = now.getHours().toString().padStart(2, '0');
-      const currentM = now.getMinutes().toString().padStart(2, '0');
-      const currentTime = `${currentH}:${currentM}`;
-
-      // Check if today is an active day
-      if (!alarm.days.includes(currentDay)) return;
-
-      // Check if time matches
-      if (currentTime !== alarm.time) return;
-
-      // Avoid double-firing in the same minute
-      const todayKey = `${now.toISOString().split('T')[0]}_${alarm.time}`;
-      if (localStorage.getItem('BH_ALARM_FIRED') === todayKey) return;
-      localStorage.setItem('BH_ALARM_FIRED', todayKey);
-
-      // Check conditions
-      const { fire, reason } = this._checkAlarmConditions(alarm);
-      if (fire) {
-        this._fireAlarm(reason);
-      }
-    }, 30000); // check every 30s
-  }
-
-  /**
-   * Fire the alarm — full-screen ringing modal + continuous alarm sound + notification
-   */
-  _fireAlarm(reason) {
-    // Start continuous alarm sound
-    this._startAlarmRinging();
-
-    // Show in-app full-screen alarm modal
-    this._showAlarmRingingModal(reason);
-
-    // Vibrate device (if supported)
-    if (navigator.vibrate) {
-      navigator.vibrate([800, 300, 800, 300, 800, 300, 800]);
-    }
-  }
-
-  /**
-   * Start the continuous two-tone alarm sound using a SINGLE AudioContext
-   * with pre-scheduled notes (reliable and browser-safe)
-   */
-  _startAlarmRinging() {
-    this._stopAlarmSound();
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      this._alarmAudioCtx = ctx;
-
-      // Chrome suspends AudioContext until user gesture — resume it
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-
-      // Schedule 10 cycles (14 seconds) worth of beeps starting from now
-      const scheduleBlock = (fromTime) => {
-        for (let i = 0; i < 10; i++) {
-          const base = fromTime + i * 1.4;
-          this._scheduleTone(ctx, 880, base,        0.5); // HIGH
-          this._scheduleTone(ctx, 660, base + 0.65, 0.5); // LOW
-        }
-      };
-
-      // Schedule first 14 seconds immediately
-      scheduleBlock(ctx.currentTime + 0.05);
-
-      // Re-schedule every 12s to keep it running indefinitely
-      this._alarmRingInterval = setInterval(() => {
-        if (!this._alarmAudioCtx || this._alarmAudioCtx !== ctx) {
-          clearInterval(this._alarmRingInterval);
-          return;
-        }
-        scheduleBlock(ctx.currentTime + 0.1);
-      }, 12000);
-
-    } catch (e) {
-      console.warn('Alarm sound error:', e);
-    }
-  }
-
-  /**
-   * Schedule a single tone burst on an AudioContext
-   */
-  _scheduleTone(ctx, freq, startT, dur) {
-    try {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(freq, startT);
-      gain.gain.setValueAtTime(0,    startT);
-      gain.gain.linearRampToValueAtTime(0.45, startT + 0.02);
-      gain.gain.setValueAtTime(0.45, startT + dur - 0.04);
-      gain.gain.linearRampToValueAtTime(0,    startT + dur);
-      osc.start(startT);
-      osc.stop(startT + dur + 0.01);
-    } catch(e) {/* skip if context is closed */}
-  }
-
-
-  /**
-   * Stop the continuous alarm sound
-   */
-  _stopAlarmSound() {
-    if (this._alarmRingInterval) {
-      clearInterval(this._alarmRingInterval);
-      this._alarmRingInterval = null;
-    }
-    if (this._alarmAudioCtx) {
-      try { this._alarmAudioCtx.close(); } catch(e) {}
-      this._alarmAudioCtx = null;
-    }
-    if (navigator.vibrate) navigator.vibrate(0);
-  }
-
-  /**
-   * Short preview beep — used by Test button
-   */
-  _playAlarmSound() {
-    this._startAlarmRinging();
-    // Auto-stop after 4 seconds for preview
-    setTimeout(() => this._stopAlarmSound(), 4000);
-  }
-
-  /**
-   * Show full-screen alarm ringing modal
-   */
-  _showAlarmRingingModal(reason) {
-    // Remove old one if exists
-    const existing = document.getElementById('alarmRingingOverlay');
-    if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'alarmRingingOverlay';
-    overlay.innerHTML = `
-      <div class="alarm-ring-inner">
-        <div class="alarm-ring-pulse">⏰</div>
-        <div class="alarm-ring-title">وقت الصحيان!</div>
-        <div class="alarm-ring-reason">${reason}</div>
-        <div class="alarm-ring-time">${this._getCurrentTimeDisplay()}</div>
-        <div class="alarm-ring-actions">
-          <button class="btn btn-secondary alarm-snooze-btn" onclick="app._snoozeAlarm(5)">😴 سنوز 5 دقايق</button>
-          <button class="btn btn-danger alarm-stop-btn" onclick="app._dismissAlarmRinging()">🔕 وقّف المنبه</button>
-        </div>
-        <div class="alarm-ring-hint">اشتغل وهتعوض! 💪</div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    // Animate in
-    requestAnimationFrame(() => overlay.classList.add('visible'));
-  }
-
-  /**
-   * Returns current time as arabic display string
-   */
-  _getCurrentTimeDisplay() {
-    const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes().toString().padStart(2, '0');
-    const period = h < 12 ? 'صباحاً' : 'مساءً';
-    const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `${displayH}:${m} ${period}`;
-  }
-
-  /**
-   * Dismiss (stop) the alarm ringing overlay
-   */
-  _dismissAlarmRinging() {
-    this._stopAlarmSound();
-    const overlay = document.getElementById('alarmRingingOverlay');
-    if (overlay) {
-      overlay.classList.remove('visible');
-      setTimeout(() => overlay.remove(), 400);
-    }
-  }
-
-  /**
-   * Snooze the alarm for N minutes
-   */
-  _snoozeAlarm(minutes) {
-    this._dismissAlarmRinging();
-    this.showToast(`😴 سنوز ${minutes} دقايق... هتصحى تاني قريب!`);
-    setTimeout(() => {
-      const alarm = this.data.settings.smartAlarm;
-      if (alarm && alarm.active) {
-        const { fire, reason } = this._checkAlarmConditions(alarm);
-        this._fireAlarm(reason || 'انتهت فترة السنوز — وقت الصحيان!');
-      }
-    }, minutes * 60 * 1000);
-  }
-
-
-  /**
-   * Calculate the next alarm date/time string for display
-   */
-  _getNextAlarmLabel(alarm) {
-    if (!alarm || !alarm.active || !alarm.days || alarm.days.length === 0) return '—';
-    const now = new Date();
-    const [h, m] = alarm.time.split(':').map(Number);
-
-    for (let i = 0; i <= 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + i);
-      const day = d.getDay();
-      if (!alarm.days.includes(day)) continue;
-      d.setHours(h, m, 0, 0);
-      if (d > now) {
-        const dayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-        const period = h < 12 ? 'صباحاً' : 'مساءً';
-        const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        return `${dayNames[day]} — ${displayH}:${m.toString().padStart(2,'0')} ${period}`;
-      }
-    }
-    return '—';
-  }
-
-  /**
-   * Show active alarm UI state
-   */
-  _showAlarmActiveUI(alarm) {
-    const badge = document.getElementById('alarmStatusBadge');
-    const activateBtn = document.getElementById('activateAlarmBtn');
-    const cancelBtn = document.getElementById('cancelAlarmBtn');
-    const nextInfo = document.getElementById('nextAlarmInfo');
-    const nextLabel = document.getElementById('nextAlarmTimeLabel');
-
-    if (badge) { badge.textContent = '✅ مفعّل'; badge.style.background = 'rgba(0,217,100,0.25)'; badge.style.color = '#00d964'; }
-    if (activateBtn) activateBtn.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = '';
-    if (nextInfo) nextInfo.style.display = 'block';
-    if (nextLabel) nextLabel.textContent = this._getNextAlarmLabel(alarm);
-  }
-
-  /**
-   * Reset alarm UI to inactive state
-   */
-  _showAlarmInactiveUI() {
-    const badge = document.getElementById('alarmStatusBadge');
-    const activateBtn = document.getElementById('activateAlarmBtn');
-    const cancelBtn = document.getElementById('cancelAlarmBtn');
-    const nextInfo = document.getElementById('nextAlarmInfo');
-
-    if (badge) { badge.textContent = 'غير مفعل'; badge.style.background = 'rgba(100,100,100,0.25)'; badge.style.color = ''; }
-    if (activateBtn) activateBtn.style.display = '';
-    if (cancelBtn) cancelBtn.style.display = 'none';
-    if (nextInfo) nextInfo.style.display = 'none';
-  }
-
-  /**
-   * Activate the smart alarm — saves settings & requests notification permission
-   * Also sends SCHEDULE_ALARM message to the Service Worker for background firing.
-   */
-  async activateSmartAlarm() {
-    const time = document.getElementById('alarmTime')?.value;
-    if (!time) { this.showToast('⚠️ اختار وقت المنبه الأول'); return; }
-
-    const condLow = document.getElementById('condLowBalance')?.checked;
-    const condPending = document.getElementById('condPendingIncomes')?.checked;
-    const condAlways = document.getElementById('condAlwaysAlarm')?.checked;
-    const threshold = parseFloat(document.getElementById('alarmLowBalanceThreshold')?.value || 200);
-    const days = this._getSelectedDays();
-
-    if (!condLow && !condPending && !condAlways) {
-      this.showToast('⚠️ اختار على الأقل شرط واحد للمنبه'); return;
-    }
-    if (days.length === 0) {
-      this.showToast('⚠️ اختار على الأقل يوم واحد'); return;
-    }
-
-    // Request notification permission (required for SW notifications)
-    let notifGranted = false;
-    if ('Notification' in window) {
-      const perm = await Notification.requestPermission();
-      notifGranted = perm === 'granted';
-    }
-
-    if (!notifGranted) {
-      this.showToast('⚠️ لازم تسمح بالإشعارات عشان المنبه يشتغل وهو التطبيق مقفول', 'error');
-      return;
-    }
-
-    const alarm = { active: true, time, condLowBalance: condLow, condPendingIncomes: condPending, condAlwaysAlarm: condAlways, threshold, days };
-    this.data.settings.smartAlarm = alarm;
-    this.saveData();
-
-    this._showAlarmActiveUI(alarm);
-    this._armAlarmTicker();
-
-    // ── Schedule via Service Worker (fires even when app is closed) ──
-    await this._scheduleSwAlarm(alarm);
-
-    this.showToast('⏰ المنبه الذكي اتفعّل! هيصحيك حتى لو التطبيق مقفول 🔔', 'success');
-  }
-
-  /**
-   * Deactivate / cancel the smart alarm
-   */
-  cancelSmartAlarm() {
-    if (this._alarmInterval) clearInterval(this._alarmInterval);
-    this.data.settings.smartAlarm = { active: false };
-    this.saveData();
-    this._showAlarmInactiveUI();
-    // Tell SW to cancel scheduled notifications
-    this._sendSwMessage({ action: 'CANCEL_ALARM' });
-    this.showToast('🔕 تم إلغاء المنبه الذكي');
-  }
-
-  /**
-   * Calculate next 7 alarm timestamps (one per active day within next 7 days)
-   * Used to pre-schedule SW notifications
-   */
-  _getNextAlarmTimestamps(alarm, maxDays = 7) {
-    const [h, m] = alarm.time.split(':').map(Number);
-    const now = new Date();
-    const timestamps = [];
-
-    for (let i = 0; i <= maxDays; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + i);
-      d.setHours(h, m, 0, 0);
-      if (alarm.days.includes(d.getDay()) && d > now) {
-        timestamps.push(d.getTime());
-      }
-    }
-    return timestamps;
-  }
-
-  /**
-   * Build the alarm reason string for SW notification body
-   */
-  _buildAlarmReason(alarm) {
-    const reasons = [];
-    if (alarm.condAlwaysAlarm) reasons.push('📅 وقت الاستيقاظ اليومي');
-    if (alarm.condLowBalance) reasons.push(`💳 راجع رصيدك — تحت ${alarm.threshold} ج.م`);
-    if (alarm.condPendingIncomes) reasons.push('⏳ عندك قبض قيد الانتظار — اصحى واقبض فلوسك!');
-    return reasons.join(' | ') || '⏰ وقت الاستيقاظ';
-  }
-
-  /**
-   * Send a message to the active Service Worker
-   */
-  async _sendSwMessage(data) {
-    try {
-      if ('serviceWorker' in navigator) {
-        const sw = navigator.serviceWorker.controller ||
-          (await navigator.serviceWorker.ready).active;
-        if (sw) sw.postMessage(data);
-      }
-    } catch (e) {
-      console.warn('Could not message SW:', e);
-    }
-  }
-
-  /**
-   * Schedule alarm notifications via Service Worker (background-safe)
-   */
-  async _scheduleSwAlarm(alarm) {
-    const timestamps = this._getNextAlarmTimestamps(alarm);
-    if (timestamps.length === 0) return;
-    const reason = this._buildAlarmReason(alarm);
-    await this._sendSwMessage({
-      action: 'SCHEDULE_ALARM',
-      timestamps,
-      reason,
-      title: '⏰ BH — منبه ذكي'
-    });
-  }
 }
 
 // Global App Instance
@@ -4711,5 +3972,4 @@ window.addEventListener('DOMContentLoaded', function() {
   app.initUpdateUI();
   app.saveInitialVersion();
   app.autoCheckUpdates();
-  app.initSmartAlarm();
 });

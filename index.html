@@ -52,7 +52,7 @@
 
         <!-- User account avatar -->
         <button class="user-avatar" id="userAvatarBtn" onclick="app.toggleUserMenu(event)" title="حسابي">
-          <img id="userAvatarImg" src="" alt="" style="display:none;" onerror="app.avatarFallback()">
+          <img id="userAvatarImg" src="" alt="" style="display:none;" onerror="this.style.display='none'; var f=document.getElementById('userAvatarFallback'); if(f) f.style.display='flex';">
           <span id="userAvatarFallback" class="avatar-fallback">👤</span>
         </button>
       </div>
@@ -61,7 +61,7 @@
       <div class="user-menu" id="userMenu">
         <div class="user-menu-head">
           <div class="user-menu-avatar">
-            <img id="menuAvatarImg" src="" alt="" style="display:none;" onerror="app.avatarFallback()">
+            <img id="menuAvatarImg" src="" alt="" style="display:none;" onerror="this.style.display='none'; var f=document.getElementById('menuAvatarFallback'); if(f) f.style.display='flex';">
             <span id="menuAvatarFallback" class="avatar-fallback">👤</span>
           </div>
           <div class="user-menu-info">
@@ -69,14 +69,14 @@
             <div class="user-menu-email" id="userMenuEmail">—</div>
           </div>
         </div>
-        <div class="user-menu-sync" id="userMenuSync">
+        <div class="user-menu-sync">
           <span class="sync-dot" id="syncDot"></span>
           <span id="userMenuSyncText">غير متزامن</span>
         </div>
         <div class="user-menu-actions">
-          <button class="user-menu-btn" onclick="app.manualSync(); app.closeUserMenu();">🔄 مزامنة دلوقتي</button>
-          <button class="user-menu-btn" onclick="app.switchTab('moreView'); app.closeUserMenu();">⚙️ إعدادات المزامنة</button>
-          <button class="user-menu-btn danger" onclick="app.cloudSignOut(); app.closeUserMenu();">👋 تسجيل الخروج</button>
+          <button class="user-menu-btn" id="menuCloudBtn" onclick="app.openCloudSetup(); app.closeUserMenu();">☁️ المزامنة السحابية</button>
+          <button class="user-menu-btn" id="menuSyncBtn" onclick="app.manualSync(); app.closeUserMenu();">🔄 مزامنة دلوقتي</button>
+          <button class="user-menu-btn danger" id="menuSignOutBtn" onclick="app.cloudSignOut(); app.closeUserMenu();" style="display:none;">👋 تسجيل الخروج</button>
         </div>
       </div>
     </header>
@@ -91,7 +91,7 @@
     <main class="app-content">
 
       <!-- 🔔 Smart Alerts Card -->
-      <div class="card" id="smartAlertsCard" style="display:none; border-top: 2px solid #fbbf24;">
+      <div class="card" id="smartAlertsCard" style="display:none; border-top: 2px solid var(--warning);">
         <!-- populated by renderSmartAlerts() -->
       </div>
 
@@ -102,7 +102,7 @@
         <div class="card balance-card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💰</span> إجمالي الرصيد الكلّي</span>
-            <span class="sub-balance-label" id="dashboardDateText">أكتوبر 2026</span>
+            <span class="sub-balance-label" id="dashboardDateText"></span>
           </div>
           <div class="total-amount"><span id="totalBalanceVal">0</span> <span class="currency">ج.م</span></div>
           <button class="balance-edit-btn" onclick="app.openBalanceAdjust()">
@@ -360,7 +360,7 @@
             <span class="card-title"><span class="card-icon">🗺️</span> خريطة شغلك</span>
             <span class="sub-balance-label">أيام × ساعات</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+          <p class="card-desc">
             بتوريك إمتى بيشتغل وإمتى بتكسب أكتر — عشان تخطّط شغلك صح.
           </p>
           <div id="heatmapWrap"></div>
@@ -550,7 +550,7 @@
           <div class="card-header">
             <span class="card-title"><span class="card-icon">📈</span> مستقبلي المالي (محاكي التوقعات)</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+          <p class="card-desc">
             توقع رصيدك المستقبلي بناءً على معدل تحويشك دون التعديل على رصيدك الحقيقي.
           </p>
           
@@ -596,83 +596,12 @@
             </div>
             <div class="split-card-item" style="border-right: 4px solid var(--essentials);">
               <span>🟡 تحويش متوسط (<span id="simMediumWeekly">1000</span> ج.م/أسبوع)</span>
-              <strong style="color: #fbbf24;" id="simMediumVal">≈ 55,000 ج.م</strong>
+              <strong style="color: var(--warning);" id="simMediumVal">≈ 55,000 ج.م</strong>
             </div>
             <div class="split-card-item" style="border-right: 4px solid var(--danger);">
               <span>🔴 تحويش ضعيف (<span id="simWeakWeekly">700</span> ج.م/أسبوع)</span>
               <strong class="val-danger" id="simWeakVal">≈ 39,400 ج.م</strong>
             </div>
-          </div>
-        </div>
-
-        <!-- ✅ Smart Financial Alarm Card -->
-        <div class="card" id="smartAlarmCard">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">⏰</span> منبه ذكي للاستيقاظ المبكر</span>
-            <span class="streak-badge" id="alarmStatusBadge" style="background: rgba(100,100,100,0.25);">غير مفعل</span>
-          </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
-            لو محتاج فلوس، التطبيق يصحيك بدري عشان تشتغل وتعوض. بيحدد سبب التنبيه بناءً على وضعك المالي.
-          </p>
-
-          <!-- Trigger Conditions -->
-          <div style="margin-bottom: 14px;">
-            <div style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; margin-bottom: 8px;">متى يصحيني؟</div>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label class="alarm-condition-row" id="condLowBalanceRow">
-                <input type="checkbox" id="condLowBalance" onchange="app.updateAlarmPreview()">
-                <span>💳 لو الرصيد المتاح أقل من</span>
-                <input type="number" id="alarmLowBalanceThreshold" class="form-control alarm-inline-input" value="200" placeholder="200" oninput="app.updateAlarmPreview()">
-                <span>ج.م</span>
-              </label>
-              <label class="alarm-condition-row" id="condPendingRow">
-                <input type="checkbox" id="condPendingIncomes" onchange="app.updateAlarmPreview()">
-                <span>⏳ لو عندي قبض قيد الانتظار</span>
-              </label>
-              <label class="alarm-condition-row" id="condAlwaysRow">
-                <input type="checkbox" id="condAlwaysAlarm" onchange="app.updateAlarmPreview()">
-                <span>📅 منبه يومي ثابت (بغض النظر)</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Alarm Time -->
-          <div class="form-group">
-            <label class="form-label">🕐 وقت الاستيقاظ</label>
-            <input type="time" id="alarmTime" class="form-control" value="06:00" onchange="app.updateAlarmPreview()">
-          </div>
-
-          <!-- Alarm Days -->
-          <div style="margin-bottom: 14px;">
-            <div style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; margin-bottom: 8px;">أيام الأسبوع</div>
-            <div class="alarm-days-row" id="alarmDaysRow">
-              <button type="button" class="day-btn active" data-day="0" onclick="app.toggleAlarmDay(this)">ح</button>
-              <button type="button" class="day-btn active" data-day="1" onclick="app.toggleAlarmDay(this)">إث</button>
-              <button type="button" class="day-btn active" data-day="2" onclick="app.toggleAlarmDay(this)">ث</button>
-              <button type="button" class="day-btn active" data-day="3" onclick="app.toggleAlarmDay(this)">أر</button>
-              <button type="button" class="day-btn active" data-day="4" onclick="app.toggleAlarmDay(this)">خ</button>
-              <button type="button" class="day-btn active" data-day="5" onclick="app.toggleAlarmDay(this)">ج</button>
-              <button type="button" class="day-btn" data-day="6" onclick="app.toggleAlarmDay(this)">س</button>
-            </div>
-          </div>
-
-          <!-- Preview Banner -->
-          <div id="alarmPreviewBanner" style="display:none; margin-bottom: 12px;" class="decision-card decision-green">
-            <div id="alarmPreviewText" style="font-size: 0.82rem; font-weight: 700;">📢 المنبه سيرن الساعة 6:00 صباحاً لو عندك قبض منتظر</div>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="action-grid">
-            <button class="btn btn-primary" id="activateAlarmBtn" onclick="app.activateSmartAlarm()">⏰ تفعيل المنبه</button>
-            <button class="btn btn-secondary" id="cancelAlarmBtn" onclick="app.cancelSmartAlarm()" style="display:none;">🔕 إلغاء المنبه</button>
-          </div>
-
-          <!-- Test Sound Button -->
-          <button class="btn btn-secondary btn-full btn-sm" style="margin-top:8px;" onclick="app._playAlarmSound()">🔊 تجربة صوت المنبه</button>
-
-          <!-- Next Alarm Info -->
-          <div id="nextAlarmInfo" style="display:none; margin-top: 10px; padding: 10px; background: rgba(0,217,255,0.07); border-radius: var(--radius-md); border: 1px solid rgba(0,217,255,0.2); font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
-            ⏰ المنبه القادم: <strong id="nextAlarmTimeLabel" style="color: #fff;">—</strong>
           </div>
         </div>
 
@@ -703,32 +632,10 @@
           <div class="card-header">
             <span class="card-title"><span class="card-icon">🔔</span> التنبيهات الذكية</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+          <p class="card-desc">
             ينبهك قبل ما تحصل مشكلة: رصيدك قارب يعمل، نسيت تسجّل وردية، أو هدفك قارب يتحقق.
           </p>
           <div id="smartAlertSettings"></div>
-        </div>
-
-        <!-- ☁️ Cloud Sync Card -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">☁️</span> المزامنة السحابية</span>
-          </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
-            خزّن بياناتك على السحابة — تفتحها من أي جهاز وبياناتك ماتضيعش.
-          </p>
-          <div id="cloudBox"></div>
-        </div>
-
-        <!-- 🛡️ Data Protection Card -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">🛡️</span> حماية البيانات</span>
-          </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
-            بياناتك محفوظة في متصفحك. دي بطّantees إنك تقدر ترجّعها لو حصل أي خطأ.
-          </p>
-          <div id="protectionBox"></div>
         </div>
 
         <!-- Balance Adjustment Card -->
@@ -736,7 +643,7 @@
           <div class="card-header">
             <span class="card-title"><span class="card-icon">✎</span> ضبط الرصيد الحقيقي</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+          <p class="card-desc">
             حط الفلوس اللي معاك فعلاً — من غير ما تتحسب قبض ولا مصروف.
           </p>
           <button class="btn btn-primary btn-full btn-sm" onclick="app.openBalanceAdjust()">
@@ -750,8 +657,11 @@
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💾</span> نسخ واستعادة البيانات</span>
           </div>
+          <p class="card-desc">
+            نسخة احتياطية كل 3 أيام بتتحمل لوحدها. نزّل نسخة كمان وابعتها لنفسك على واتساب.
+          </p>
           <div class="action-grid" style="margin-bottom: 10px;">
-            <button class="btn btn-secondary btn-sm" onclick="app.exportData()">📤 تصدير (Backup)</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.downloadBackup()">📦 نسخة الآن</button>
             <label class="btn btn-secondary btn-sm" style="margin:0; text-align:center;">
               📥 استعادة (Import)
               <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="app.importData(event)">

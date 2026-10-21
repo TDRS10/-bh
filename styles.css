@@ -21,6 +21,7 @@
   --savings:       #00C87A;
   --essentials:    #FFAA00;
   --outings:       #C084FC;
+  --warning:       #FBBF24;
 
   --r-ctrl: 16px;
   --r-card: 20px;
@@ -406,7 +407,7 @@ body.big-numbers-mode .balance-chip-val {
 
 .sync-dot.ok { background: var(--savings); box-shadow: 0 0 8px rgba(0, 200, 122, 0.6); }
 .sync-dot.busy { background: var(--accent); animation: syncPulse 1s ease-in-out infinite; }
-.sync-dot.warn { background: #fbbf24; }
+.sync-dot.warn { background: var(--warning); }
 .sync-dot.bad { background: var(--danger); }
 .sync-dot.idle { background: var(--text-muted); }
 
@@ -580,7 +581,7 @@ body.big-numbers-mode .balance-chip-val {
 .sa-item.yellow {
   background: rgba(245, 158, 11, 0.08);
   border-color: rgba(245, 158, 11, 0.28);
-  border-right-color: #fbbf24;
+  border-right-color: var(--warning);
 }
 
 .sa-item.green {
@@ -775,6 +776,14 @@ body.big-numbers-mode .balance-chip-val {
 }
 .view-page.active { display: flex; }
 
+/* ── Card description (replaces repeated inline styles) ── */
+.card-desc {
+  font-size: .82rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
 /* ── Eyebrow Label (accent, uppercase, tracked) ── */
 .eyebrow {
   font-family: var(--font-disp);
@@ -929,13 +938,6 @@ body.big-numbers-mode .balance-chip-val {
 }
 .btn-savings:active { background: rgba(0,200,122,.25); }
 
-.btn-outings {
-  background: rgba(192,132,252,.15);
-  border: 1px solid rgba(192,132,252,.35);
-  color: var(--outings);
-}
-.btn-outings:active { background: rgba(192,132,252,.25); }
-
 .btn-danger {
   background: rgba(255,59,92,.15);
   border: 1px solid rgba(255,59,92,.35);
@@ -950,20 +952,6 @@ body.big-numbers-mode .balance-chip-val {
   color: var(--text-primary);
 }
 .btn-secondary:active { background: rgba(255,255,255,.10); }
-
-/* CTA — cyan, rounded rect, glow */
-.btn-cta {
-  background: var(--accent);
-  color: #000000;
-  border-radius: var(--r-cta);
-  font-size: .95rem;
-  font-weight: 700;
-  box-shadow: 0 0 20px var(--accent-glow);
-}
-.btn-cta:active {
-  background: var(--accent-hover);
-  box-shadow: 0 0 40px rgba(0,217,255,.35);
-}
 
 .btn-full { width: 100%; }
 .btn-sm {
@@ -996,7 +984,6 @@ body.big-numbers-mode .balance-chip-val {
 
 .fill-outings    { background: var(--outings); }
 .fill-savings    { background: var(--savings); }
-.fill-essentials { background: var(--essentials); }
 
 /* ═══════════════════════════════════════════════════
    STATS GRID  ─  capability-chip style
@@ -1476,214 +1463,6 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 .mc-verdict-warn  { background: rgba(255,170,0,0.10); border-color: rgba(255,170,0,0.3); color: var(--essentials); }
 .mc-verdict-bad   { background: rgba(255,59,92,0.10); border-color: rgba(255,59,92,0.3); color: var(--danger); }
 
-/* ═══════════════════════════════════════════════════
-   ALARM RINGING FULL-SCREEN OVERLAY
-═══════════════════════════════════════════════════ */
-
-#alarmRingingOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: radial-gradient(ellipse at center, #0a1628 0%, #04060A 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: scale(1.04);
-  transition: opacity 0.35s ease, transform 0.35s ease;
-  pointer-events: none;
-}
-#alarmRingingOverlay.visible {
-  opacity: 1;
-  transform: scale(1);
-  pointer-events: all;
-}
-
-.alarm-ring-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 40px 28px;
-  text-align: center;
-  max-width: 360px;
-  width: 100%;
-}
-
-/* Big pulsing clock emoji */
-.alarm-ring-pulse {
-  font-size: 5rem;
-  animation: ring-pulse 0.7s ease-in-out infinite alternate;
-  filter: drop-shadow(0 0 24px rgba(0, 217, 255, 0.6));
-  line-height: 1;
-}
-@keyframes ring-pulse {
-  from { transform: scale(1) rotate(-8deg); }
-  to   { transform: scale(1.18) rotate(8deg); }
-}
-
-.alarm-ring-title {
-  font-family: var(--font-disp);
-  font-size: 2rem;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.02em;
-  text-shadow: 0 0 30px rgba(0,217,255,0.4);
-}
-
-.alarm-ring-reason {
-  font-size: 0.92rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  padding: 12px 16px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: var(--r-ctrl);
-  width: 100%;
-}
-
-.alarm-ring-time {
-  font-size: 3rem;
-  font-weight: 700;
-  color: var(--accent);
-  font-family: var(--font-disp);
-  letter-spacing: -0.02em;
-  text-shadow: 0 0 40px rgba(0,217,255,0.5);
-  animation: time-glow 1.4s ease-in-out infinite alternate;
-}
-@keyframes time-glow {
-  from { text-shadow: 0 0 20px rgba(0,217,255,0.3); }
-  to   { text-shadow: 0 0 50px rgba(0,217,255,0.9); }
-}
-
-.alarm-ring-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  width: 100%;
-  margin-top: 8px;
-}
-.alarm-snooze-btn {
-  padding: 14px !important;
-  font-size: 0.95rem !important;
-}
-.alarm-stop-btn {
-  padding: 14px !important;
-  font-size: 0.95rem !important;
-  animation: stop-pulse 0.8s ease-in-out infinite alternate;
-}
-@keyframes stop-pulse {
-  from { box-shadow: 0 0 0 0 rgba(255,59,92,0.5); }
-  to   { box-shadow: 0 0 0 10px rgba(255,59,92,0); }
-}
-
-.alarm-ring-hint {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-
-/* Scanline animation on the overlay for extra drama */
-#alarmRingingOverlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,217,255,0.015) 2px,
-    rgba(0,217,255,0.015) 4px
-  );
-  pointer-events: none;
-  animation: scanlines 8s linear infinite;
-}
-@keyframes scanlines {
-  from { background-position-y: 0; }
-  to   { background-position-y: 100px; }
-}
-
-/* Alarm condition checkbox row */
-.alarm-condition-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  cursor: pointer;
-  padding: 10px 12px;
-  border-radius: var(--r-ctrl);
-  border: 1px solid var(--border);
-  background: var(--surface-glass);
-  transition: var(--trans-fast);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-.alarm-condition-row:hover {
-  border-color: var(--border-accent);
-  background: rgba(0,217,255,0.05);
-  color: var(--text-primary);
-}
-.alarm-condition-row input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-/* Small inline number input inside condition row */
-.alarm-inline-input {
-  width: 72px !important;
-  padding: 4px 8px !important;
-  font-size: 0.85rem !important;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-/* Alarm days row */
-.alarm-days-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-/* Individual day toggle button */
-.day-btn {
-  flex: 1;
-  min-width: 36px;
-  height: 38px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-  background: var(--surface-glass);
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 700;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: var(--trans-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.day-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.day-btn.active {
-  background: rgba(0, 217, 255, 0.15);
-  border-color: var(--accent);
-  color: var(--accent);
-  box-shadow: 0 0 8px rgba(0,217,255,0.2);
-}
-
-/* Pulse animation for active alarm badge */
-@keyframes alarm-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 217, 100, 0.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(0, 217, 100, 0); }
-}
-#alarmStatusBadge[style*="mfعّل"] {
-  animation: alarm-pulse 2s infinite;
-}
 
 /* ═══════════════════════════════════════════════════════════
    WORK HEATMAP  (خريطة أيام وساعات الشغل)
@@ -2274,7 +2053,7 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 }
 
 .dp-badge.late {
-  color: #fbbf24;
+  color: var(--warning);
   background: rgba(245, 158, 11, 0.12);
 }
 
@@ -2504,7 +2283,7 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 
 .ap-same { color: var(--text-muted); font-weight: 700; font-size: 0.78rem; }
 .ap-up { color: var(--savings); font-weight: 800; font-size: 0.8rem; }
-.ap-down { color: #fbbf24; font-weight: 800; font-size: 0.8rem; }
+.ap-down { color: var(--warning); font-weight: 800; font-size: 0.8rem; }
 
 .ap-split {
   margin-top: 8px;
@@ -2553,136 +2332,6 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
   font-size: 0.68rem;
   color: var(--text-muted);
   margin-top: 2px;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   DATA PROTECTION  (حماية البيانات)
-════════════════════════════════════════════════════════════ */
-.prot-health {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--r-ctrl);
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.prot-health-ring {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 3px solid var(--savings);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.25);
-}
-
-.prot-health-ring span {
-  font-family: var(--font-disp);
-  font-size: 0.85rem;
-  font-weight: 800;
-}
-
-.prot-health-text { flex: 1; min-width: 0; }
-
-.prot-health-title {
-  font-size: 0.86rem;
-  font-weight: 800;
-  color: #fff;
-  margin-bottom: 3px;
-}
-
-.prot-health-sub {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.prot-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.prot-check {
-  font-size: 0.74rem;
-  padding: 8px 10px;
-  border-radius: var(--r-ctrl);
-  line-height: 1.5;
-}
-
-.prot-check.ok {
-  background: rgba(0, 200, 122, 0.08);
-  border: 1px solid rgba(0, 200, 122, 0.22);
-  color: var(--text-secondary);
-}
-
-.prot-check.warn {
-  background: rgba(245, 158, 11, 0.09);
-  border: 1px solid rgba(245, 158, 11, 0.28);
-  color: #fcd34d;
-  font-weight: 600;
-}
-
-.prot-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.prot-size {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-bottom: 12px;
-}
-
-.prot-size strong { color: var(--text-secondary); }
-
-.prot-sub-title {
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.prot-snapshots {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-}
-
-.prot-snap-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
-  border-radius: var(--r-ctrl);
-  padding: 8px 10px;
-  margin-bottom: 6px;
-}
-
-.prot-snap-info { flex: 1; min-width: 0; }
-
-.prot-snap-info strong {
-  display: block;
-  font-size: 0.75rem;
-  color: #fff;
-  font-weight: 700;
-}
-
-.prot-snap-info small {
-  display: block;
-  font-size: 0.66rem;
-  color: var(--text-muted);
-  margin-top: 1px;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2736,10 +2385,7 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
   font-size: 0.72rem;
   color: var(--text-secondary);
   line-height: 1.6;
-}
-
-.cloud-status-sub code,
-.cloud-steps code {
+}.cloud-status-sub code, {
   background: rgba(0, 217, 255, 0.12);
   border-radius: 5px;
   padding: 1px 5px;
@@ -2766,49 +2412,6 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 }
 
 .cloud-note strong { color: var(--text-secondary); }
-
-.cloud-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.cloud-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--r-ctrl);
-  padding: 9px 11px;
-}
-
-.cloud-step span {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(0, 217, 255, 0.15);
-  color: var(--accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.cloud-setup {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  text-align: center;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--r-ctrl);
-}
 
 /* ── Direct console links ── */
 .cloud-links {
@@ -3022,20 +2625,11 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
   animation: splashFadeIn 0.55s ease-out both;
 }
 
-/* Enabled by the inline head script (guaranteed to work on every browser) */
+/* Enabled by the inline head script (guaranteed to work on every browser).
+   Also forces a full-screen cover so no strip is left uncovered on phones. */
 html.splash-on #pwaSplashOverlay,
 #pwaSplashOverlay.splash-force {
   display: grid !important;
-}
-
-/* Freeze scrolling while the splash is up (also removes the scrollbar gap) */
-html.splash-on, html.splash-on body {
-  overflow: hidden !important;
-}
-
-/* The splash must always cover the full screen, even on small phones */
-html.splash-on #pwaSplashOverlay,
-#pwaSplashOverlay.splash-force {
   position: fixed !important;
   top: 0 !important;
   right: 0 !important;
@@ -3044,6 +2638,11 @@ html.splash-on #pwaSplashOverlay,
   width: 100vw !important;
   height: 100vh !important;
   height: 100dvh !important;
+}
+
+/* Freeze scrolling while the splash is up (also removes the scrollbar gap) */
+html.splash-on, html.splash-on body {
+  overflow: hidden !important;
 }
 
 .splash-hide {
