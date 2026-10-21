@@ -1,14 +1,19 @@
 {
-  "name": "BH - إدارة الفلوس والقبض",
+  "name": "BH — إدارة الفلوس والقبض",
   "short_name": "BH",
-  "description": "تطبيق إدارة القبض والمصاريف الشخصية لفرسان الدليفري - فصل التحويش عن الصرف",
-  "start_url": "./index.html",
+  "description": "تطبيق إدارة القبض والمصاريف الشخصية لفرسان الدليفري — فصل التحويش عن الصرف، مع مزامنة سحابية وتنبيهات ذكية.",
+  "id": "/-bh/",
+  "start_url": "/-bh/?source=pwa",
+  "scope": "/-bh/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#04060A",
+  "theme_color": "#00D9FF",
   "orientation": "portrait-primary",
   "dir": "rtl",
   "lang": "ar",
+  "categories": ["finance", "productivity", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icon-192.png",
@@ -23,8 +28,24 @@
       "purpose": "any maskable"
     }
   ],
+  "shortcuts": [
+    {
+      "name": "قبض جديد",
+      "short_name": "قبض",
+      "description": "سجّل قبض سريع",
+      "url": "/-bh/?action=income",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "مصروف جديد",
+      "short_name": "مصروف",
+      "description": "سجّل مصروف سريع",
+      "url": "/-bh/?action=expense",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "share_target": {
-    "action": "./index.html",
+    "action": "/-bh/",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {
@@ -32,21 +53,5 @@
       "text": "text",
       "url": "url"
     }
-  },
-  "shortcuts": [
-    {
-      "name": "قبض جديد",
-      "short_name": "قبض",
-      "description": "سجّل قبض سريع",
-      "url": "./index.html?action=income",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "مصروف جديد",
-      "short_name": "مصروف",
-      "description": "سجّل مصروف سريع",
-      "url": "./index.html?action=expense",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
-    }
-  ]
+  }
 }

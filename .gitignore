@@ -1,0 +1,22 @@
+# ── Build output ──
+build/
+.gradle/
+app/build/
+*.apk
+*.aab
+
+# ── Signing keys (NEVER commit) ──
+*.keystore
+*.jks
+!android/bh-release.keystore
+
+# ── Node ──
+node_modules/
+package-lock.json
+
+# ── OS / editor ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,88 @@
+name: Build Android APK
+
+# Builds a signed TWA (Trusted Web Activity) APK for the BH app.
+# The APK wraps the PWA hosted on GitHub Pages — same URL, real Android app.
+#
+# After every push to main, the APK is available as a build artifact.
+# To publish it on Google Play, connect this workflow with the Play Console.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > android/bh-release.keystore
+
+      - name: Cache Bubblewrap
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm-global
+          key: bubblewrap-${{ runner.os }}-${{ hashFiles('twa-manifest.json') }}
+          restore-keys: bubblewrap-${{ runner.os }}-
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Configure Bubblewrap paths
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat > ~/.bubblewrap/config.json <<EOF
+          {
+            "jdkPath": "$JAVA_HOME",
+            "androidSdkPath": "$ANDROID_HOME"
+          }
+          EOF
+
+      - name: Generate the Android project
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          bubblewrap init --manifest twa-manifest.json
+          bubblewrap build --manifest twa-manifest.json
+
+      - name: Sign the APK
+        run: |
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.1.0"
+          "$BUILD_TOOLS/zipalign" -f 4 \
+            app/build/outputs/apk/release/app-release-unsigned.apk \
+            app/build/outputs/apk/release/app-release-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks android/bh-release.keystore \
+            --ks-key-alias bh \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --out app/build/outputs/apk/release/BH-Finance.apk \
+            app/build/outputs/apk/release/app-release-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --print-certs app/build/outputs/apk/release/BH-Finance.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BH-Finance-APK
+          path: app/build/outputs/apk/release/BH-Finance.apk
+          if-no-files-found: error
