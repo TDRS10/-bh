@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v7';
+const CACHE_NAME = 'bh-finance-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './icon-512.png',
   './firebase-config.js',
   './firebase-service.js',
+  './capacitor-bridge.js',
   './.well-known/assetlinks.json',
   // Firebase SDK (cached for offline use — app degrades gracefully if missing)
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',

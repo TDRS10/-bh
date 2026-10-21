@@ -143,6 +143,19 @@ window.BHNative = (function () {
     }
   };
 
+  const Preferences = {
+    async get(key) {
+      const p = plugin('Preferences');
+      if (!p) return null;
+      try { const r = await p.get({ key }); return r.value; } catch (e) { return null; }
+    },
+    async set(key, value) {
+      const p = plugin('Preferences');
+      if (!p) return false;
+      try { await p.set({ key, value: String(value) }); return true; } catch (e) { return false; }
+    }
+  };
+
   // Set everything up once
   function init() {
     if (!isNative) return false;
@@ -172,6 +185,7 @@ window.BHNative = (function () {
     Share: Share,
     Notifications: Notifications,
     App: App,
-    Browser: Browser
+    Browser: Browser,
+    Preferences: Preferences
   };
 })();
