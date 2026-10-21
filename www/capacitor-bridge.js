@@ -146,6 +146,10 @@ window.BHNative = (function () {
   // Set everything up once
   function init() {
     if (!isNative) return false;
+
+    // Mark the body so the CSS can apply native-only adjustments
+    document.body.classList.add('capacitor-native');
+
     StatusBar.setup();
 
     // Hide the native splash as soon as the web app is painted
