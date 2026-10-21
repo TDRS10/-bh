@@ -1,4 +1,4 @@
-# â”€â”€ Build output â”€â”€
+# Ã¢â€â‚¬Ã¢â€â‚¬ Build output Ã¢â€â‚¬Ã¢â€â‚¬
 build/
 .gradle/
 .kotlin/
@@ -10,17 +10,18 @@ android/capacitor-cordova-android-plugins/build/
 *.aab
 *.idsig
 !releases/*.apk
+!BH-Finance-v1.1.0.apk
 
-# â”€â”€ Signing keys (NEVER commit) â”€â”€
+# Ã¢â€â‚¬Ã¢â€â‚¬ Signing keys (NEVER commit) Ã¢â€â‚¬Ã¢â€â‚¬
 *.keystore
 *.jks
 !keystore-backup.keystore
 
-# â”€â”€ Node â”€â”€
+# Ã¢â€â‚¬Ã¢â€â‚¬ Node Ã¢â€â‚¬Ã¢â€â‚¬
 node_modules/
 package-lock.json
 
-# â”€â”€ OS / editor â”€â”€
+# Ã¢â€â‚¬Ã¢â€â‚¬ OS / editor Ã¢â€â‚¬Ã¢â€â‚¬
 .DS_Store
 Thumbs.db
 .vscode/
