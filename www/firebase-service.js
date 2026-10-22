@@ -126,7 +126,22 @@ window.BHFirebase = (function () {
   function signInWithGoogle() {
     if (!state.auth) return Promise.reject(new Error('Firebase غير مفعّل'));
     setStatus('syncing');
-    return state.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+
+    var provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    // Android WebView cannot open popups — use the redirect flow instead.
+    // The redirect returns to the same page, where getRedirectResult() picks it up.
+    if (isNativeApp()) {
+      return state.auth.signInWithRedirect(provider)
+        .then(function () { return null; })
+        .catch(function (e) {
+          setStatus('error', e.message);
+          throw e;
+        });
+    }
+
+    return state.auth.signInWithPopup(provider)
       .then(function (cred) {
         state.user = cred.user;
         setStatus('synced');
@@ -135,6 +150,36 @@ window.BHFirebase = (function () {
       .catch(function (e) {
         setStatus('error', e.message);
         throw e;
+      });
+  }
+
+  // Detect the native Android shell (Capacitor)
+  function isNativeApp() {
+    try {
+      return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    } catch (e) { return false; }
+  }
+
+  // Complete a sign-in that came back through the redirect flow
+  function completeRedirectSignIn() {
+    if (!state.auth) return Promise.resolve(null);
+    return state.auth.getRedirectResult()
+      .then(function (result) {
+        if (result && result.user) {
+          state.user = result.user;
+          setStatus('synced');
+          return result.user;
+        }
+        return null;
+      })
+      .catch(function (e) {
+        // "The redirect URI does not match..." etc.
+        if (e && e.code === 'auth/operation-not-supported-in-this-environment') {
+          setStatus('signed-out');
+          return null;
+        }
+        setStatus('error', e.message);
+        return null;
       });
   }
 
@@ -218,6 +263,8 @@ window.BHFirebase = (function () {
     isConfigured: isConfigured,
     signInAnonymously: signInAnonymously,
     signInWithGoogle: signInWithGoogle,
+    completeRedirectSignIn: completeRedirectSignIn,
+    isNativeApp: isNativeApp,
     signOut: signOut,
     pull: pull,
     push: push,

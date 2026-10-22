@@ -11,6 +11,10 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <!-- Paint the dark background immediately — prevents any white flash -->
+  <style>
+    html, body { background: #04060A; }
+  </style>
 
   <!-- Show splash on the very first paint (before any flash of the app) -->
   <script>
@@ -27,6 +31,18 @@
       }, 4000);
     })();
   </script>
+
+  <!-- Inline splash: shown instantly (before styles.css loads) so there is
+       never a white/empty frame on slow connections -->
+  <style id="bh-boot-style">
+    html.splash-on body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 100000;
+      background: #04060A;
+    }
+  </style>
 </head>
 <body>
 

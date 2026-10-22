@@ -128,6 +128,16 @@ window.BHNative = (function () {
         p.addListener('backButton', () => { handler(); });
       } catch (e) { /* ignore */ }
     },
+    // Called when the app comes back to the foreground
+    onResume(handler) {
+      const p = plugin('App');
+      if (!p) return;
+      try {
+        p.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) handler();
+        });
+      } catch (e) { /* ignore */ }
+    },
     async exit() {
       const p = plugin('App');
       if (p) { try { await p.exitApp(); } catch (e) {} }
