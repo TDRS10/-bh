@@ -2,7 +2,7 @@
 
 تطبيق **PWA + Android app** لإدارة قبضك ومصاريفك، مع فصل **التحويش** عن الصرف، ومزامنة سحابية، وتحديات وشارات.
 
-🔗 **الرابط:** https://mhmoudmohmed269-cmd.github.io/-bh/
+🔗 **الرابط:** https://tdrs10.github.io/-bh/
 
 ---
 
@@ -27,7 +27,7 @@
 افتح الرابط في Chrome → **⋮ → إضافة إلى الشاشة الرئيسية**
 
 ### APK (تطبيق أصلي)
-📥 **[BH-Finance-v1.0.0.apk](https://mhmoudmohmed269-cmd.github.io/-bh/releases/BH-Finance-v1.0.0.apk)**
+📥 **[BH-Finance-v1.0.0.apk](https://tdrs10.github.io/-bh/releases/BH-Finance-v1.0.0.apk)**
 
 > فعّل "تثبيت التطبيقات غير المعروفة" من إعدادات الأمان، ثم افتح الملف من Downloads.
 

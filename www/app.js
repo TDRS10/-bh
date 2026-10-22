@@ -426,7 +426,7 @@ class BHApp {
           <span class="cloud-link-num">2</span>
           <span>
             <strong>ضيف الدومين</strong>
-            <small>Authorized domains → mhmoudmohmed269-cmd.github.io</small>
+            <small>Authorized domains → tdrs10.github.io</small>
           </span>
         </a>
         <div class="cloud-links-foot">بعد Publish → ارجع للتطبيق واضغط "شخّص المشكلة" ثم "دخول سريع".</div>
@@ -3871,7 +3871,7 @@ class BHApp {
     if (window.BHNative && window.BHNative.App) window.BHNative.App.exit();
   }
 
-  get GITHUB_API()  { return 'https://api.github.com/repos/mhmoudmohmed269-cmd/-bh/commits?per_page=1'; }
+  get GITHUB_API()  { return 'https://api.github.com/repos/TDRS10/-bh/commits?per_page=1'; }
   get UPDATE_KEY()  { return 'BH_LAST_COMMIT_SHA'; }
 
   initUpdateUI() {

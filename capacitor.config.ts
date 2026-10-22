@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   // The app is served from GitHub Pages — the native shell loads the same URL,
   // so every push to GitHub shows up in the app immediately.
   server: {
-    url: 'https://mhmoudmohmed269-cmd.github.io/-bh/',
+    url: 'https://tdrs10.github.io/-bh/',
     androidScheme: 'https'
   },
   android: {

@@ -1,7 +1,7 @@
 # 📱 BH — تطبيق أندرويد أصلي (Capacitor)
 
 التطبيق موجود في **3 أشكال** — كلها بتحمّل **نفس رابط GitHub Pages**:
-`https://mhmoudmohmed269-cmd.github.io/-bh/`
+`https://tdrs10.github.io/-bh/`
 
 | الشكل | إزاي تستخدمه | التحديثات |
 |---|---|---|
@@ -90,7 +90,7 @@ npm run build:apk
 
 ## 🔗 ليه `assetlinks.json` مهم؟
 
-بيقول لـ Android: "التطبيق ده موقّع بنفس شهادة `com.bhfinance.app` مسموحله يفتح `mhmoudmohmed269-cmd.github.io`"
+بيقول لـ Android: "التطبيق ده موقّع بنفس شهادة `com.bhfinance.app` مسموحله يفتح `tdrs10.github.io`"
 
 البصمة (لازم تطابق الـ APK):
 ```

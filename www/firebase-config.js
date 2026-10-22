@@ -11,7 +11,7 @@
       (وكمان "Google" لو عايز مزامنة بين أكتر من جهاز)
 
    2) Authentication → Settings → Authorized domains → ضيف:
-        mhmoudmohmed269-cmd.github.io
+        tdrs10.github.io
         localhost
 
    3) Realtime Database → Rules → الصق:
