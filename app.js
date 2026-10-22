@@ -3005,12 +3005,12 @@ class BHApp {
 
     if (!looksLikeRedirect) return false;
 
-    // Clean the URL so a refresh doesn't re-trigger it
-    try {
-      window.history.replaceState({}, '', window.location.pathname);
-    } catch (e) { /* ignore */ }
+    // ⚠️ DO NOT clean the URL yet — Firebase reads the result straight from
+    // window.location.hash inside getRedirectResult(). Clearing it first is
+    // exactly what made the sign-in appear to "never come back".
 
-    // If the Firebase SDK isn't ready yet, retry once it loads
+    // If the Firebase SDK isn't ready yet, retry once it loads.
+    // (Leave the URL untouched so Firebase can still pick up the hash later.)
     const st = window.BHFirebase.getState();
     if (!st.ready) {
       this._pendingAuthRedirect = true;
@@ -3018,6 +3018,11 @@ class BHApp {
     }
 
     window.BHFirebase.completeRedirectSignIn().then((user) => {
+      // NOW it's safe to clean the URL (after Firebase consumed the hash)
+      try {
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (e) { /* ignore */ }
+
       if (user) {
         this._cloudReady = true;
         localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
@@ -3028,6 +3033,12 @@ class BHApp {
       } else {
         this.updateUserAvatar();
       }
+    }).catch(() => {
+      // Still clean up so a refresh doesn't loop
+      try {
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (e) { /* ignore */ }
+      this.updateUserAvatar();
     });
 
     return true;

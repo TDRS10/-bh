@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Android 12+ (API 31) launch theme: dark background + the BH logo,
+         so the system splash matches the app instead of the default white/robot -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/bh_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/bh_splash_background</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:statusBarColor">@color/bh_background</item>
+        <item name="android:navigationBarColor">@color/bh_background</item>
+        <item name="android:windowBackground">@color/bh_background</item>
+    </style>
+</resources>
