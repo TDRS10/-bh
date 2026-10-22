@@ -11,6 +11,7 @@ android/capacitor-cordova-android-plugins/build/
 *.idsig
 !releases/*.apk
 !BH-Finance-v1.1.0.apk
+!BH-Finance-v1.1.2.apk
 
 # Ã¢â€â‚¬Ã¢â€â‚¬ Signing keys (NEVER commit) Ã¢â€â‚¬Ã¢â€â‚¬
 *.keystore
