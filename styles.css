@@ -2335,29 +2335,6 @@ body.big-numbers-mode .item-amount     { font-size: 1.2rem; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   NATIVE APP (Capacitor) — edge-to-edge adjustments
-════════════════════════════════════════════════════════════ */
-/* Inside the native app the status bar is transparent, so the header
-   needs extra top padding to avoid being hidden behind it. */
-body.capacitor-native .app-header {
-  padding-top: env(safe-area-inset-top, 0px);
-  height: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
-}
-
-body.capacitor-native .motivation-banner {
-  margin-top: 4px;
-}
-
-body.capacitor-native .user-menu {
-  top: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 6px);
-}
-
-/* The native splash is used instead of the web one */
-body.capacitor-native #pwaSplashOverlay {
-  display: none !important;
-}
-
-/* ═══════════════════════════════════════════════════════════
    CLOUD SYNC  (المزامنة السحابية)
 ════════════════════════════════════════════════════════════ */
 .cloud-status {

@@ -1,31 +1,19 @@
-# Ã¢â€â‚¬Ã¢â€â‚¬ Build output Ã¢â€â‚¬Ã¢â€â‚¬
+# ملفات البناء
 build/
-.gradle/
-.kotlin/
-android/.kotlin/
-android/build/
-android/app/build/
-android/capacitor-cordova-android-plugins/build/
-*.apk
-*.aab
-*.idsig
-!releases/*.apk
-!BH-Finance-v1.1.0.apk
-!BH-Finance-v1.1.2.apk
+dist/
 
-# Ã¢â€â‚¬Ã¢â€â‚¬ Signing keys (NEVER commit) Ã¢â€â‚¬Ã¢â€â‚¬
-*.keystore
-*.jks
-!keystore-backup.keystore
-
-# Ã¢â€â‚¬Ã¢â€â‚¬ Node Ã¢â€â‚¬Ã¢â€â‚¬
+# Node
 node_modules/
-package-lock.json
 
-# Ã¢â€â‚¬Ã¢â€â‚¬ OS / editor Ã¢â€â‚¬Ã¢â€â‚¬
+# نظام التشغيل / المحرر
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.log
 build-log.txt
+
+# أسرار محلية
+*.keystore
+*.jks
+.env

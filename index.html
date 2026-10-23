@@ -1079,18 +1079,6 @@
   </script>
   <script src="firebase-service.js"></script>
 
-  <!-- Capacitor native bridge (no-op in a normal browser) -->
-  <script src="capacitor-bridge.js"></script>
-  <script>
-    // Load the Capacitor runtime only inside the native app
-    (function () {
-      if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) return;
-      var s = document.createElement('script');
-      s.src = 'capacitor.js';
-      s.onload = function () { if (window.BHNative) window.BHNative.init(); };
-      document.head.appendChild(s);
-    })();
-  </script>
   <script>
     // Register Service Worker for Offline PWA
     if ('serviceWorker' in navigator) {

@@ -130,17 +130,6 @@ window.BHFirebase = (function () {
     var provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Android WebView cannot open popups — use the redirect flow instead.
-    // The redirect returns to the same page, where getRedirectResult() picks it up.
-    if (isNativeApp()) {
-      return state.auth.signInWithRedirect(provider)
-        .then(function () { return null; })
-        .catch(function (e) {
-          setStatus('error', e.message);
-          throw e;
-        });
-    }
-
     return state.auth.signInWithPopup(provider)
       .then(function (cred) {
         state.user = cred.user;
@@ -151,13 +140,6 @@ window.BHFirebase = (function () {
         setStatus('error', e.message);
         throw e;
       });
-  }
-
-  // Detect the native Android shell (Capacitor)
-  function isNativeApp() {
-    try {
-      return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    } catch (e) { return false; }
   }
 
   // Complete a sign-in that came back through the redirect flow
@@ -264,7 +246,6 @@ window.BHFirebase = (function () {
     signInAnonymously: signInAnonymously,
     signInWithGoogle: signInWithGoogle,
     completeRedirectSignIn: completeRedirectSignIn,
-    isNativeApp: isNativeApp,
     signOut: signOut,
     pull: pull,
     push: push,
