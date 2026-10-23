@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v11';
+const CACHE_NAME = 'bh-finance-v12';
 const ASSETS = [
   './',
   './index.html',

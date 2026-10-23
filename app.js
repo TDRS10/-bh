@@ -710,6 +710,33 @@ class BHApp {
     });
   }
 
+  // ═══ 3D Balance Card — it tilts with your finger/mouse ═══
+  initCardTilt() {
+    const card = document.querySelector('.balance-card');
+    if (!card) return;
+
+    const MAX_DEG = 7;
+    let raf = null;
+
+    const apply = (rx, ry, scale) => {
+      raf = null;
+      card.style.transform = `perspective(950px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${scale})`;
+    };
+    const reset = () => {
+      if (raf) cancelAnimationFrame(raf);
+      apply(0, 0, 1);
+    };
+
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => apply(-py * MAX_DEG * 2, px * MAX_DEG * 2, 1.02));
+    });
+    ['pointerleave', 'pointerup', 'pointercancel'].forEach(ev => card.addEventListener(ev, reset));
+  }
+
   // App Initialization
   init() {
     this.applyBigNumbersMode();
@@ -724,6 +751,7 @@ class BHApp {
     this.installUnloadGuard();
     this.initCloudSync();
     this.updateUserAvatar();
+    this.initCardTilt();
     this.maybeShowWelcome();
     this.scheduleSmartNotification();
 
@@ -1896,6 +1924,12 @@ class BHApp {
     // Header balance chip — always visible on every tab
     const headerVal = document.getElementById('headerBalanceVal');
     if (headerVal) headerVal.textContent = total.toLocaleString();
+
+    // الخلفية الحية — لون الإضاءة حسب حالة الفلوس
+    const mood = total <= 0 ? 'poor' : (spendable < 100 ? 'tight' : 'rich');
+    document.body.classList.toggle('bh-rich', mood === 'rich');
+    document.body.classList.toggle('bh-tight', mood === 'tight');
+    document.body.classList.toggle('bh-poor', mood === 'poor');
   }
 
   renderOutingsWidget() {

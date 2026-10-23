@@ -73,12 +73,40 @@ body::after {
   position: fixed;
   inset: 0;
   background: 
-    radial-gradient(circle at 10% 15%, rgba(0, 217, 255, 0.18) 0%, transparent 40%),
-    radial-gradient(circle at 90% 75%, rgba(192, 132, 252, 0.14) 0%, transparent 40%),
-    radial-gradient(circle at 50% 45%, rgba(0, 200, 122, 0.10) 0%, transparent 50%);
+    radial-gradient(circle at 10% 15%, var(--glow-1, rgba(0, 217, 255, 0.18)) 0%, transparent 40%),
+    radial-gradient(circle at 90% 75%, var(--glow-2, rgba(192, 132, 252, 0.14)) 0%, transparent 40%),
+    radial-gradient(circle at 50% 45%, var(--glow-3, rgba(0, 200, 122, 0.10)) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
   transform: translateZ(0);
+  animation: bhAmbientBreath 8s ease-in-out infinite;
+}
+
+/* ═══ الخلفية الحية — بتتنفس وبتلون حسب حالة الرصيد ═══ */
+body.bh-rich {                                    /* فلوسك تمام — أخضر وسايان حيوي */
+  --glow-1: rgba(0, 217, 255, 0.20);
+  --glow-2: rgba(0, 200, 122, 0.16);
+  --glow-3: rgba(0, 217, 255, 0.12);
+}
+body.bh-tight {                                   /* الرصيد نزل تحت 100 — إنذار كهرماني */
+  --glow-1: rgba(251, 191, 36, 0.20);
+  --glow-2: rgba(255, 170, 0, 0.16);
+  --glow-3: rgba(251, 191, 36, 0.10);
+}
+body.bh-poor {                                    /* مفيش فلوس — أحمر وفاجر */
+  --glow-1: rgba(255, 59, 92, 0.24);
+  --glow-2: rgba(255, 59, 92, 0.16);
+  --glow-3: rgba(255, 59, 92, 0.12);
+}
+
+/* تنفّس الإضاءة — حيا ببطء */
+@keyframes bhAmbientBreath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.66; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; }
 }
 
 html, body {
@@ -830,12 +858,50 @@ body.big-numbers-mode .balance-chip-val {
 
 .card-icon { font-size: .9rem; }
 
-/* ── BALANCE CARD (hero) ── */
+/* ── BALANCE CARD (hero) ── الخلفية الحية — بطاقة 3D بلمعة هولوغرام */
 .balance-card {
   background: rgba(8, 24, 42, 0.88);
   border: 1px solid rgba(0, 217, 255, 0.35);
   border-top: 1.5px solid var(--accent);
   box-shadow: 0 12px 40px rgba(0, 217, 255, 0.14), inset 0 1px 0 rgba(0, 217, 255, 0.35);
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transition: transform .22s ease-out, box-shadow .35s ease;
+  will-change: transform;
+}
+
+/* بطاقة 3D حسب حالة الميزانية — أخضر / كهرمان / أحمر يتنفس حى الحالة */
+body.bh-rich .balance-card   { box-shadow: 0 12px 42px rgba(0, 200, 122, 0.20), inset 0 1px 0 rgba(0, 217, 255, 0.35); }
+body.bh-tight .balance-card  { box-shadow: 0 12px 42px rgba(251, 191, 36, 0.20), inset 0 1px 0 rgba(251, 191, 36, 0.30); }
+body.bh-poor .balance-card   { box-shadow: 0 12px 42px rgba(255, 59, 92, 0.24), inset 0 1px 0 rgba(255, 59, 92, 0.30); }
+body.bh-poor .balance-card   { border-color: rgba(255, 59, 92, 0.4); border-top-color: var(--danger); }
+body.bh-tight .balance-card  { border-top-color: var(--warning); }
+
+/* اللمعة الهولوغرامي — تمر عبر البطاقة مثل البطاقة البلاستيكية الحقيقية */
+.balance-card::after {
+  content: '';
+  position: absolute;
+  inset: -45% -60%;
+  background: linear-gradient(115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.10) 46%,
+    rgba(0, 217, 255, 0.22) 49%,
+    rgba(255, 255, 255, 0.14) 52%,
+    transparent 58%);
+  pointer-events: none;
+  transform: translateX(-65%) rotate(2deg);
+  animation: bhHoloSweep 5.5s ease-in-out infinite;
+}
+
+@keyframes bhHoloSweep {
+  0%, 52%  { transform: translateX(-65%) rotate(2deg); }
+  86%, 100% { transform: translateX(65%) rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .balance-card::after { animation: none; opacity: .4; }
+  .balance-card { transition: none; }
 }
 
 .total-amount {
