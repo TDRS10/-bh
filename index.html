@@ -114,7 +114,29 @@
 
       <!-- ================= 1. DASHBOARD VIEW ================= -->
       <section id="dashboardView" class="view-page active">
-        
+
+        <!-- Work & Rest Tracker — نزلت الشغل ولا لا -->
+        <div class="card" id="workTrackerCard">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🛵</span> الشغل والراحة</span>
+            <span class="work-today-name" id="workTodayName"></span>
+          </div>
+          <div class="work-today-row">
+            <span class="work-today-status" id="workTodayStatus"></span>
+            <div class="work-today-btns">
+              <button class="btn work-btn" id="workBtnYes" onclick="app.setWorkDay(true)">✅ نزلت</button>
+              <button class="btn work-btn" id="workBtnNo" onclick="app.setWorkDay(false)">🌙 راحة</button>
+            </div>
+          </div>
+          <div class="work-stats-grid">
+            <div class="work-stat"><span class="work-stat-val" id="workStatWorked">0</span><span class="work-stat-label">يوم شغل الشهر ده</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatOff">0</span><span class="work-stat-label">يوم راحة</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatMoney">0</span><span class="work-stat-label">قبض أيام الشغل (ج.م)</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatAvg">—</span><span class="work-stat-label">متوسط يوم قبض</span></div>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.switchTab('workView')">📅 الجدول الكامل — كم يوم نزلت؟</button>
+        </div>
+
         <!-- Main Balance Card -->
         <div class="card balance-card">
           <div class="card-header">
@@ -249,6 +271,29 @@
           </div>
         </div>
 
+      </section>
+
+      <!-- ================= 1b. WORK TRACKER (جدول الشغل) ================= -->
+      <section id="workView" class="view-page">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🛵</span> جدول الشغل الشهري</span>
+            <button class="btn btn-secondary btn-sm" onclick="app.switchTab('dashboardView')">↩ الرئيسية</button>
+          </div>
+          <p class="work-cal-hint">دوس على أي يوم يغيّر حالته: مش متسجل → نزلت ✅ → راحة 🌙</p>
+          <div class="work-cal-nav">
+            <button class="icon-btn" onclick="app.workCalNav(-1)" title="الشهر السابق">◀</button>
+            <span class="work-cal-title" id="workCalTitle"></span>
+            <button class="icon-btn" onclick="app.workCalNav(1)" title="الشهر التالي">▶</button>
+          </div>
+          <div class="work-cal-stats" id="workCalStats"></div>
+          <div class="work-cal-grid" id="workCalGrid"></div>
+          <div class="work-cal-legend">
+            <span class="lg-item"><span class="lg-dot lg-worked"></span> نزلت</span>
+            <span class="lg-item"><span class="lg-dot lg-off"></span> راحة</span>
+            <span class="lg-item"><span class="lg-dot lg-today"></span> النهارده</span>
+          </div>
+        </div>
       </section>
 
       <!-- ================= 2. INCOMES & RIDER SHIFT VIEW ================= -->

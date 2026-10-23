@@ -62,6 +62,7 @@ class BHApp {
       ],
       debts: [],
       workSessions: [],
+      workDays: {},
       adjustments: [],
       pendingIncomes: []
     };
@@ -76,6 +77,7 @@ class BHApp {
       // Merge with defaults in case of missing keys
       const merged = { ...this.getDefaultData(), ...parsed, pendingIncomes: parsed.pendingIncomes || [] };
       merged.workSessions = parsed.workSessions || [];
+      merged.workDays = Object.assign({}, parsed.workDays || {});
       merged.adjustments = parsed.adjustments || [];
       merged.settings = { ...this.getDefaultData().settings, ...(parsed.settings || {}) };
       merged.settings.challenges = merged.settings.challenges || {};
@@ -266,6 +268,9 @@ class BHApp {
     out.pendingIncomes = union(local.pendingIncomes, remote.pendingIncomes);
     out.workSessions = union(local.workSessions, remote.workSessions);
     out.adjustments = union(local.adjustments, remote.adjustments);
+    // Work days: keep every marked day; the local value wins on conflict
+    // (the device that was actually tapped is usually the correct one)
+    out.workDays = Object.assign({}, remote.workDays || {}, local.workDays || {});
 
     // Balances: the newer side wins
     const remoteIsNewer = remoteUpdatedAt > (localUpdatedAt || 0);
@@ -875,6 +880,9 @@ class BHApp {
     this.currentTab = viewId;
     if (viewId === 'moreView') {
       this.renderReportChart();
+    }
+    if (viewId === 'workView') {
+      this.renderWorkCalendar();
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1577,6 +1585,153 @@ class BHApp {
     if (this.data.workSessions.length !== before) this.saveData();
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  WORK TRACKER (جدول الشغل — نزلت ولا لا؟)
+  //  workDays = { 'YYYY-MM-DD': true(نزلت) | false(راحة) }
+  // ═══════════════════════════════════════════════════════════
+
+  WORK_DAY_NAMES   = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  WORK_MONTH_NAMES = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+  getWorkDaysMap() {
+    if (!this.data.workDays) this.data.workDays = {};
+    return this.data.workDays;
+  }
+
+  workDateKey(y, m, d) {
+    return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+
+  todayKey() {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  // Monthly counters: { worked, off, incomeTotal, incomeDays }
+  workMonthStats(y, m) {
+    const map = this.getWorkDaysMap();
+    const days = new Date(y, m + 1, 0).getDate();
+    const prefix = this.workDateKey(y, m, 1).slice(0, 7);
+    let worked = 0, off = 0;
+    for (let d = 1; d <= days; d++) {
+      const st = map[this.workDateKey(y, m, d)];
+      if (st === true) worked++;
+      else if (st === false) off++;
+    }
+    // Link work with money: only incomes recorded on days marked as worked
+    let incomeTotal = 0;
+    const incomeDays = new Set();
+    (this.data.incomes || []).forEach(inc => {
+      if (!inc.date || !inc.date.startsWith(prefix)) return;
+      if (map[inc.date] !== true) return;
+      incomeTotal += Number(inc.amount) || 0;
+      incomeDays.add(inc.date);
+    });
+    return { worked, off, incomeTotal, incomeDayCount: incomeDays.size };
+  }
+
+  // Dashboard mini card — today's status + month chips
+  renderWorkTracker() {
+    const card = document.getElementById('workTrackerCard');
+    if (!card) return;
+
+    const now = new Date();
+    const dayName = this.WORK_DAY_NAMES[now.getDay()];
+    document.getElementById('workTodayName').textContent =
+      `${dayName} ${now.getDate()} ${this.WORK_MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+
+    const status = this.getWorkDaysMap()[this.todayKey()];
+    const statusEl = document.getElementById('workTodayStatus');
+    statusEl.textContent = status === true ? '✅ نزلت الشغل'
+      : status === false ? '🌙 خدت راحة' : '⏳ لسه ما اتسجلتش';
+    statusEl.className = 'work-today-status ' + (status === true ? 'st-worked' : status === false ? 'st-off' : 'st-none');
+
+    document.getElementById('workBtnYes').classList.toggle('active', status === true);
+    document.getElementById('workBtnNo').classList.toggle('active', status === false);
+
+    const stats = this.workMonthStats(now.getFullYear(), now.getMonth());
+    document.getElementById('workStatWorked').textContent = stats.worked;
+    document.getElementById('workStatOff').textContent = stats.off;
+    document.getElementById('workStatMoney').textContent = stats.incomeTotal.toLocaleString();
+    document.getElementById('workStatAvg').textContent =
+      stats.incomeDayCount ? Math.round(stats.incomeTotal / stats.incomeDayCount).toLocaleString() : '—';
+  }
+
+  // Toggle today's status from the dashboard (tap the same one again = unmark)
+  setWorkDay(status) {
+    const map = this.getWorkDaysMap();
+    const key = this.todayKey();
+    const was = map[key];
+    if (was === status) delete map[key];
+    else map[key] = status;
+
+    this.saveData();
+    this.renderWorkTracker();
+    this.renderWorkCalendar();
+
+    if (was === status) this.showToast('↩️ اتشال تسجيل النهارده', 'info');
+    else if (status) this.showToast('✅ سجلت إنك نزلت الشغل النهارده — عقبال كل يوم!', 'success');
+    else this.showToast('🌙 راحة كده... بكرة نزول ومنه ياجر', 'info');
+  }
+
+  // Full monthly calendar — month navigation
+  workCalNav(delta) {
+    if (!this._workCal) { const n = new Date(); this._workCal = { y: n.getFullYear(), m: n.getMonth() }; }
+    let m = this._workCal.m + delta;
+    let y = this._workCal.y;
+    if (m < 0) { m = 11; y--; }
+    if (m > 11) { m = 0; y++; }
+    this._workCal = { y, m };
+    this.renderWorkCalendar();
+  }
+
+  renderWorkCalendar() {
+    const grid = document.getElementById('workCalGrid');
+    if (!grid) return;
+    if (!this._workCal) { const n = new Date(); this._workCal = { y: n.getFullYear(), m: n.getMonth() }; }
+    const { y, m } = this._workCal;
+    const map = this.getWorkDaysMap();
+    const tKey = this.todayKey();
+
+    document.getElementById('workCalTitle').textContent = `${this.WORK_MONTH_NAMES[m]} ${y}`;
+
+    const stats = this.workMonthStats(y, m);
+    document.getElementById('workCalStats').innerHTML =
+      `✅ نزلت <b>${stats.worked}</b> يوم &nbsp;•&nbsp; 🌙 راحة <b>${stats.off}</b> &nbsp;•&nbsp; 💸 قبض أيام الشغل <b>${stats.incomeTotal.toLocaleString()}</b> ج.م`;
+
+    // Week columns start on Saturday (الأسبوع المصري يبدأ السبت)
+    const HEAD = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+    let html = HEAD.map(h => `<span class="work-cal-head">${h}</span>`).join('');
+
+    const offset = (new Date(y, m, 1).getDay() + 1) % 7;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    for (let i = 0; i < offset; i++) html += '<span class="work-cal-cell blank"></span>';
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = this.workDateKey(y, m, d);
+      const st = map[key];
+      const cls = ['work-cal-cell'];
+      if (st === true) cls.push('worked');
+      else if (st === false) cls.push('off');
+      if (key === tKey) cls.push('today');
+      html += `<span class="${cls.join(' ')}" onclick="app.cycleWorkDay('${key}')"><b>${d}</b><i>${st === true ? '✓' : st === false ? '—' : ''}</i></span>`;
+    }
+    grid.innerHTML = html;
+  }
+
+  // Tap a day: unset → نزلت → راحة → unset
+  cycleWorkDay(key) {
+    const map = this.getWorkDaysMap();
+    const cur = map[key];
+    if (cur === undefined) map[key] = true;          // unset → نزلت
+    else if (cur === true) map[key] = false;         // نزلت → راحة
+    else delete map[key];                            // راحة → unset
+
+    this.saveData();
+    this.renderWorkCalendar();
+    if (key === this.todayKey()) this.renderWorkTracker();
+  }
+
   // Render Master Logic
   renderAll() {
     this.renderBalances();
@@ -1599,6 +1754,7 @@ class BHApp {
     this.renderAdjustHistory();
     this.renderSmartAlerts();
     this.renderSmartAlertSettings();
+    this.renderWorkTracker();
   }
 
   // ── Month-over-Month Comparison ──────────────────────────────
