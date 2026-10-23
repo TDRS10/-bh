@@ -115,29 +115,7 @@
       <!-- ================= 1. DASHBOARD VIEW ================= -->
       <section id="dashboardView" class="view-page active">
 
-        <!-- Work & Rest Tracker — نزلت الشغل ولا لا -->
-        <div class="card" id="workTrackerCard">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">🛵</span> الشغل والراحة</span>
-            <span class="work-today-name" id="workTodayName"></span>
-          </div>
-          <div class="work-today-row">
-            <span class="work-today-status" id="workTodayStatus"></span>
-            <div class="work-today-btns">
-              <button class="btn work-btn" id="workBtnYes" onclick="app.setWorkDay(true)">✅ نزلت</button>
-              <button class="btn work-btn" id="workBtnNo" onclick="app.setWorkDay(false)">🌙 راحة</button>
-            </div>
-          </div>
-          <div class="work-stats-grid">
-            <div class="work-stat"><span class="work-stat-val" id="workStatWorked">0</span><span class="work-stat-label">يوم شغل الشهر ده</span></div>
-            <div class="work-stat"><span class="work-stat-val" id="workStatOff">0</span><span class="work-stat-label">يوم راحة</span></div>
-            <div class="work-stat"><span class="work-stat-val" id="workStatMoney">0</span><span class="work-stat-label">قبض أيام الشغل (ج.م)</span></div>
-            <div class="work-stat"><span class="work-stat-val" id="workStatAvg">—</span><span class="work-stat-label">متوسط يوم قبض</span></div>
-          </div>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="app.switchTab('workView')">📅 الجدول الكامل — كم يوم نزلت؟</button>
-        </div>
-
-        <!-- Main Balance Card -->
+        <!-- Main Balance Card — أول حاجة في الصفحة -->
         <div class="card balance-card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💰</span> إجمالي الرصيد الكلّي</span>
@@ -158,6 +136,49 @@
               <span class="sub-balance-val val-spendable"><span id="spendableBalanceVal">0</span> <small>ج.م</small></span>
             </div>
           </div>
+        </div>
+
+        <!-- كابسولة النهارده — عينك على الشغل -->
+        <div class="card today-hub-card" id="todayHubCard">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">⚡</span> كبسولة النهارده</span>
+            <span class="work-today-name" id="workTodayName"></span>
+          </div>
+          <div class="today-hub-body">
+            <div class="progress-ring-wrap">
+              <svg class="progress-ring" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="42"></circle>
+                <circle class="ring-fill" id="dailyRingFill" cx="50" cy="50" r="42"></circle>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-num" id="todayNetVal">0</span>
+                <span class="ring-label">صافي النهارده</span>
+              </div>
+            </div>
+            <div class="hub-side">
+              <span class="fire-streak" id="todayStreak"></span>
+              <div class="hub-status" id="todayHubStatus"></div>
+              <div class="today-hub-btns">
+                <button class="btn work-btn" id="hubBtnYes" onclick="app.setWorkDay(true)">✅ نزلت</button>
+                <button class="btn work-btn" id="hubBtnNo" onclick="app.setWorkDay(false)">🌙 راحة</button>
+              </div>
+              <button class="hub-target" id="hubTargetText" onclick="app.editDailyTarget()"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work & Rest Tracker — نزلت الشغل ولا لا -->
+        <div class="card" id="workTrackerCard">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🛵</span> جدول الشغل والراحة</span>
+          </div>
+          <div class="work-stats-grid">
+            <div class="work-stat"><span class="work-stat-val" id="workStatWorked">0</span><span class="work-stat-label">يوم شغل الشهر ده</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatOff">0</span><span class="work-stat-label">يوم راحة</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatMoney">0</span><span class="work-stat-label">قبض أيام الشغل (ج.م)</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatAvg">—</span><span class="work-stat-label">متوسط يوم قبض</span></div>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.switchTab('workView')">📅 الجدول الكامل — كم يوم نزلت؟</button>
         </div>
 
         <!-- Action Grid -->

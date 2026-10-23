@@ -40,6 +40,7 @@ class BHApp {
         weeklyOutingsBudget: 300,
         lastSavingsWithdrawalDate: today,
         savingsStreakDays: 0,
+        dailyWorkTarget: 300,
         bigNumbersMode: false,
         challenges: {},
         badges: {},
@@ -1658,31 +1659,106 @@ class BHApp {
     return { worked, off, incomeTotal, incomeDayCount: incomeDays.size };
   }
 
-  // Dashboard mini card — today's status + month chips
+  // Dashboard + كبسولة النهارده — today's status, streak, ring, month chips
   renderWorkTracker() {
-    const card = document.getElementById('workTrackerCard');
-    if (!card) return;
-
-    const now = new Date();
-    const dayName = this.WORK_DAY_NAMES[now.getDay()];
-    document.getElementById('workTodayName').textContent =
-      `${dayName} ${now.getDate()} ${this.WORK_MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+    document.getElementById('workTodayName').textContent = (() => {
+      const n = new Date();
+      return `النهارده ${this.WORK_DAY_NAMES[n.getDay()]} ${n.getDate()} ${this.WORK_MONTH_NAMES[n.getMonth()]}`;
+    })();
 
     const status = this.getWorkDaysMap()[this.todayKey()];
-    const statusEl = document.getElementById('workTodayStatus');
-    statusEl.textContent = status === true ? '✅ نزلت الشغل'
-      : status === false ? '🌙 خدت راحة' : '⏳ لسه ما اتسجلتش';
-    statusEl.className = 'work-today-status ' + (status === true ? 'st-worked' : status === false ? 'st-off' : 'st-none');
+    document.getElementById('hubBtnYes').classList.toggle('active', status === true);
+    document.getElementById('hubBtnNo').classList.toggle('active', status === false);
 
-    document.getElementById('workBtnYes').classList.toggle('active', status === true);
-    document.getElementById('workBtnNo').classList.toggle('active', status === false);
+    this.renderTodayHub();
 
+    const now = new Date();
     const stats = this.workMonthStats(now.getFullYear(), now.getMonth());
     document.getElementById('workStatWorked').textContent = stats.worked;
     document.getElementById('workStatOff').textContent = stats.off;
     document.getElementById('workStatMoney').textContent = stats.incomeTotal.toLocaleString();
     document.getElementById('workStatAvg').textContent =
       stats.incomeDayCount ? Math.round(stats.incomeTotal / stats.incomeDayCount).toLocaleString() : '—';
+  }
+
+  // ═══ كبسولة النهارده — حلقة صافي اليوم + شعلة الأيام المتتالية ═══
+  renderTodayHub() {
+    const tKey = this.todayKey();
+    const map = this.getWorkDaysMap();
+
+    // صافي النهارده = قبض النهارده − مصاريف النهارده
+    const inc = (this.data.incomes || []).filter(i => i.date === tKey)
+      .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const exp = (this.data.expenses || []).filter(e => e.date === tKey)
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const net = inc - exp;
+
+    const numEl = document.getElementById('todayNetVal');
+    if (numEl) {
+      numEl.textContent = net.toLocaleString();
+      numEl.className = 'ring-num' + (net < 0 ? ' neg' : net > 0 ? ' pos' : '');
+    }
+
+    // الحلقة — نسبة الوصول لهدف اليوم
+    const target = Number(this.data.settings && this.data.settings.dailyWorkTarget) || 300;
+    const pct = Math.max(0, Math.min(100, (net / target) * 100));
+    const C = 2 * Math.PI * 42;
+    const ring = document.getElementById('dailyRingFill');
+    if (ring) {
+      ring.style.strokeDasharray = C.toFixed(1);
+      ring.style.strokeDashoffset = (C * (1 - pct / 100)).toFixed(1);
+      ring.classList.toggle('ring-good', pct >= 100);
+      ring.classList.toggle('ring-bad', net < 0);
+    }
+
+    // حالة النهارده
+    const stEl = document.getElementById('todayHubStatus');
+    if (stEl) {
+      const st = map[tKey];
+      stEl.textContent = st === true
+        ? (pct >= 100 ? '🎉 كملت هدف النهارده!' : '🔥 شغال — كمل قبض')
+        : st === false ? '🌙 راحة النهارده' : '⏳ سجل إنك نزلت';
+      stEl.className = 'hub-status ' + (st === true ? 'st-worked' : st === false ? 'st-off' : 'st-none');
+    }
+
+    // شعلة الأيام المتتالية
+    const streak = this.getWorkStreak();
+    const fire = document.getElementById('todayStreak');
+    if (fire) {
+      fire.textContent = streak >= 3 ? `🔥 ${streak} أيام ورا بعض`
+        : streak === 2 ? '🔥 يومين ورا بعض'
+        : streak === 1 ? '🔥 بدأتها' : '';
+      fire.classList.toggle('blazing', streak >= 2);
+    }
+
+    const tEl = document.getElementById('hubTargetText');
+    if (tEl) tEl.textContent = `🎯 هدفك: ${Number(target).toLocaleString()} ج.م`;
+  }
+
+  // كم يوم متتالي نزلت شغل (يبدأ من النهارده أو آخر يوم مسجل)
+  getWorkStreak() {
+    const map = this.getWorkDaysMap();
+    const d = new Date();
+    if (map[this.todayKey()] === undefined) d.setUTCDate(d.getUTCDate() - 1);
+    let streak = 0;
+    while (map[d.toISOString().split('T')[0]] === true) {
+      streak++;
+      d.setUTCDate(d.getUTCDate() - 1);
+    }
+    return streak;
+  }
+
+  // تغيير هدف اليوم
+  editDailyTarget() {
+    const cur = Number(this.data.settings && this.data.settings.dailyWorkTarget) || 300;
+    const v = prompt('هدفك اليومي من الشغل كام (ج.م)؟', cur);
+    if (v === null) return;
+    const n = parseFloat(v);
+    if (isNaN(n) || n <= 0) { this.showToast('⚠️ اكتب رقم صحيح', 'error'); return; }
+    this.data.settings.dailyWorkTarget = Math.round(n);
+    this.saveData();
+    this.renderTodayHub();
+    this.showToast(`🎯 الهدف بقى ${Math.round(n)} ج.م يوميًا — عقبال ما تكمّله!`, 'success');
   }
 
   // Toggle today's status from the dashboard (tap the same one again = unmark)

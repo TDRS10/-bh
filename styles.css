@@ -2793,6 +2793,128 @@ html.splash-on, html.splash-on body {
 /* ═══════════════════════════════════════════════════════════
    WORK TRACKER (جدول الشغل — نزلت ولا لا؟)
 ════════════════════════════════════════════════════════════ */
+/* ── كبسولة النهارده — الحافز اليومي ── */
+.today-hub-card {
+  background: linear-gradient(145deg, rgba(10, 22, 38, 0.92), rgba(6, 14, 26, 0.92));
+  border: 1px solid rgba(0, 217, 255, 0.28);
+}
+body.bh-tight .today-hub-card { border-color: rgba(251, 191, 36, 0.35); }
+body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
+
+.today-hub-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ── حلقة التقدّم ── */
+.progress-ring-wrap {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 18px rgba(0, 217, 255, 0.18));
+}
+
+.progress-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+.progress-ring circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+
+.ring-bg { stroke: rgba(255, 255, 255, 0.07); }
+
+.ring-fill {
+  stroke: var(--accent);
+  transition: stroke-dashoffset .9s cubic-bezier(.22,1,.36,1), stroke .5s ease;
+  filter: drop-shadow(0 0 6px rgba(0, 217, 255, 0.55));
+}
+.ring-fill.ring-good { stroke: var(--savings); filter: drop-shadow(0 0 8px rgba(0, 200, 122, 0.6)); }
+.ring-fill.ring-bad  { stroke: var(--danger);  filter: drop-shadow(0 0 8px rgba(255, 59, 92, 0.55)); }
+
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.ring-num {
+  font-family: var(--font-disp);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.ring-num.pos { color: var(--savings); text-shadow: 0 0 14px rgba(0, 200, 122, 0.45); }
+.ring-num.neg { color: var(--danger);  text-shadow: 0 0 14px rgba(255, 59, 92, 0.45); }
+
+.ring-label {
+  font-size: .56rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: .04em;
+}
+
+/* ـ─ الجنب التاني ── */
+.hub-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fire-streak {
+  font-size: .72rem;
+  font-weight: 800;
+  color: var(--essentials);
+  min-height: 1em;
+}
+.fire-streak.blazing {
+  animation: firePulse 1.6s ease-in-out infinite;
+  text-shadow: 0 0 12px rgba(255, 170, 0, 0.55);
+}
+
+@keyframes firePulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+.hub-status {
+  font-family: var(--font-disp);
+  font-size: .92rem;
+  font-weight: 700;
+}
+.hub-status.st-none   { color: var(--text-secondary); }
+.hub-status.st-worked { color: var(--savings); }
+.hub-status.st-off    { color: var(--essentials); }
+
+.today-hub-btns { display: flex; gap: 8px; }
+
+.hub-target {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: .68rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: var(--trans-fast);
+}
+.hub-target:active { transform: scale(.96); border-color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fire-streak.blazing { animation: none; }
+}
+
+/* ── (الباقي من الجدول الشهري) ── */
 .work-today-name {
   font-size: .68rem;
   color: var(--text-secondary);
