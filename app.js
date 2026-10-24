@@ -145,6 +145,7 @@ class BHApp {
         window.BHFirebase.onStatusChange((st) => {
           this._cloudState = st;
           this.updateUserAvatar();
+          this.handleCloudSession(st);
         });
       } catch (e) { /* ignore */ }
 
@@ -179,7 +180,11 @@ class BHApp {
           waited++;
           setTimeout(waitForSdk, 100);
         } else {
-          window.BHFirebase.onStatusChange((st) => { this._cloudState = st; this.updateUserAvatar(); });
+          window.BHFirebase.onStatusChange((st) => {
+            this._cloudState = st;
+            this.updateUserAvatar();
+            this.handleCloudSession(st);
+          });
           window.BHFirebase.getState().status = 'sdk-missing';
         }
       };
@@ -189,11 +194,75 @@ class BHApp {
     }
   }
 
+  // ── session حية ──────────────────────────────────────────
+  // لما المستخدم يكون مسجّل (حتى بعد إعادة فتح التطبيق من غير ما يسجل تاني)
+  // نفعّل الرفع التلقائي + الاستماع المباشر للسحابة — دي كانت المشكلة:
+  // الجلسة المحفوظة ما كانتش بتفعّل _cloudReady فالتعديلات مكانش بيرفعها.
+  handleCloudSession(st) {
+    if (!st || typeof window.BHFirebase === 'undefined') return;
+    try {
+      if (st.user && (st.status === 'synced' || st.status === 'offline')) {
+        this._cloudReady = true;
+
+        const uid = st.user.uid;
+        if (this._cloudSubUid !== uid) {
+          this._cloudSubUid = uid;
+          this.startCloudListener();
+          this.pullFromCloud();   // اسحب مرة واحدة بعد التأكد من الجلسة
+        }
+      } else if (!st.user && this._cloudSubUid) {
+        // خرج من الحساب → افصل الاستماع
+        this._cloudSubUid = null;
+        try { window.BHFirebase.unsubscribeRealtime(); } catch (e) { /* ignore */ }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // اشتراك مباشر: أي تعديل من جهاز تاني بييجي هنا فورًا
+  startCloudListener() {
+    if (typeof window.BHFirebase === 'undefined') return;
+    try {
+      window.BHFirebase.subscribe((envelope) => {
+        this.applyRemoteEnvelope(envelope);
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  // دمج البيانات الجاية حيًا من السحابة (من غير دونات لا نهائي)
+  applyRemoteEnvelope(envelope) {
+    if (!envelope || !envelope.data || !envelope.data.balances) return;
+
+    // تجاهل صدى رفّعنا الايح احنا نفسنا — التوقيض بيبقى مطابقة
+    // (أي تحديث من جهاز تاني بيبقى بتوقيض مختلف فبيعدّي عادي)
+    if (this._lastPushAt && Math.abs(envelope.updatedAt - this._lastPushAt) <= 100) return;
+
+    const localUpdatedAt = parseInt(localStorage.getItem(LOCAL_TIME_KEY) || '0', 10);
+    const merged = this.mergeCloudData(this.data, envelope.data, envelope.updatedAt, localUpdatedAt);
+    const changed = merged.__changed;
+
+    this.data = merged;
+    delete this.data.__changed;
+
+    if (changed) {
+      this._suppressCloudPush = true;
+      this.saveData();
+      this.renderAll();
+      try { this.showToast('☁️ اتحدّثت من جهاز تاني', 'info'); } catch (e) { /* ignore */ }
+      // ارفع الدمج نفسه عشان باقي الأجهزة تتقارب على نفس البيانات
+      this._lastPushAt = Date.now();
+      window.BHFirebase.push(this.data).then((ok) => {
+        if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+      });
+    }
+  }
+
   // Push local data to the cloud (debounced so typing doesn't spam it)
   _scheduleCloudPush() {
     if (!this._cloudReady) return;
+    if (this._suppressCloudPush) { this._suppressCloudPush = false; return; }
     clearTimeout(this._cloudPushTimer);
     this._cloudPushTimer = setTimeout(() => {
+      this._lastPushAt = Date.now();
       window.BHFirebase.push(this.data).then((ok) => {
         if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
       });
@@ -383,7 +452,9 @@ class BHApp {
         ${this.renderConsoleLinks()}
 
         <div class="cloud-note" style="margin-top:10px;">
-          💡 البيانات محفوظة على جهازك دايماً — المزامنة بس اللي إضافية.
+          💡 البيانات محفوظة على جهازك دايماً — المزامنة بس اللي إضافية.<br>
+          ☁️ للمزامنة بين الأجهزة: لازم <b>نفس حساب Google</b> على كل الأجهزة —
+          «الدخول السريع» بيفتح حساب مختلف من غير مزامنة بينه وبين Google.
         </div>
       </div>
     `;
@@ -3266,7 +3337,6 @@ class BHApp {
         this.updateUserAvatar();
         this.showToast('☁️ تم تسجيل الدخول بـ Google بنجاح!', 'success');
         this.pullFromCloud();
-        this.renderCloudCard();
       } else {
         this.updateUserAvatar();
       }

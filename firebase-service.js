@@ -240,6 +240,39 @@ window.BHFirebase = (function () {
     };
   }
 
+  // ── Realtime subscription ────────────────────────────────
+  // يسمع لأي تغيير في السحابة وينفّذ callback فورًا — هكذا كل الأجهزة
+  // تتحدث مع بعضها حيًا من غير ما تعمل سحب يدوي.
+  let dataCallback = null;
+  let dataRef = null;
+
+  function subscribe(cb) {
+    if (!cb || typeof cb !== 'function') return false;
+    const base = userPath();
+    if (!base || !state.db) return false;
+    try {
+      unsubscribe();
+      dataCallback = cb;
+      dataRef = state.db.ref(base + '/' + DATA_PATH);
+      dataRef.on('value', function (snap) {
+        const val = snap.val();
+        if (dataCallback) {
+          try { dataCallback(val); } catch (e) { /* listener must not crash the app */ }
+        }
+      });
+      return true;
+    } catch (e) {
+      dataCallback = null;
+      return false;
+    }
+  }
+
+  function unsubscribeRealtime() {
+    try { if (dataRef) dataRef.off('value'); } catch (e) { /* ignore */ }
+    dataRef = null;
+    dataCallback = null;
+  }
+
   return {
     init: init,
     isConfigured: isConfigured,
@@ -249,6 +282,8 @@ window.BHFirebase = (function () {
     signOut: signOut,
     pull: pull,
     push: push,
+    subscribe: subscribe,
+    unsubscribeRealtime: unsubscribeRealtime,
     onStatusChange: onStatusChange,
     getState: function () { return state; },
     getUser: function () { return state.user; }
