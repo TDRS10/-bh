@@ -1804,6 +1804,21 @@ class BHApp {
 
     const tEl = document.getElementById('hubTargetText');
     if (tEl) tEl.textContent = `🎯 هدفك: ${Number(target).toLocaleString()} ج.م`;
+
+    // 💸 كملت هدف النهارده؟ مطر فلوس! (مرة واحدة في اليوم — ومن غير احتفال عند فتح الصفحة)
+    if (net > 0 && net >= target) {
+      if (!this._hubSeen) {
+        // أول فتح: الهدف واقف من زمان → من غير احتفال، ونسلم هدفي جديد لو عبرت الحد حيًا
+        // (من غير ما نثبّت المفتاح عشان العبور الحي بعدها يشتغل)
+      } else if (this._hubHitKey !== tKey) {
+        this._hubHitKey = tKey;
+        this.moneyRain(26);
+      }
+    } else if (this._hubHitKey === tKey && net < target) {
+      // نزل تحت الهدف تاني — نسمح بالاحتفال يتعيد لو كملت تاني
+      delete this._hubHitKey;
+    }
+    this._hubSeen = true;
   }
 
   // كم يوم متتالي نزلت شغل (يبدأ من النهارده أو آخر يوم مسجل)
@@ -1845,7 +1860,7 @@ class BHApp {
     this.renderWorkCalendar();
 
     if (was === status) this.showToast('↩️ اتشال تسجيل النهارده', 'info');
-    else if (status) this.showToast('✅ سجلت إنك نزلت الشغل النهارده — عقبال كل يوم!', 'success');
+    else if (status) { this.showToast('✅ سجلت إنك نزلت الشغل النهارده — عقبال كل يوم!', 'success'); this.moneyRain(12, true); }
     else this.showToast('🌙 راحة كده... بكرة نزول ومنه ياجر', 'info');
   }
 
@@ -2064,19 +2079,62 @@ class BHApp {
       dateEl.textContent = monthNames[now.getMonth()] + ' ' + now.getFullYear();
     }
 
-    document.getElementById('totalBalanceVal').textContent = total.toLocaleString();
-    document.getElementById('reservedSavingsVal').textContent = reserved.toLocaleString();
-    document.getElementById('spendableBalanceVal').textContent = spendable.toLocaleString();
+    // عداد الرصيد المتحرك — الأرقام بتنطع من القيمة القديمة للجديدة
+    this.animateNumber(document.getElementById('totalBalanceVal'), total);
+    this.animateNumber(document.getElementById('reservedSavingsVal'), reserved);
+    this.animateNumber(document.getElementById('spendableBalanceVal'), spendable);
 
     // Header balance chip — always visible on every tab
-    const headerVal = document.getElementById('headerBalanceVal');
-    if (headerVal) headerVal.textContent = total.toLocaleString();
+    this.animateNumber(document.getElementById('headerBalanceVal'), total);
 
     // الخلفية الحية — لون الإضاءة حسب حالة الفلوس
     const mood = total <= 0 ? 'poor' : (spendable < 100 ? 'tight' : 'rich');
     document.body.classList.toggle('bh-rich', mood === 'rich');
     document.body.classList.toggle('bh-tight', mood === 'tight');
     document.body.classList.toggle('bh-poor', mood === 'poor');
+  }
+
+  // رقم بيتحرك من القيمة القديمة للجديدة (زي عداد التاكسي 🚕)
+  animateNumber(el, to, dur = 800) {
+    if (!el) return;
+    const from = Number(el._bhVal != null ? el._bhVal : 0);
+    if (from === to) { el.textContent = to.toLocaleString(); return; }
+    el._bhVal = to;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || dur === 0) { el.textContent = to.toLocaleString(); return; }
+    const t0 = performance.now();
+    const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = Math.round(from + (to - from) * easeOut(p)).toLocaleString();
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // 💸 مطر الفلوس — احتفال لما تكمل هدف اليوم (أو تسجل إنك نزلت)
+  moneyRain(count = 24, small = false) {
+    try {
+      let host = document.getElementById('bhCoinRain');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'bhCoinRain';
+        document.body.appendChild(host);
+      }
+      const coins = ['💵', '🪙', '💰', '💎'];
+      for (let i = 0; i < count; i++) {
+        const c = document.createElement('span');
+        c.className = 'bh-coin';
+        c.textContent = coins[Math.floor(Math.random() * coins.length)];
+        c.style.left = (Math.random() * 96 + 2) + '%';
+        c.style.fontSize = ((small ? 13 : 18) + Math.random() * (small ? 6 : 14)) + 'px';
+        c.style.animationDuration = (1.7 + Math.random() * 1.5) + 's';
+        c.style.animationDelay = (Math.random() * 0.7) + 's';
+        c.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg');
+        host.appendChild(c);
+        setTimeout(() => c.remove(), 4200);
+      }
+    } catch (e) { /* ignore */ }
   }
 
   renderOutingsWidget() {

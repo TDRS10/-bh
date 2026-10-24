@@ -2914,6 +2914,33 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
   .fire-streak.blazing { animation: none; }
 }
 
+/* ── 💸 مطر الفلوس — الاحتفال ── */
+#bhCoinRain {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bh-coin {
+  position: absolute;
+  top: -8vh;
+  will-change: transform;
+  animation: bhCoinFall linear forwards;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+@keyframes bhCoinFall {
+  0%   { transform: translateY(-8vh) rotate(0deg); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(112vh) rotate(var(--r, 360deg)); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #bhCoinRain { display: none; }
+}
+
 /* ── (الباقي من الجدول الشهري) ── */
 .work-today-name {
   font-size: .68rem;
