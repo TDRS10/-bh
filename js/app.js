@@ -50,6 +50,7 @@ class BHApp {
         reservedSavings: 0,
         spendableBalance: 0
       },
+      workDaysAt: {},
       incomes: [],
       expenses: [],
       goals: [
@@ -385,10 +386,32 @@ class BHApp {
     out.workSessions = union(local.workSessions, remote.workSessions, 'workSessions');
     out.adjustments = union(local.adjustments, remote.adjustments, 'adjustments');
 
-    // أيام الشغل: كل يوم متسجل يفضل — إلا لو اتمسح (شنطة). الجهاز اللي داس آخر حاجة يكسب
+    // أيام الشغل: آخر حركة تكسب لكل يوم. التسجيل موثّق بوقته (workDaysAt) —
+    // القبر بيتشال لو الجهاز سجّل اليوم تاني بعد الunset (بدل ما يفضّل يمحيه للأبد)
+    const localWd = (local && local.workDays) || {}, remoteWd = (remote && remote.workDays) || {};
+    const localWdAt = (local && local.workDaysAt) || {}, remoteWdAt = (remote && remote.workDaysAt) || {};
     const wdBefore = JSON.stringify(out.workDays || {});
-    out.workDays = Object.assign({}, remote.workDays || {}, local.workDays || {});
-    Object.keys(tom.workDays || {}).forEach(k => { delete out.workDays[k]; });
+    out.workDays = Object.assign({}, remoteWd, localWd);
+    out.workDaysAt = Object.assign({}, remoteWdAt, localWdAt);
+    let tombKilled = false;
+    Object.keys(tom.workDays || {}).forEach(k => {
+      const tTs = tom.workDays[k] || 0;
+      const markTs = Math.max(localWdAt[k] || 0, remoteWdAt[k] || 0);
+      const haveLocal = localWd[k] !== undefined;
+      // تسجيل أحدث من القبر؟ أو بيانات قديمة مش موثّقة بس اليوم موجود محليًا (المستخدم ضغطه هنا)؟
+      if (markTs > tTs || (!markTs && haveLocal)) {
+        delete tom.workDays[k];
+        tombKilled = true;
+        if (!haveLocal && remoteWd[k] !== undefined) out.workDays[k] = remoteWd[k];
+        out.workDaysAt[k] = markTs || Date.now();
+      } else {
+        // القبر أحدث — اليوم محسوب مسح قبل تسجيل جديد
+        delete out.workDays[k];
+        delete out.workDaysAt[k];
+      }
+    });
+    if (!Object.keys(tom.workDays || {}).length) delete tom.workDays;
+    if (tombKilled) changed = true;
     if (JSON.stringify(out.workDays || {}) !== wdBefore) changed = true;
 
     // Balances: الأحدث يكسب — لكن ملف سحابي ناقص من غير رصيد ما يصفرّش رصيدنا
@@ -1639,6 +1662,26 @@ class BHApp {
     this.data._tombstones[coll][id] = Date.now();
   }
 
+  // تسجيل/تحديث يوم شغل — بيشيل قبر اليوم لو كان اتحفر قبل كده + بيوثّق وقت التسجيل
+  markWorkDay(key, status) {
+    const map = this.getWorkDaysMap();
+    map[key] = status;
+    if (!this.data.workDaysAt) this.data.workDaysAt = {};
+    this.data.workDaysAt[key] = Date.now();
+    if (this.data._tombstones && this.data._tombstones.workDays) {
+      delete this.data._tombstones.workDays[key];
+      if (!Object.keys(this.data._tombstones.workDays).length) delete this.data._tombstones.workDays;
+    }
+  }
+
+  // شيل يسجل يوم شغل — قبر + شيل توثيق الوقت
+  unmarkWorkDay(key) {
+    const map = this.getWorkDaysMap();
+    delete map[key];
+    if (this.data.workDaysAt) delete this.data.workDaysAt[key];
+    this.tombstone('workDays', key);
+  }
+
   // Ratios Configuration
   saveRatios() {
     const s = parseFloat(document.getElementById('ratioSavings').value);
@@ -2017,8 +2060,8 @@ class BHApp {
     const map = this.getWorkDaysMap();
     const key = this.todayKey();
     const was = map[key];
-    if (was === status) delete map[key];
-    else map[key] = status;
+    if (was === status) this.unmarkWorkDay(key);
+    else this.markWorkDay(key, status);
 
     this.saveData();
     this.renderWorkTracker();
@@ -2080,9 +2123,9 @@ class BHApp {
   cycleWorkDay(key) {
     const map = this.getWorkDaysMap();
     const cur = map[key];
-    if (cur === undefined) map[key] = true;          // unset → نزلت
-    else if (cur === true) map[key] = false;         // نزلت → راحة
-    else { delete map[key]; this.tombstone('workDays', key); }  // راحة → unset (ما يرجعش من مزامنة جهاز تاني)
+    if (cur === undefined) this.markWorkDay(key, true);        // unset → نزلت
+    else if (cur === true) this.markWorkDay(key, false);       // نزلت → راحة
+    else this.unmarkWorkDay(key);                              // راحة → unset (ما يرجعش من مزامنة جهاز تاني)
 
     this.saveData();
     this.renderWorkCalendar();
