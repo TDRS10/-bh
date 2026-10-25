@@ -1906,6 +1906,85 @@ class BHApp {
     return streak;
   }
 
+  // 🛵 ميني سكوتر — بيكبر كل ما تنزل، وبيتعب من الإرهاق لو راحة كتير — دوس عليه تسمّيه
+  renderMascot() {
+    const actor = document.getElementById('mascotActor');
+    if (!actor) return;
+    const emoji = document.getElementById('mascotEmoji');
+    const lvlEl = document.getElementById('mascotLvl');
+    const nameEl = document.getElementById('mascotName');
+    const moodEl = document.getElementById('mascotMoodTxt');
+    const xpFill = document.getElementById('mascotXpFill');
+    if (!emoji || !lvlEl || !nameEl || !moodEl || !xpFill) return;
+
+    const map = this.data.workDays || {};
+    let worked = 0;
+    Object.keys(map).forEach(k => { if (map[k] === true) worked++; });
+
+    const level = Math.floor(worked / 5) + 1;
+    const tiers = [
+      { lvl: 1, emoji: '🛵', name: 'مبتدي الطريق' },
+      { lvl: 2, emoji: '🛵', name: 'شاطر' },
+      { lvl: 3, emoji: '🏍️', name: 'محترف الشوارع' },
+      { lvl: 4, emoji: '🚀', name: 'أسطورة' },
+      { lvl: 5, emoji: '👑', name: 'ملك الطريق' }
+    ];
+    const tier = tiers.slice().reverse().find(t => level >= t.lvl);
+
+    const streak = this.getWorkStreak();
+    // عدّاد أيام الراحة المتتالية (من آخر يوم مسجل)
+    const d = new Date();
+    if (map[this.todayKey()] === undefined) d.setUTCDate(d.getUTCDate() - 1);
+    let rest = 0;
+    while (map[d.toISOString().split('T')[0]] === false) { rest++; d.setUTCDate(d.getUTCDate() - 1); }
+
+    const today = map[this.todayKey()];
+    const mood = (today === true || streak >= 1) ? 'happy' : (rest >= 2 ? 'tired' : (rest === 1 ? 'rest' : 'idle'));
+    actor.classList.remove('is-happy', 'is-tired', 'is-rest', 'is-idle');
+    actor.classList.add('is-' + mood);
+    emoji.textContent = mood === 'tired' ? '😪' : tier.emoji;
+
+    const name = (this.data.settings && this.data.settings.mascotName) || 'بوني';
+    nameEl.textContent = name;
+    lvlEl.textContent = 'Lv ' + level;
+    xpFill.style.width = Math.min(100, (worked % 5) / 5 * 100) + '%';
+
+    const moodTxt = mood === 'happy'
+      ? (streak > 1 ? `شايل نهارده! ${streak} أيام ورا بعض 🔥` : 'شايل نهارده! عقبال لفل جديد')
+      : mood === 'tired' ? `طاح من الإرهاق... ${rest} أيام راحة كتير 😪`
+      : mood === 'rest' ? 'راحة النهارده — بكرة ننزل غصب عنكم 😂' : 'جاهز ينزل معاك النهارده';
+    moodEl.textContent = moodTxt;
+
+    // لفل جديد؟ احتفال صغير (أول فتح للصفحة من غير احتفال)
+    if (this._mascotLvlSeen === undefined) {
+      this._mascotLvlSeen = level;
+    } else if (level > this._mascotLvlSeen) {
+      this._mascotLvlSeen = level;
+      actor.classList.remove('lvl-up');
+      void actor.offsetWidth;   // إعادة تشغيل الأنيميشن
+      actor.classList.add('lvl-up');
+      const flare = document.getElementById('mascotFlare');
+      if (flare) {
+        flare.style.display = '';
+        try { this.moneyRain(14, true); } catch (e) { /* ignore */ }
+        setTimeout(() => { flare.style.display = 'none'; }, 2600);
+      }
+      try { this.showToast(`🛵 ${name} بقى: ${tier.name} (Lv ${level})!`, 'success'); } catch (e) { /* ignore */ }
+    }
+  }
+
+  // تسمية السكوتر — دوسة واحدة على الشريط
+  renameMascot() {
+    const cur = (this.data.settings && this.data.settings.mascotName) || 'بوني';
+    const v = prompt('اسم السكوتر بتاعك؟', cur);
+    if (v === null) return;
+    const n = (v || '').trim().slice(0, 12);
+    this.data.settings.mascotName = n || 'بوني';
+    this.saveData();
+    this.renderMascot();
+    this.showToast('✅ السكوتر اسمه دلوقتي: ' + this.data.settings.mascotName, 'success');
+  }
+
   // تغيير هدف اليوم
   editDailyTarget() {
     const cur = Number(this.data.settings && this.data.settings.dailyWorkTarget) || 300;
@@ -1931,6 +2010,7 @@ class BHApp {
     this.renderWorkTracker();
     this.renderWorkCalendar();
     this.renderHeaderWorkChip();
+    this.renderMascot();
 
     if (was === status) this.showToast('↩️ اتشال تسجيل النهارده', 'info');
     else if (status) { this.showToast('✅ سجلت إنك نزلت الشغل النهارده — عقبال كل يوم!', 'success'); this.moneyRain(12, true); }
@@ -1993,6 +2073,7 @@ class BHApp {
     this.saveData();
     this.renderWorkCalendar();
     this.renderHeaderWorkChip();
+    this.renderMascot();
     if (key === this.todayKey()) this.renderWorkTracker();
   }
 
@@ -2064,6 +2145,7 @@ class BHApp {
   // Render Master Logic
   renderAll() {
     this.renderHeaderWorkChip();
+    this.renderMascot();
     this.renderBalances();
     this.renderPendingIncomes();
     this.renderDebtAlerts();
