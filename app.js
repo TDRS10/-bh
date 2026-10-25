@@ -2726,7 +2726,7 @@ class BHApp {
     const startX = (width - (3 * barWidth + 2 * gap)) / 2;
 
     const items = [
-      { label: 'الدخل', value: monthlyInc, color: '#FF2D95' },
+      { label: 'الدخل', value: monthlyInc, color: '#06b6d4' },
       { label: 'المصاريف', value: monthlyExp, color: '#ef4444' },
       { label: 'التحويش', value: reserved, color: '#10b981' }
     ];
