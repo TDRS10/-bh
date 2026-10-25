@@ -760,13 +760,105 @@ body.big-numbers-mode .balance-chip-val {
 /* Streak badge is not shown in the header (it lives in the motivation banner) */
 .app-header .streak-badge { display: none !important; }
 
+/* ── 🛵 شارة حالة شغل النهارده (في الهيدر) ── */
+.work-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-disp);
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+}
+.work-chip:active { transform: scale(.93); }
+.work-chip.is-todo {
+  color: rgba(255,255,255,.72);
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.14);
+}
+.work-chip.is-yes {
+  color: #eafff2;
+  background: rgba(46,204,113,.16);
+  border-color: rgba(46,204,113,.45);
+  box-shadow: 0 0 12px rgba(46,204,113,.18);
+}
+.work-chip.is-off {
+  color: #eaf2ff;
+  background: rgba(77,163,255,.14);
+  border-color: rgba(77,163,255,.4);
+}
+.work-chip-icon { font-size: .82rem; }
+
+/* ── ☁️ مؤشر المزامنة الحي (في الهيدر) ── */
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-disp);
+  font-size: .68rem;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  color: rgba(255,255,255,.78);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .2s ease, background .2s ease;
+}
+.sync-chip:active { transform: scale(.93); }
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7a8797;
+  flex-shrink: 0;
+  transition: background .25s ease, box-shadow .25s ease;
+}
+.sync-chip.is-ok .sync-dot {
+  background: #2ecc71;
+  box-shadow: 0 0 8px rgba(46,204,113,.75);
+  animation: syncBreath 3s ease-in-out infinite;
+}
+.sync-chip.is-ok { border-color: rgba(46,204,113,.35); }
+.sync-chip.is-off .sync-dot { background: #f39c12; box-shadow: 0 0 8px rgba(243,156,18,.6); }
+.sync-chip.is-off { border-color: rgba(243,156,18,.4); }
+.sync-chip.is-busy .sync-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(0,217,255,.8);
+  animation: syncBlink .9s ease-in-out infinite;
+}
+.sync-chip.is-err .sync-dot { background: #ff5366; box-shadow: 0 0 8px rgba(255,83,102,.7); }
+.sync-chip.is-err { border-color: rgba(255,83,102,.45); }
+@keyframes syncBreath {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+@keyframes syncBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .3; }
+}
+
 /* Media Query for Small Screens */
+@media (max-width: 420px) {
+  .sync-chip .sync-chip-txt { display: none; }
+  .work-chip { padding: 5px 8px; }
+}
 @media (max-width: 360px) {
   .brand-sub { display: none; }
   .brand-icon-img { width: 34px; height: 34px; border-radius: 10px; }
   .brand-title { font-size: .98rem; }
   .brand { gap: 7px; }
   .balance-chip { max-width: 95px; }
+  .sync-chip { padding: 5px 7px; }
+  .work-chip .work-chip-txt { display: none; }
 }
 
 /* ═══════════════════════════════════════════════════

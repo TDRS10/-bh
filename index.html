@@ -64,6 +64,18 @@
           <span class="balance-chip-val" id="headerBalanceVal">0</span>
         </button>
         <div class="streak-badge" id="headerStreakBadge" style="display:none;">🔥 0 أيام تحويش</div>
+
+        <!-- 🛵 شارة حالة شغل النهارده — دوس للتدوير: لسه ← نزلت ← راحة -->
+        <button class="work-chip is-todo" id="headerWorkChip" onclick="app.cycleWorkDay(app.todayKey())" title="شغل النهارده — دوس للتدوير">
+          <span class="work-chip-icon" id="headerWorkIcon">⏳</span>
+          <span class="work-chip-txt" id="headerWorkTxt">لسه؟</span>
+        </button>
+
+        <!-- ☁️ مؤشر المزامنة الحي — دوس يفتح إعدادات السحابة -->
+        <button class="sync-chip" id="headerSyncChip" onclick="app.openCloudSetup()" title="حالة المزامنة">
+          <span class="sync-dot" id="headerSyncDot"></span>
+          <span class="sync-chip-txt" id="headerSyncTxt">مزامنة</span>
+        </button>
         <button class="icon-btn" onclick="app.switchTab('moreView')" title="الإعدادات">⚙️</button>
 
         <!-- User account avatar -->

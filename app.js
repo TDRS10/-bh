@@ -65,7 +65,8 @@ class BHApp {
       workSessions: [],
       workDays: {},
       adjustments: [],
-      pendingIncomes: []
+      pendingIncomes: [],
+      _tombstones: {}
     };
   }
 
@@ -132,6 +133,7 @@ class BHApp {
   // Init Firebase (safe: does nothing when not configured)
   initCloudSync() {
     if (typeof window.BHFirebase === 'undefined') return;
+    this.startReconcile();
 
     // The SDK may still be loading (it's loaded async with a CDN fallback)
     const tryInit = () => {
@@ -230,7 +232,7 @@ class BHApp {
 
   // دمج البيانات الجاية حيًا من السحابة (من غير دونات لا نهائي)
   applyRemoteEnvelope(envelope) {
-    if (!envelope || !envelope.data || !envelope.data.balances) return;
+    if (!envelope || !envelope.data || typeof envelope.data !== 'object') return;
 
     // تجاهل صدى رفّعنا الايح احنا نفسنا — التوقيض بيبقى مطابقة
     // (أي تحديث من جهاز تاني بيبقى بتوقيض مختلف فبيعدّي عادي)
@@ -269,6 +271,28 @@ class BHApp {
     }, 2500);
   }
 
+  // ♻️ مزامنة خفية مستمرة: كل دقيقة ونص فحص سريع + أول ما التطبيق يرجع من
+  // الخلفية (الموبايل بيقطع سوكيت السحابة وهو ماسك تطبيق تاني — من غير كده
+  // يفضل شايل بيانات قديمة لحد ما تقفل التطبيق وتفتحه تاني)
+  startReconcile() {
+    if (this._reconcileTimer) return;
+    const wantSync = () => {
+      try {
+        if (!window.BHFirebase || !window.BHFirebase.getUser()) return;
+        if (document.visibilityState !== 'visible') return;
+        this.pullFromCloud();
+      } catch (e) { /* ignore */ }
+    };
+    this._reconcileTimer = setInterval(wantSync, 90000);
+    document.addEventListener('visibilitychange', () => {
+      try {
+        if (document.visibilityState !== 'visible') return;
+        clearTimeout(this._reconcileVisTimer);
+        this._reconcileVisTimer = setTimeout(wantSync, 1200);   // مهلة صغيرة بعد الرجوع
+      } catch (e) { /* ignore */ }
+    });
+  }
+
   // Pull remote data — merge it with ours (never delete anything)
   pullFromCloud() {
     if (typeof window.BHFirebase === 'undefined') return;
@@ -278,6 +302,7 @@ class BHApp {
     window.BHFirebase.pull().then((envelope) => {
       if (!envelope) {
         // Nothing in the cloud yet → upload ours
+        this._lastPushAt = Date.now();   // عشان صدى رفعتنا إحنا مايتبلعش غلط
         window.BHFirebase.push(this.data).then((ok) => {
           if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
         });
@@ -285,7 +310,9 @@ class BHApp {
       }
 
       const remote = envelope.data;
-      if (!remote || !remote.balances) return;
+      // سواء الملف السحابي كامل أو ناقص — ندمجه على طول
+      // (الدمج بيتعامل مع الملفات الناقصة بأمان ومش هيصفرر حاجة)
+      if (!remote || typeof remote !== 'object') return;
 
       // 🔐 SAFETY: merge instead of replace — no entry is ever lost
       const merged = this.mergeCloudData(this.data, remote, envelope.updatedAt, localUpdatedAt);
@@ -302,6 +329,7 @@ class BHApp {
       }
 
       // Push the merged result back so every device converges
+      this._lastPushAt = Date.now();
       window.BHFirebase.push(this.data).then((ok) => {
         if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
       });
@@ -309,52 +337,80 @@ class BHApp {
     });
   }
 
-  // Merge cloud data with local data — union of all entries, nothing deleted
+  // Merge cloud data with local data — union of all entries,
+  // إلا الحاجة اللي اتمسحت (متسجلة في _tombstones) — دي عمرها ما بترجع.
   mergeCloudData(local, remote, remoteUpdatedAt, localUpdatedAt) {
     const out = JSON.parse(JSON.stringify(local || {}));
     let changed = false;
 
-    const union = (a, b) => {
+    // 🔐 Tombstones (شنط الجثث): كل آي دي اتمسح من أي جهاز — ما يرجّعوش مرة تانية
+    const tom = Object.assign({}, (local && local._tombstones) || {}, (remote && remote._tombstones) || {});
+    if (JSON.stringify((local && local._tombstones) || {}) !== JSON.stringify(tom)) changed = true;
+    out._tombstones = tom;
+    const isDead = (coll, id) => !!(id && tom[coll] && tom[coll][id]);
+
+    // إدخال من غير آي دي — نديله آي دي فوري عشان مايتكررش مع كل عملية دمج
+    const fixId = (x) => {
+      if (!x.id) x.id = 'x_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    };
+
+    const union = (a, b, collName) => {
       const res = [...(a || [])];
+      let pruned = 0;
+      for (let i = res.length - 1; i >= 0; i--) {
+        fixId(res[i]);
+        if (isDead(collName, res[i].id)) { res.splice(i, 1); pruned++; }
+      }
       const seen = new Set(res.map(x => x.id));
       let added = 0;
       (b || []).forEach(x => {
-        if (!x.id || !seen.has(x.id)) {
-          res.push(x);
-          seen.add(x.id);
-          added++;
-        }
+        if (!x || typeof x !== 'object') return;
+        fixId(x);
+        if (seen.has(x.id) || isDead(collName, x.id)) return;
+        res.push(x);
+        seen.add(x.id);
+        added++;
       });
       // Newest entries first
       res.sort((x, y) => (y.date || '').localeCompare(x.date || ''));
-      if (added > 0) changed = true;
+      if (added > 0 || pruned > 0) changed = true;
       return res;
     };
 
-    out.incomes = union(local.incomes, remote.incomes);
-    out.expenses = union(local.expenses, remote.expenses);
-    out.goals = union(local.goals, remote.goals);
-    out.debts = union(local.debts, remote.debts);
-    out.pendingIncomes = union(local.pendingIncomes, remote.pendingIncomes);
-    out.workSessions = union(local.workSessions, remote.workSessions);
-    out.adjustments = union(local.adjustments, remote.adjustments);
-    // Work days: keep every marked day; the local value wins on conflict
-    // (the device that was actually tapped is usually the correct one)
-    out.workDays = Object.assign({}, remote.workDays || {}, local.workDays || {});
+    out.incomes = union(local.incomes, remote.incomes, 'incomes');
+    out.expenses = union(local.expenses, remote.expenses, 'expenses');
+    out.goals = union(local.goals, remote.goals, 'goals');
+    out.debts = union(local.debts, remote.debts, 'debts');
+    out.pendingIncomes = union(local.pendingIncomes, remote.pendingIncomes, 'pendingIncomes');
+    out.workSessions = union(local.workSessions, remote.workSessions, 'workSessions');
+    out.adjustments = union(local.adjustments, remote.adjustments, 'adjustments');
 
-    // Balances: the newer side wins
+    // أيام الشغل: كل يوم متسجل يفضل — إلا لو اتمسح (شنطة). الجهاز اللي داس آخر حاجة يكسب
+    const wdBefore = JSON.stringify(out.workDays || {});
+    out.workDays = Object.assign({}, remote.workDays || {}, local.workDays || {});
+    Object.keys(tom.workDays || {}).forEach(k => { delete out.workDays[k]; });
+    if (JSON.stringify(out.workDays || {}) !== wdBefore) changed = true;
+
+    // Balances: الأحدث يكسب — لكن ملف سحابي ناقص من غير رصيد ما يصفرّش رصيدنا
     const remoteIsNewer = remoteUpdatedAt > (localUpdatedAt || 0);
-    const src = remoteIsNewer ? remote : local;
+    const hasRemoteBal = !!(remote && remote.balances && Object.keys(remote.balances).length);
+    const src = (remoteIsNewer && hasRemoteBal) ? remote : local;
+    const localBal = (local.balances || {});
     out.balances = {
       reservedSavings: (src.balances && src.balances.reservedSavings) || 0,
       spendableBalance: (src.balances && src.balances.spendableBalance) || 0
     };
+    if (out.balances.reservedSavings !== localBal.reservedSavings ||
+        out.balances.spendableBalance !== localBal.spendableBalance) changed = true;
 
-    // Settings: merge (challenges / badges from both)
-    out.settings = Object.assign({}, local.settings || {}, remote.settings || {}, {
-      challenges: Object.assign({}, (local.settings||{}).challenges, (remote.settings||{}).challenges),
-      badges: Object.assign({}, (local.settings||{}).badges, (remote.settings||{}).badges)
-    });
+    // Settings: الجهاز الأحدث يكسب في الإعدادات العامة (زي هدف اليوم) —
+    // التحديات والشارات union دايمًا من الاتنين
+    out.settings = remoteIsNewer
+      ? Object.assign({}, local.settings || {}, remote.settings || {})
+      : Object.assign({}, remote.settings || {}, local.settings || {});
+    out.settings.challenges = Object.assign({}, (local.settings || {}).challenges, (remote.settings || {}).challenges);
+    out.settings.badges = Object.assign({}, (local.settings || {}).badges, (remote.settings || {}).badges);
+    if (out.settings.dailyWorkTarget !== (local.settings || {}).dailyWorkTarget) changed = true;
 
     out.__changed = changed;
     return out;
@@ -1165,6 +1221,7 @@ class BHApp {
     });
 
     this.data.pendingIncomes = this.data.pendingIncomes.filter(p => p.id !== pendId);
+    this.tombstone('pendingIncomes', pendId);   // ما يرجّعهوش كـ"قيد الانتظار" على جهاز تاني
     this.saveData();
 
     // Populate Celebration Screen
@@ -1185,6 +1242,7 @@ class BHApp {
   deletePendingIncome(pendId) {
     if (!confirm('هل أنت متأكد من حذف هذا القبض المنتظر؟')) return;
     this.data.pendingIncomes = (this.data.pendingIncomes || []).filter(p => p.id !== pendId);
+    this.tombstone('pendingIncomes', pendId);
     this.saveData();
     this.renderAll();
     this.showToast('🗑️ تم حذف القبض المنتظر بنجاح');
@@ -1561,18 +1619,24 @@ class BHApp {
 
   deleteItem(type, id) {
     if (!confirm('هل أنت متأكد من حذف هذه العملية؟')) return;
-    if (type === 'income') {
-      this.data.incomes = this.data.incomes.filter(i => i.id !== id);
-    } else if (type === 'expense') {
-      this.data.expenses = this.data.expenses.filter(e => e.id !== id);
-    } else if (type === 'goal') {
-      this.data.goals = this.data.goals.filter(g => g.id !== id);
-    } else if (type === 'debt') {
-      this.data.debts = this.data.debts.filter(d => d.id !== id);
+    const map = { income: 'incomes', expense: 'expenses', goal: 'goals', debt: 'debts' };
+    const coll = map[type];
+    if (coll) {
+      this.data[coll] = (this.data[coll] || []).filter(x => x.id !== id);
+      this.tombstone(coll, id);
     }
     this.saveData();
     this.renderAll();
     this.showToast('🗑️ تم الحذف بنجاح');
+  }
+
+  // 🔐 شنطة (Tombstone): سجّل إن الآي دي ده اتمسح نهائيًا — عشان دمج المزامنة
+  // (اللي بيجمع كل حاجة من كل الأجهزة) ما يرجّعهوش تاني كأنه لسه موجود
+  tombstone(coll, id) {
+    if (!id) return;
+    if (!this.data._tombstones) this.data._tombstones = {};
+    if (!this.data._tombstones[coll]) this.data._tombstones[coll] = {};
+    this.data._tombstones[coll][id] = Date.now();
   }
 
   // Ratios Configuration
@@ -1666,8 +1730,16 @@ class BHApp {
     if (confirm('⚠️ هل أنت متأكد تماماً من تصفير وحذف جميع بيانات التطبيق؟ لا يمكن التراجع عن هذا الإجراء!')) {
       // 🛡️ Keep a snapshot so the user can restore if it was a mistake
       this._saveSnapshot();
-      localStorage.removeItem(STORAGE_KEY);
+      // 🔐 شنطة جماعية: سجّل كل الآي هات القديم — عشان المزامنة ما ترجّعهمش من السحابة
+      const old = this.data;
+      const tom = { incomes: {}, expenses: {}, goals: {}, debts: {}, pendingIncomes: {}, workSessions: {}, adjustments: {}, workDays: {} };
+      ['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments'].forEach(c => {
+        (old[c] || []).forEach(x => { if (x && x.id) tom[c][x.id] = Date.now(); });
+      });
+      Object.keys(old.workDays || {}).forEach(k => { tom.workDays[k] = Date.now(); });
       this.data = this.getDefaultData();
+      this.data._tombstones = tom;
+      localStorage.removeItem(STORAGE_KEY);
       this.saveData();
       this.renderAll();
       this.showToast('🧹 تم تصفير البيانات بنجاح');
@@ -1858,6 +1930,7 @@ class BHApp {
     this.saveData();
     this.renderWorkTracker();
     this.renderWorkCalendar();
+    this.renderHeaderWorkChip();
 
     if (was === status) this.showToast('↩️ اتشال تسجيل النهارده', 'info');
     else if (status) { this.showToast('✅ سجلت إنك نزلت الشغل النهارده — عقبال كل يوم!', 'success'); this.moneyRain(12, true); }
@@ -1915,15 +1988,82 @@ class BHApp {
     const cur = map[key];
     if (cur === undefined) map[key] = true;          // unset → نزلت
     else if (cur === true) map[key] = false;         // نزلت → راحة
-    else delete map[key];                            // راحة → unset
+    else { delete map[key]; this.tombstone('workDays', key); }  // راحة → unset (ما يرجعش من مزامنة جهاز تاني)
 
     this.saveData();
     this.renderWorkCalendar();
+    this.renderHeaderWorkChip();
     if (key === this.todayKey()) this.renderWorkTracker();
+  }
+
+  // ☁️ مؤشر المزامنة الحي في الهيدر — نقطة ملوّنة على حسب حالة السحابة
+  renderHeaderSync() {
+    const chip = document.getElementById('headerSyncChip');
+    const dot = document.getElementById('headerSyncDot');
+    const txt = document.getElementById('headerSyncTxt');
+    if (!chip || !dot || !txt) return;
+
+    const fb = (typeof window.BHFirebase !== 'undefined') ? window.BHFirebase : null;
+    const user = fb ? fb.getUser() : null;
+    const st = this._cloudState || (fb ? fb.getState() : null);
+    const status = user ? ((st && st.status) || 'offline') : 'signed-out';
+
+    chip.classList.remove('is-ok', 'is-off', 'is-busy', 'is-err');
+    let label = 'مزامنة';
+    let title = 'افتح إعدادات المزامنة';
+
+    if (!fb || !user) {
+      title = 'سجّل بحساب Google واحد على كل أجهزتك عشان تكمش مزامنة الجهازات';
+    } else if (status === 'synced') {
+      chip.classList.add('is-ok');
+      label = 'متزامن';
+      const t = (st && st.lastSync) || parseInt(localStorage.getItem(SYNC_TIME_KEY) || '0', 10);
+      if (t) {
+        const hhmm = new Date(t).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        const mins = Math.round((Date.now() - t) / 60000);
+        label = mins >= 5 ? 'متزامن · ' + hhmm : 'متزامن';
+        title = 'كل أجهزتك شايفة نفس البيانات. آخر مزامنة: ' + hhmm;
+      } else {
+        title = 'كل أجهزتك شايفة نفس البيانات.';
+      }
+    } else if (status === 'syncing') {
+      chip.classList.add('is-busy');
+      label = 'بينقل';
+      title = 'بننقل بياناتك للسحابة...';
+    } else if (status === 'offline') {
+      chip.classList.add('is-off');
+      label = 'بدون نت';
+      title = 'مش متصل بالسحابة دلوقتي — هيتزامن أول ما النت يرجع';
+    } else if (status === 'error') {
+      chip.classList.add('is-err');
+      label = 'خطأ';
+      title = 'في مشكلة في المزامنة — ' + ((st && st.lastError) || 'دوس للتفاصيل');
+    }
+
+    txt.textContent = label;
+    chip.title = title;
+  }
+
+  // 🛵 شارة حالة شغل النهارده في الهيدر — بتدوّر زي نفس المفاتيح في التقويم
+  renderHeaderWorkChip() {
+    const chip = document.getElementById('headerWorkChip');
+    const icon = document.getElementById('headerWorkIcon');
+    const txt = document.getElementById('headerWorkTxt');
+    if (!chip || !icon || !txt) return;
+    const v = (this.data.workDays || {})[this.todayKey()];
+    chip.classList.toggle('is-yes', v === true);
+    chip.classList.toggle('is-off', v === false);
+    chip.classList.toggle('is-todo', v !== true && v !== false);
+    icon.textContent = v === true ? '🛵' : v === false ? '🌙' : '⏳';
+    txt.textContent = v === true ? 'نزلت' : v === false ? 'راحة' : 'لسه؟';
+    chip.title = v === true ? 'نزلت شغل النهارده — دوس تحوّلها لراحة'
+      : v === false ? 'راحة النهارده — دوس ترجّعها لسه؟'
+      : 'لسه مسجلتش النهارده — دوس يحددك إنك نزلت';
   }
 
   // Render Master Logic
   renderAll() {
+    this.renderHeaderWorkChip();
     this.renderBalances();
     this.renderPendingIncomes();
     this.renderDebtAlerts();
@@ -3710,6 +3850,7 @@ class BHApp {
   // ═══════════════════════════════════════════════════════════
 
   updateUserAvatar() {
+    this.renderHeaderSync();
     const user = (typeof window.BHFirebase !== 'undefined') ? window.BHFirebase.getUser() : null;
     const photo = (user && user.photoURL) ? user.photoURL : null;
     const name = (user && (user.displayName || user.email)) || 'مستخدم مجهول';

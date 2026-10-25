@@ -251,7 +251,7 @@ window.BHFirebase = (function () {
     const base = userPath();
     if (!base || !state.db) return false;
     try {
-      unsubscribe();
+      unsubscribeRealtime();
       dataCallback = cb;
       dataRef = state.db.ref(base + '/' + DATA_PATH);
       dataRef.on('value', function (snap) {
