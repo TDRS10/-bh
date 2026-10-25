@@ -1,14 +1,15 @@
-const CACHE_NAME = 'bh-finance-v21';
+const CACHE_NAME = 'bh-finance-v22';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
+  './css/styles.css',
+  './js/app.js',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './firebase-config.js',
-  './firebase-service.js',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
+  './assets/logo.jpg',
+  './js/firebase-config.js',
+  './js/firebase-service.js',
   // Firebase SDK (cached for offline use — app degrades gracefully if missing)
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js',

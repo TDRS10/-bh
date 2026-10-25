@@ -8,9 +8,9 @@
   <title>BH - إدارة الفلوس والقبض</title>
   
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
   <!-- Paint the dark background immediately — prevents any white flash -->
   <style>
     html, body { background: #04060A; }
@@ -51,7 +51,7 @@
     <!-- Top App Header -->
     <header class="app-header">
       <div class="brand">
-        <img src="logo.jpg" alt="BH Logo" class="brand-icon-img">
+        <img src="assets/logo.jpg" alt="BH Logo" class="brand-icon-img">
         <div class="brand-text">
           <div class="brand-title"><span>B</span>H</div>
           <div class="brand-sub">إدارة الفلوس</div>
@@ -1113,12 +1113,12 @@
     <div class="splash-subtitle">إدارة أموالك</div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="js/app.js"></script>
   <script>
     // ── Firebase (optional — app works without it) ──
     // Loaded after app.js so BHFirebase is defined before init runs
   </script>
-  <script src="firebase-config.js"></script>
+  <script src="js/firebase-config.js"></script>
   <script>
     // Load the Firebase SDK with a fallback CDN (if one is blocked, try the other).
     // The app works normally even if BOTH fail — cloud sync is simply disabled.
@@ -1155,7 +1155,7 @@
       loadNext(0);
     })();
   </script>
-  <script src="firebase-service.js"></script>
+  <script src="js/firebase-service.js"></script>
 
   <script>
     // Register Service Worker for Offline PWA

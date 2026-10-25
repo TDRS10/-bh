@@ -607,7 +607,7 @@ class BHApp {
 
     const cfg = window.BH_FIREBASE_CONFIG;
     if (!cfg || !cfg.apiKey) {
-      add('الإعدادات', false, 'ملف firebase-config.js فاضي');
+      add('الإعدادات', false, 'ملف js/firebase-config.js فاضي');
       this.renderDiagnostics(results);
       return;
     }
@@ -740,7 +740,7 @@ class BHApp {
       return '⚙️ لازم تفعّل "Anonymous" في Firebase → Authentication → Sign-in method';
     }
     if (m.indexOf('api-key-not-valid') >= 0 || m.indexOf('api key') >= 0) {
-      return '⚙️ الـ API Key غلط — راجع firebase-config.js';
+      return '⚙️ الـ API Key غلط — راجع js/firebase-config.js';
     }
     if (m.indexOf('permission-denied') >= 0) {
       return '🔒 권한 مرفوض — راجع الـ Rules في Realtime Database';
@@ -2631,7 +2631,7 @@ class BHApp {
     try {
       new Notification('⏰ تنبيه ديون مستحقة', {
         body: lines.join('\n'),
-        icon: 'icon-192.png'
+        icon: 'assets/icon-192.png'
       });
     } catch (e) {
       console.error('Debt notification error:', e);
@@ -4320,11 +4320,11 @@ class BHApp {
     try {
       if ('Notification' in window) {
         if (Notification.permission === 'granted') {
-          new Notification(title, { body, icon: 'icon-192.png', tag: 'bh-smart-test' });
+          new Notification(title, { body, icon: 'assets/icon-192.png', tag: 'bh-smart-test' });
         } else if (Notification.permission === 'default') {
           const p = await Notification.requestPermission();
           if (p === 'granted') {
-            new Notification(title, { body, icon: 'icon-192.png', tag: 'bh-smart-test' });
+            new Notification(title, { body, icon: 'assets/icon-192.png', tag: 'bh-smart-test' });
           } else {
             this.showToast('⚠️ الإشعارات مسموحةش — فعّلها من إعدادات المتصفح', 'error');
           }
@@ -4402,7 +4402,7 @@ class BHApp {
         try {
           new Notification('🔔 تطبيق BH', {
             body: 'تم تفعيل إشعارات التحديثات بنجاح!',
-            icon: 'icon-192.png'
+            icon: 'assets/icon-192.png'
           });
         } catch (e) {}
       } else {
@@ -4482,7 +4482,7 @@ class BHApp {
             try {
               var notif = new Notification('🆕 تحديث جديد متاح لتطبيق BH', {
                 body: commitMsg,
-                icon: 'icon-192.png',
+                icon: 'assets/icon-192.png',
                 tag: 'bh-update-' + latestSHA
               });
               notif.onclick = function() {
