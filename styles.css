@@ -73,9 +73,9 @@ body::after {
   position: fixed;
   inset: 0;
   background: 
-    radial-gradient(circle at 10% 15%, var(--glow-1, rgba(255, 45, 149,0.20)) 0%, transparent 40%),
-    radial-gradient(circle at 90% 75%, var(--glow-2, rgba(0, 217, 255,0.14)) 0%, transparent 40%),
-    radial-gradient(circle at 50% 45%, var(--glow-3, rgba(255, 45, 149,0.12)) 0%, transparent 50%);
+    radial-gradient(circle at 10% 15%, var(--glow-1, rgba(255, 45, 149,0.18)) 0%, transparent 40%),
+    radial-gradient(circle at 90% 75%, var(--glow-2, rgba(0, 217, 255,0.18)) 0%, transparent 40%),
+    radial-gradient(circle at 50% 45%, var(--glow-3, rgba(255, 45, 149,0.08)) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
   transform: translateZ(0);
@@ -84,9 +84,9 @@ body::after {
 
 /* ═══ الخلفية الحية — بتتنفس وبتلون حسب حالة الرصيد ═══ */
 body.bh-rich {                                    /* فلوسك تمام — أخضر وسايان حيوي */
-  --glow-1: rgba(255, 45, 149, 0.20);
-  --glow-2: rgba(0, 217, 255, 0.14);
-  --glow-3: rgba(255, 45, 149, 0.12);
+  --glow-1: rgba(255, 45, 149, 0.18);
+  --glow-2: rgba(0, 217, 255, 0.18);
+  --glow-3: rgba(255, 45, 149, 0.08);
 }
 body.bh-tight {                                   /* الرصيد نزل تحت 100 — إنذار كهرماني */
   --glow-1: rgba(251, 191, 36, 0.20);
