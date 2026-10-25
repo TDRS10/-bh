@@ -1775,8 +1775,14 @@ class BHApp {
     return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
   }
 
+  // مفتاح التاريخ بالتوقيت المحلي — مهم! UTC كان مخلي من 12 لـ 3 بالليل
+  // بتوقيت مصر التسجيل يقع على تاريخ امبارح فيسقط فوق تسجيلة امبارح
+  localKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   todayKey() {
-    return new Date().toISOString().split('T')[0];
+    return this.localKey(new Date());
   }
 
   // Monthly counters: { worked, off, incomeTotal, incomeDays }
@@ -1897,11 +1903,11 @@ class BHApp {
   getWorkStreak() {
     const map = this.getWorkDaysMap();
     const d = new Date();
-    if (map[this.todayKey()] === undefined) d.setUTCDate(d.getUTCDate() - 1);
+    if (map[this.todayKey()] === undefined) d.setDate(d.getDate() - 1);
     let streak = 0;
-    while (map[d.toISOString().split('T')[0]] === true) {
+    while (map[this.localKey(d)] === true) {
       streak++;
-      d.setUTCDate(d.getUTCDate() - 1);
+      d.setDate(d.getDate() - 1);
     }
     return streak;
   }
@@ -1932,11 +1938,11 @@ class BHApp {
     const tier = tiers.slice().reverse().find(t => level >= t.lvl);
 
     const streak = this.getWorkStreak();
-    // عدّاد أيام الراحة المتتالية (من آخر يوم مسجل)
+    // عدّاد أيام الراحة المتتالية (من آخر يوم مسجل) — توقيت محلي
     const d = new Date();
-    if (map[this.todayKey()] === undefined) d.setUTCDate(d.getUTCDate() - 1);
+    if (map[this.todayKey()] === undefined) d.setDate(d.getDate() - 1);
     let rest = 0;
-    while (map[d.toISOString().split('T')[0]] === false) { rest++; d.setUTCDate(d.getUTCDate() - 1); }
+    while (map[this.localKey(d)] === false) { rest++; d.setDate(d.getDate() - 1); }
 
     const today = map[this.todayKey()];
     const mood = (today === true || streak >= 1) ? 'happy' : (rest >= 2 ? 'tired' : (rest === 1 ? 'rest' : 'idle'));
@@ -1955,9 +1961,17 @@ class BHApp {
       : mood === 'rest' ? 'راحة النهارده — بكرة ننزل غصب عنكم 😂' : 'جاهز ينزل معاك النهارده';
     moodEl.textContent = moodTxt;
 
-    // لفل جديد؟ احتفال صغير (أول فتح للصفحة من غير احتفال)
+    // تثبيت اللفل في الإعدادات — لو الجهاز قفل قبل ما اتحفظ بيرجع ويلحق نفسه
+    const savedLvl = parseInt((this.data.settings || {}).mascotLvl, 10) || 0;
+    if (level > savedLvl) {
+      if (!this.data.settings) this.data.settings = {};
+      this.data.settings.mascotLvl = level;
+      try { this.saveData(); } catch (e) { /* ignore */ }
+    }
+
+    // لفل جديد؟ احتفال صغير (أول فتح للصفحة من غير احتفال، ولا احتفال مكرر بعد إعادة تحميل)
     if (this._mascotLvlSeen === undefined) {
-      this._mascotLvlSeen = level;
+      this._mascotLvlSeen = Math.max(savedLvl, level);
     } else if (level > this._mascotLvlSeen) {
       this._mascotLvlSeen = level;
       actor.classList.remove('lvl-up');
@@ -2844,6 +2858,39 @@ class BHApp {
   getChallenges() {
     const self = this;
     return [
+      // ── تحديات الشغل (زي سكوترك) ──
+      {
+        id: 'ch_wstreak5', icon: '🛵',
+        title: '5 أيام نزول ورا بعض',
+        desc: 'نزّل 5 أيام متتالية من غير راحة تقطف السلسلة — بوني هيفرح!',
+        target: 5, unit: 'يوم',
+        progress: () => Math.min(5, self.getWorkStreak() || 0)
+      },
+      {
+        id: 'ch_wmonth20', icon: '📅',
+        title: '20 يوم شغل في الشهر',
+        desc: 'سجّل نزول 20 يوم خلال الشهر الحالي من تقويم الشغل.',
+        target: 20, unit: 'يوم',
+        progress: () => {
+          const n = new Date();
+          try { return Math.min(20, self.workMonthStats(n.getFullYear(), n.getMonth()).worked); }
+          catch (e) { return 0; }
+        }
+      },
+      {
+        id: 'ch_scooter3', icon: '🏍️',
+        title: 'السكوتر Lv 3',
+        desc: 'وصّل بوني لمحترف الشوارع — سجّل 10 أيام نزول إجمالي.',
+        target: 10, unit: 'يوم',
+        progress: () => Math.min(10, Object.keys(self.data.workDays || {}).filter(k => self.data.workDays[k] === true).length)
+      },
+      {
+        id: 'ch_wtotal50', icon: '👑',
+        title: '50 يوم نزول إجمالي',
+        desc: '50 يوم شغل مسجل في تاريخك مع التطبيق — ملك الطريق فعلاً.',
+        target: 50, unit: 'يوم',
+        progress: () => Math.min(50, Object.keys(self.data.workDays || {}).filter(k => self.data.workDays[k] === true).length)
+      },
       {
         id: 'ch_streak30', icon: '🔥',
         title: '30 يوم بدون لمس التحويش',
@@ -3048,7 +3095,8 @@ class BHApp {
 
     list.innerHTML = challenges.map(c => {
       const isActive = !!active[c.id];
-      const val = c.progress();
+      let val = 0;
+      try { val = Number(c.progress()) || 0; } catch (e) { val = 0; }   // تحدي واحد يقع؟ الباقي يفضل شغال
       const pct = Math.min(100, Math.round((val / c.target) * 100));
       const done = val >= c.target;
       const isMoney = c.unit === 'ج.م';
