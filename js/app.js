@@ -1135,6 +1135,7 @@ class BHApp {
     this.updateUserAvatar();
     this.initCardTilt();
     this.initNavMascot();
+    this.renderDailyProverb();
     this.maybeShowWelcome();
     this.scheduleSmartNotification();
 
@@ -1314,6 +1315,40 @@ class BHApp {
       const r = navEl.getBoundingClientRect();
       const x = (r.left + r.width / 2) - navRect.left;
       m.style.transform = 'translateX(' + Math.max(6, x) + 'px)';
+    } catch (e) { /* ignore */ }
+  }
+
+  // ═══ 🧠 حكمة اليوم — حكمة عربية تختلف كل يوم ═══
+  renderDailyProverb() {
+    const el = document.getElementById('dailyProverb');
+    if (!el) return;
+    const PROVERBS = [
+      'الصبر مفتاح الفرج',
+      'اللي صبر ظفر',
+      'درهم وقاية خير من قنطار علاج',
+      'القرش الأبيض ينفع في اليوم الأسود',
+      'يد واحدة ما تصفق',
+      'الوقت أثمن من الذهب',
+      'الليل الطويل له صبح',
+      'خير الكلام ما قل ودل',
+      'أداء الأمانة من الشجاعة',
+      'الحركة بركة — النخافة في الحركة خير من اليقين في السكون',
+      'اعقلها وتوكل',
+      'في التأني السلامة وفي العجلة الندامة',
+      'الجار قبل الدار'
+    ];
+    try {
+      // الفهرس مأخوذ من التاريخ نفسه → يوم مختلف كل يو، وثابت طول اليوم
+      const d = new Date();
+      const idx = (d.getFullYear() * 1000 + (d.getMonth() + 1) * 40 + d.getDate()) % PROVERBS.length;
+      el.textContent = '🧠 "' + PROVERBS[idx] + '"';
+      // تفريغ أوتوماتيكي أول ما يبدأ يوم جديد
+      clearTimeout(this._proverbTimer);
+      const next = new Date(d);
+      next.setHours(24, 0, 5, 0);
+      this._proverbTimer = setTimeout(() => {
+        try { this.renderDailyProverb(); } catch (e) { /* ignore */ }
+      }, Math.min(next - d, 86340000));
     } catch (e) { /* ignore */ }
   }
 
