@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>BH Promo Renderer</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; }
+  #c { display: block; margin: 0 auto; max-width: 40vh; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+"use strict";
+const cv = document.getElementById('c');
+const x = cv.getContext('2d');
+const W = 1080, H = 1920;
+const CY = '#00D9FF';
+const DUR = 10.0;
+
+function clamp01(v){ return v < 0 ? 0 : v > 1 ? 1 : v; }
+function easeOutCubic(p){ return 1 - Math.pow(1 - p, 3); }
+function easeInOut(p){ return p < .5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2)/2; }
+function easeBack(p){ const c = 1.70158*1.2; return 1 + (c+1)*Math.pow(p-1,3) + c*Math.pow(p-1,2); }
+function interp(a, b, p){ return a + (b - a) * p; }
+function live(t, start, dur){ return clamp01((t - start) / dur); }     // دخول مشهد
+function die(t, end, dur){ return 1 - clamp01((t - end) / dur); }      // خروج مشهد
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function roundRect(x0, y0, w, h, r){
+  x.beginPath();
+  x.roundRect(x0, y0, w, h, r);
+}
+function noShadow(){ x.shadowBlur = 0; x.shadowColor = 'transparent'; }
+
+function text(str, sx, sy, size, color, opts){
+  opts = opts || {};
+  x.save();
+  x.font = (opts.weight || 700) + ' ' + size + 'px ' + (opts.font || '"Segoe UI", Tahoma, sans-serif');
+  x.textAlign = opts.align || 'center';
+  x.textBaseline = opts.baseline || 'middle';
+  if (opts.glow){ x.shadowColor = opts.glow; x.shadowBlur = opts.blur || 24; }
+  x.fillStyle = color;
+  x.fillText(str, sx, sy);
+  x.restore();
+}
+function emoji(str, sx, sy, size, opts){
+  text(str, sx, sy, size, '#fff', Object.assign({ font: '"Segoe UI Emoji", "Segoe UI", sans-serif' }, opts));
+}
+
+// 🛵 سكوتر فكتور سماوي — نفس هوية التطبيق (بدل emoji الأحمر)
+function drawScooter(cx, cy, s){
+  x.save();
+  x.translate(cx, cy);
+  x.scale(s / 100, s / 100);
+  x.lineCap = 'round';
+  x.lineJoin = 'round';
+  x.shadowColor = CY; x.shadowBlur = 26;
+  // البودي — خط من المقعد للفودام + صندوق توصيل
+  x.strokeStyle = CY; x.lineWidth = 13;
+  x.beginPath();
+  x.moveTo(-52, -6);
+  x.quadraticCurveTo(-66, -26, -38, -34);      // وير الخلفية
+  x.lineTo(2, -40);                            // قاعدة الرجل
+  x.quadraticCurveTo(30, -44, 36, -72);        // ساعد الفودام
+  x.stroke();
+  // ت External خلفية (الحرارية — الخدمة):
+  x.beginPath();
+  x.moveTo(-62, -4);
+  x.lineTo(-38, -28);
+  x.lineTo(-20, -22);
+  x.lineTo(-40, 6);
+  x.closePath();
+  x.fillStyle = CY; x.fill();
+  // الفاعل ضوي — كبسولة الفودام
+  x.beginPath(); x.arc(40, -66, 7, 0, 7); x.fillStyle = '#fff'; x.fill();
+  noShadow();
+  x.fillStyle = CY;
+  roundRect(-90, -46, 40, 38, 9); x.fill();    // صندوق
+  // عجلات
+  x.fillStyle = '#0a0f16';
+  x.lineWidth = 6; x.strokeStyle = CY;
+  [[54, 8, 25], [-54, 8, 25]].forEach(function(w){
+    x.beginPath(); x.arc(w[0], w[1], w[2], 0, 7); x.stroke();
+    x.beginPath(); x.arc(w[0], w[1], w[2] - 8, 0, 7); x.fillStyle = 'rgba(0,217,255,.22)'; x.fill();
+    x.fillStyle = '#0a0f16';
+  });
+  // هالة الطريق تحت العجلة
+  const gg = x.createRadialGradient(0, 36, 2, 0, 36, 46);
+  gg.addColorStop(0, 'rgba(0, 217, 255, .45)');
+  gg.addColorStop(1, 'rgba(0, 217, 255, 0)');
+  x.fillStyle = gg;
+  x.beginPath(); x.ellipse(0, 40, 46, 10, 0, 0, 7); x.fill();
+  x.restore();
+}
+
+function bg(t){
+  x.fillStyle = '#05080e';
+  x.fillRect(0, 0, W, H);
+  // نقطة متاعين
+  x.save();
+  x.globalAlpha = 0.05;
+  x.fillStyle = CY;
+  const rnd = mulberry32(42);
+  for (let i = 0; i < 90; i++){
+    x.beginPath(); x.arc(rnd() * W, rnd() * H, 2, 0, 7); x.fill();
+  }
+  x.restore();
+  // هالة من تحت
+  const g = x.createRadialGradient(W/2, H + 200, 100, W/2, H + 200, 900);
+  g.addColorStop(0, 'rgba(0, 217, 255, ' + (0.10 + 0.03 * Math.sin(t * 1.5)) + ')');
+  g.addColorStop(1, 'rgba(0, 217, 255, 0)');
+  x.fillStyle = g;
+  x.fillRect(0, H - 900, W, 900);
+}
+
+// ─── مشهد 1: السكوتر لي كدا يدخر؟ بيدخل بسرعة ───
+function scene1(t){
+  const p = easeOutCubic(live(t, 0, 1.15));
+  const dieP = die(t, 2.95, 0.45);
+  if (dieP <= 0) return;
+  const sxp = interp(W + 220, W/2 - 10, p);
+  // خطوط سرعة
+  if (t < 2.3){
+    const fade = t > 1.15 ? 1 - clamp01((t - 1.15) / 0.6) : 1;
+    const rnd = mulberry32(99);
+    x.save();
+    x.strokeStyle = CY; x.lineWidth = 4; x.lineCap = 'round';
+    for (let i = 0; i < 6; i++){
+      const ly = 1330 + rnd() * 240;
+      const len = 90 + rnd() * 150;
+      x.globalAlpha = fade * (0.12 + rnd() * 0.3) * dieP;
+      const off = Math.sin(t * 9 + i) * 30;
+      x.beginPath(); x.moveTo(sxp + 150 + off, ly); x.lineTo(sxp + 150 + len + off, ly); x.stroke();
+    }
+    x.restore();
+  }
+  const bob = t > 1.15 ? Math.sin((t - 1.15) * 2.2) * 6 - 6 : 0;
+  x.save();
+  x.globalAlpha = clamp01(t / 0.35) * dieP;
+  drawScooter(sxp, 1420 + bob, 200);
+  x.restore();
+}
+
+// ─── مشهد 2: العنوان ───
+function scene2(t){
+  const p = live(t, 1.25, 0.55);
+  const dieP = die(t, 2.95, 0.4);
+  if (p <= 0 || dieP <= 0) return;
+  const pop = easeBack(p);
+  const scale = 0.4 + 0.6 * pop;
+  x.save();
+  x.globalAlpha = dieP;
+  x.translate(W/2, 850);
+  x.scale(scale, scale);
+  emoji('💰', 0, -270, 92, { glow: '#ffce4d', blur: 26 });
+  text('BH', 0, -50, 250, '#ffffff', { weight: 800, glow: CY, blur: 46 });
+  text('إدارة فلوسك يا وحش', 0, 150, 74, CY, { weight: 700, glow: CY, blur: 20 });
+  x.restore();
+  const p2 = live(t, 1.85, 0.5), die2 = dieP;
+  if (p2 > 0){
+    x.save();
+    x.globalAlpha = p2 * die2;
+    text('توفير • صرف • أهداف — بضغطة زرار', W/2, 1090, 46, 'rgba(224, 235, 245, .75)', { weight: 500 });
+    x.restore();
+  }
+}
+
+// ─── مشهد 3: كارت القبضة والتقسيم ───
+function scene3(t){
+  const p = live(t, 3.1, 0.5);
+  const dieP = die(t, 5.55, 0.35);
+  if (p <= 0 || dieP <= 0) return;
+  const card = { x: 140, y: 480, w: 800, h: 620 };
+  x.save();
+  x.globalAlpha = p * dieP;
+  x.translate(0, (1 - easeOutCubic(p)) * 60);
+  roundRect(card.x, card.y, card.w, card.h, 44);
+  x.fillStyle = 'rgba(10, 16, 24, .92)';
+  x.fill();
+  x.strokeStyle = 'rgba(0, 217, 255, .45)'; x.lineWidth = 3; x.stroke();
+  text('💸 قبضة جديدة', W/2, card.y + 95, 52, CY, { weight: 700 });
+  const amt = Math.round(250 * easeOutCubic(live(t, 3.45, 1.1)));
+  text(amt + ' ج.م', W/2, card.y + 225, 92, '#fff', { weight: 800, glow: CY, blur: 18 });
+  const rows = [
+    { label: 'التحويش 🔒', pct: 60, color: CY },
+    { label: 'للصرف 💳', pct: 30, color: '#4ade80' },
+    { label: 'الخرجة 🍔', pct: 10, color: '#fbbf24' }
+  ];
+  rows.forEach(function(r, i){
+    const bp = live(t, 4.0 + i * 0.4, 0.5);
+    if (bp <= 0) return;
+    const ry = card.y + 340 + i * 88;
+    const e = easeOutCubic(bp);
+    text(r.label, card.x + 60, ry - 16, 38, 'rgba(224,235,245,.85)', { align: 'left', weight: 600 });
+    const bw = 460, bx = card.x + 300;
+    roundRect(bx, ry + 12, bw, 14, 7);
+    x.fillStyle = 'rgba(255,255,255,.08)'; x.fill();
+    if (e > 0){
+      roundRect(bx, ry + 12, bw * e, 14, 7);
+      x.fillStyle = r.color; x.shadowColor = r.color; x.shadowBlur = 14; x.fill(); noShadow();
+    }
+    text(Math.round(r.pct * e) + '%', card.x + card.w - 52, ry - 16, 38, r.color, { align: 'right', weight: 700 });
+  });
+  // عملة بتطير للكارت
+  const cp = live(t, 3.35, 0.85);
+  if (cp > 0 && cp < 1){
+    const cx0 = W/2 + 200, cy0 = 1300, cx1 = W/2 - 60, cy1 = card.y + 60;
+    const e2 = easeOutCubic(cp);
+    const cxp = interp(cx0, cx1, e2);
+    const cyp = interp(cy0, cy1, e2) - Math.sin(cp * Math.PI) * 220;
+    emoji('🪙', cxp, cyp, 80, { glow: '#ffce4d', blur: 22 });
+  }
+  x.restore();
+}
+
+// ─── مشهد 4: الميزات ───
+function scene4(t){
+  const p = live(t, 5.85, 0.5);
+  const dieP = die(t, 7.5, 0.35);
+  if (p <= 0 || dieP <= 0) return;
+  const feats = ['📴 شغالة حتى بدون نت', '☁️ مزامنة حية بين أجهزتك', '🔔 تنبيهات ذكية للفلووس', '🔐 بياناتك محمية كاملة'];
+  feats.forEach(function(f, i){
+    const fp = live(t, 5.9 + i * 0.3, 0.45);
+    if (fp <= 0) return;
+    const pop = easeBack(fp);
+    const py = 640 + i * 155;
+    x.save();
+    x.translate(W/2, py);
+    x.scale(0.5 + 0.5 * pop, 0.5 + 0.5 * pop);
+    x.globalAlpha = fp * dieP;
+    roundRect(-350, -62, 700, 124, 62);
+    x.fillStyle = 'rgba(10, 16, 24, .94)'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, ' + (0.25 + 0.2 * fp) + ')'; x.lineWidth = 2.5; x.stroke();
+    text(f, 0, 2, 44, 'rgba(230, 240, 250, .95)', { weight: 600 });
+    x.restore();
+  });
+}
+
+// ─── مشهد 5: البار + الذروة ───
+function scene5(t){
+  const p = live(t, 7.7, 0.4);
+  const dieP = die(t, 9.6, 0.3);
+  if (p <= 0 || dieP <= 0) return;
+  x.save();
+  x.globalAlpha = p * dieP;
+  const by = H - 320;
+  roundRect(30, by, W - 60, 140, 60);
+  x.fillStyle = 'rgba(8, 12, 20, .96)'; x.fill();
+  x.strokeStyle = 'rgba(255,255,255,.12)'; x.lineWidth = 2; x.stroke();
+  // 6 بادجات متوهجة
+  for (let i = 0; i < 6; i++){
+    const pw = 145;
+    const gap = (W - 90 - 6 * pw) / 5;
+    const px = 45 + i * (pw + gap);
+    roundRect(px, by + 22, pw, 96, 48);
+    x.fillStyle = 'rgba(12, 16, 22, .95)'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, .3)'; x.lineWidth = 2; x.stroke();
+    emoji(['🏠','💵','💳','🎯','🏆','⚙️'][i], px + pw/2, by + 56, 36);
+  }
+  // شريط ذروة فوق البار (يرسم الأول عشان السكوتر يعدّي فوقه)
+  const sp = live(t, 8.15, 0.4);
+  if (sp > 0){
+    x.globalAlpha = p * dieP * sp;
+    roundRect(150, by - 150, W - 300, 72, 36);
+    x.fillStyle = 'rgba(0, 217, 255, .10)'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, .55)'; x.lineWidth = 2; x.stroke();
+    text('🚦 ذروة الصبح — كمّل شغّل نفسك!', W/2, by - 114, 38, CY, { weight: 700 });
+  }
+  // 🛵 بيعدي على البادجات — يمين ⇒ شمال
+  const ride = easeInOut(live(t, 7.85, 1.55));
+  const mx = interp(960, 120, ride);
+  drawScooter(mx, by - 18, 86);
+  x.restore();
+}
+
+// ─── مشهد 6: الكول تو أكشن ───
+function scene6(t){
+  const p = live(t, 9.0, 0.45);
+  if (p <= 0) return;
+  const rnd = mulberry32(1337);
+  for (let i = 0; i < 14; i++){
+    const cxp = rnd() * W;
+    const speed = 220 + rnd() * 260;
+    const yy = ((t - 9.0) * speed + rnd() * 500) % (H + 200) - 100;
+    x.globalAlpha = p * 0.85;
+    emoji(rnd() > .5 ? '🪙' : '💰', cxp, yy, 34 + rnd() * 42);
+  }
+  x.globalAlpha = p;
+  const pop = easeBack(live(t, 9.05, 0.55));
+  x.save();
+  x.translate(W/2, 800);
+  x.scale(0.5 + 0.5 * pop, 0.5 + 0.5 * pop);
+  text('حمّل بوني دلوقتي', 0, -60, 104, '#fff', { weight: 800, glow: CY, blur: 40 });
+  drawScooter(0, 160, 190);
+  x.restore();
+  text('مجانًا 100% — يفتح من المتصفح وخلاص ✅', W/2, 1030, 44, 'rgba(224,235,245,.8)', { weight: 500 });
+  text('tdrs10.github.io/-bh', W/2, 1190, 56, CY, { weight: 800, glow: CY, blur: 20 });
+}
+
+function draw(t){
+  bg(t);
+  scene5(t);
+  scene3(t);
+  scene4(t);
+  scene6(t);
+  scene2(t);
+  scene1(t);
+  let fade = 1;
+  if (t < 0.25) fade = t / 0.25;
+  if (t > DUR - 0.35) fade = clamp01((DUR - t) / 0.35);
+  if (fade < 1){
+    x.fillStyle = 'rgba(0, 0, 0, ' + (1 - fade) + ')';
+    x.fillRect(0, 0, W, H);
+  }
+}
+
+window.__render = draw;
+window.__state = 'idle';
+window.__blob = null;
+
+window.startRec = function(){
+  return new Promise(function(resolve){
+    window.__state = 'starting';
+    const stream = cv.captureStream(30);
+    let rec;
+    try { rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 5000000 }); }
+    catch (e) {
+      try { rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 5000000 }); }
+      catch (e2) { window.__state = 'error'; resolve(false); return; }
+    }
+    const chunks = [];
+    rec.ondataavailable = function(e){ if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = function(){
+      window.__blob = new Blob(chunks, { type: 'video/webm' });
+      window.__state = 'done';
+      resolve(true);
+    };
+    rec.start(200);
+    window.__state = 'recording';
+    const t0 = performance.now();
+    function loop(){
+      const t = (performance.now() - t0) / 1000;
+      if (t >= DUR){ rec.stop(); return; }
+      draw(t);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  });
+};
+window.__b64 = function(){
+  if (!window.__blob) return '';
+  const fr = new FileReader();
+  return new Promise(function(res){
+    fr.onload = function(){ res(fr.result.split(',')[1]); };
+    fr.readAsDataURL(window.__blob);
+  });
+};
+</script>
+</body>
+</html>
