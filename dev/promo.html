@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>BH Promo Renderer</title>
+<title>BH Promo Renderer v2</title>
 <style>
   html, body { margin: 0; padding: 0; background: #000; }
   #c { display: block; margin: 0 auto; max-width: 40vh; }
@@ -16,15 +16,17 @@ const cv = document.getElementById('c');
 const x = cv.getContext('2d');
 const W = 1080, H = 1920;
 const CY = '#00D9FF';
-const DUR = 10.0;
+const DUR = 12.0;                       // ┐ مدة أطول — CTA يفضل ظاهر تلات ثواني كاملة
+const CUTS = [1.0, 2.8, 4.7, 6.6, 8.6]; // نقاط القطع السريعة
 
 function clamp01(v){ return v < 0 ? 0 : v > 1 ? 1 : v; }
-function easeOutCubic(p){ return 1 - Math.pow(1 - p, 3); }
-function easeInOut(p){ return p < .5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2)/2; }
-function easeBack(p){ const c = 1.70158*1.2; return 1 + (c+1)*Math.pow(p-1,3) + c*Math.pow(p-1,2); }
+function eoc(p){ return 1 - Math.pow(1 - p, 3); }
+function eob(p){ const c = 2.0; p = clamp01(p); return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
+function eio(p){ return p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
 function interp(a, b, p){ return a + (b - a) * p; }
-function live(t, start, dur){ return clamp01((t - start) / dur); }     // دخول مشهد
-function die(t, end, dur){ return 1 - clamp01((t - end) / dur); }      // خروج مشهد
+function live(t, s, d){ return clamp01((t - s) / d); }
+function die(t, end, dur){ return 1 - clamp01((t - end) / dur); }
+function beat(t, pr){ pr = pr || 0.6; return 1 - (t % pr) / pr; }   // نبض 1→0
 function mulberry32(seed){
   return function(){
     seed |= 0; seed = seed + 0x6D2B79F5 | 0;
@@ -34,10 +36,7 @@ function mulberry32(seed){
   };
 }
 
-function roundRect(x0, y0, w, h, r){
-  x.beginPath();
-  x.roundRect(x0, y0, w, h, r);
-}
+function roundRect(a, b, w, h, r){ x.beginPath(); x.roundRect(a, b, w, h, r); }
 function noShadow(){ x.shadowBlur = 0; x.shadowColor = 'transparent'; }
 
 function text(str, sx, sy, size, color, opts){
@@ -55,23 +54,22 @@ function emoji(str, sx, sy, size, opts){
   text(str, sx, sy, size, '#fff', Object.assign({ font: '"Segoe UI Emoji", "Segoe UI", sans-serif' }, opts));
 }
 
-// 🛵 سكوتر فكتور سماوي — نفس هوية التطبيق (بدل emoji الأحمر)
-function drawScooter(cx, cy, s){
+// ─── 🛵 السكوتر الفكتور السماوي (بدل emoji الأحمر) ───
+function drawScooter(cx, cy, s, tilt){
   x.save();
   x.translate(cx, cy);
+  if (tilt) x.rotate(tilt);
   x.scale(s / 100, s / 100);
   x.lineCap = 'round';
   x.lineJoin = 'round';
   x.shadowColor = CY; x.shadowBlur = 26;
-  // البودي — خط من المقعد للفودام + صندوق توصيل
   x.strokeStyle = CY; x.lineWidth = 13;
   x.beginPath();
   x.moveTo(-52, -6);
-  x.quadraticCurveTo(-66, -26, -38, -34);      // وير الخلفية
-  x.lineTo(2, -40);                            // قاعدة الرجل
-  x.quadraticCurveTo(30, -44, 36, -72);        // ساعد الفودام
+  x.quadraticCurveTo(-66, -26, -38, -34);
+  x.lineTo(2, -40);
+  x.quadraticCurveTo(30, -44, 36, -72);
   x.stroke();
-  // ت External خلفية (الحرارية — الخدمة):
   x.beginPath();
   x.moveTo(-62, -4);
   x.lineTo(-38, -28);
@@ -79,12 +77,10 @@ function drawScooter(cx, cy, s){
   x.lineTo(-40, 6);
   x.closePath();
   x.fillStyle = CY; x.fill();
-  // الفاعل ضوي — كبسولة الفودام
   x.beginPath(); x.arc(40, -66, 7, 0, 7); x.fillStyle = '#fff'; x.fill();
   noShadow();
   x.fillStyle = CY;
-  roundRect(-90, -46, 40, 38, 9); x.fill();    // صندوق
-  // عجلات
+  roundRect(-90, -46, 40, 38, 9); x.fill();
   x.fillStyle = '#0a0f16';
   x.lineWidth = 6; x.strokeStyle = CY;
   [[54, 8, 25], [-54, 8, 25]].forEach(function(w){
@@ -92,7 +88,6 @@ function drawScooter(cx, cy, s){
     x.beginPath(); x.arc(w[0], w[1], w[2] - 8, 0, 7); x.fillStyle = 'rgba(0,217,255,.22)'; x.fill();
     x.fillStyle = '#0a0f16';
   });
-  // هالة الطريق تحت العجلة
   const gg = x.createRadialGradient(0, 36, 2, 0, 36, 46);
   gg.addColorStop(0, 'rgba(0, 217, 255, .45)');
   gg.addColorStop(1, 'rgba(0, 217, 255, 0)');
@@ -101,208 +96,387 @@ function drawScooter(cx, cy, s){
   x.restore();
 }
 
+// ─── كاميرا: زوم-بانش عند بداية كل مشهد + اهتزاز عند القطع ───
+function shakeAmp(t){
+  let a = 0;
+  for (let i = 0; i < CUTS.length; i++){
+    const d = Math.abs(t - CUTS[i]);
+    if (d < 0.3) a = Math.max(a, 1 - d / 0.3);
+  }
+  return a * 10;
+}
+function cam(t, s, z0){
+  const kick = z0 + (1 - z0) * eoc(clamp01((t - s) / 0.45));
+  const zoom = kick * (1 + 0.012 * Math.sin(t * 1.2));
+  const amp = shakeAmp(t);
+  x.save();
+  x.translate(W / 2, H / 2);
+  x.scale(zoom, zoom);
+  x.translate(-W / 2, -H / 2);
+  if (amp > 0) x.translate(Math.sin(t * 63) * amp, Math.cos(t * 51) * amp * 0.7);
+}
+
+// ─── خلفية حية: شارع بيجري + خطوط ضوء ───
 function bg(t){
   x.fillStyle = '#05080e';
   x.fillRect(0, 0, W, H);
-  // نقطة متاعين
+  // خطوط أفقية بتجري ناحيتنا — إحساس سرعة
+  const horizon = 1310;
   x.save();
-  x.globalAlpha = 0.05;
-  x.fillStyle = CY;
+  x.strokeStyle = CY; x.lineWidth = 3;
+  const sp = (t * 2.2) % 1;
+  for (let i = 0; i < 9; i++){
+    const z = (i / 9 + sp) % 1;
+    const yy = horizon + Math.pow(z, 2.6) * (H - horizon + 120);
+    x.globalAlpha = 0.13 * z;
+    x.beginPath(); x.moveTo(0, yy); x.lineTo(W, yy); x.stroke();
+  }
+  x.globalAlpha = 0.10;
+  x.beginPath();
+  x.moveTo(W / 2 - 620, horizon); x.lineTo(-140, H + 60);
+  x.moveTo(W / 2 + 620, horizon); x.lineTo(W + 140, H + 60);
+  x.stroke();
+  x.restore();
+  // نقاط ثابتة
+  x.save(); x.globalAlpha = 0.06; x.fillStyle = CY;
   const rnd = mulberry32(42);
-  for (let i = 0; i < 90; i++){
-    x.beginPath(); x.arc(rnd() * W, rnd() * H, 2, 0, 7); x.fill();
+  for (let i = 0; i < 70; i++){ x.beginPath(); x.arc(rnd() * W, rnd() * H, 2, 0, 7); x.fill(); }
+  x.restore();
+  // خطوط ضوء تطير من يمين لشمال
+  x.save();
+  x.strokeStyle = CY; x.lineWidth = 5; x.lineCap = 'round';
+  const r2 = mulberry32(5);
+  for (let i = 0; i < 9; i++){
+    const spd = 320 + r2() * 500;
+    const yy = 180 + r2() * 1500;
+    const len = 90 + r2() * 170;
+    const xx = W + 300 - ((t * spd + r2() * 2400) % (W + 500));
+    x.globalAlpha = 0.07 + 0.07 * Math.abs(Math.sin(t * 2.4 + i));
+    x.beginPath(); x.moveTo(xx, yy); x.lineTo(xx + len, yy); x.stroke();
   }
   x.restore();
-  // هالة من تحت
-  const g = x.createRadialGradient(W/2, H + 200, 100, W/2, H + 200, 900);
-  g.addColorStop(0, 'rgba(0, 217, 255, ' + (0.10 + 0.03 * Math.sin(t * 1.5)) + ')');
+  // هالة نبض من تحت
+  const b = beat(t) * 0.04;
+  const g = x.createRadialGradient(W / 2, H + 200, 100, W / 2, H + 200, 950);
+  g.addColorStop(0, 'rgba(0, 217, 255, ' + (0.11 + b + 0.03 * Math.sin(t * 1.5)) + ')');
   g.addColorStop(1, 'rgba(0, 217, 255, 0)');
   x.fillStyle = g;
-  x.fillRect(0, H - 900, W, 900);
+  x.fillRect(0, H - 950, W, 950);
 }
 
-// ─── مشهد 1: السكوتر لي كدا يدخر؟ بيدخل بسرعة ───
-function scene1(t){
-  const p = easeOutCubic(live(t, 0, 1.15));
-  const dieP = die(t, 2.95, 0.45);
-  if (dieP <= 0) return;
-  const sxp = interp(W + 220, W/2 - 10, p);
-  // خطوط سرعة
-  if (t < 2.3){
-    const fade = t > 1.15 ? 1 - clamp01((t - 1.15) / 0.6) : 1;
-    const rnd = mulberry32(99);
-    x.save();
-    x.strokeStyle = CY; x.lineWidth = 4; x.lineCap = 'round';
-    for (let i = 0; i < 6; i++){
-      const ly = 1330 + rnd() * 240;
-      const len = 90 + rnd() * 150;
-      x.globalAlpha = fade * (0.12 + rnd() * 0.3) * dieP;
-      const off = Math.sin(t * 9 + i) * 30;
-      x.beginPath(); x.moveTo(sxp + 150 + off, ly); x.lineTo(sxp + 150 + len + off, ly); x.stroke();
+// ─── أنيميشن القطع: فلاش سماوي + شررات من المركز ───
+function cutFX(t){
+  for (let i = 0; i < CUTS.length; i++){
+    const c = CUTS[i];
+    if (t < c) continue; // الفلاش بعد القطع بس — مش قبله
+    const fp = 1 - clamp01((t - c) / 0.13);
+    if (fp > 0){
+      x.fillStyle = 'rgba(0, 217, 255, ' + (fp * 0.22) + ')';
+      x.fillRect(0, 0, W, H);
     }
+    const bp = clamp01((t - c) / 0.32);
+    if (bp > 0 && bp < 1){
+      const rnd = mulberry32((c * 100) | 0);
+      x.save();
+      x.translate(W / 2, H * 0.46);
+      x.strokeStyle = CY; x.lineWidth = 5; x.lineCap = 'round';
+      x.globalAlpha = (1 - bp) * 0.85;
+      for (let k = 0; k < 16; k++){
+        const ang = (k / 16) * Math.PI * 2 + rnd() * 0.2;
+        const r0 = 60 + bp * 560 + rnd() * 60;
+        const r1 = r0 + 70 + rnd() * 90;
+        x.beginPath();
+        x.moveTo(Math.cos(ang) * r0, Math.sin(ang) * r0);
+        x.lineTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+        x.stroke();
+      }
+      x.restore();
+    }
+  }
+}
+
+// ─── مشهد 1 (0→1.0): السكوتر بيصطدم بالشاشة ───
+function scene1(t){
+  const s = 0;
+  const dieP = die(t, 0.9, 0.15);
+  if (dieP <= 0) return;
+  cam(t, s, 1.14);
+  const land = live(t, 0, 0.55);
+  const p = eoc(land);
+  const sxp = interp(W + 340, W / 2 - 10, p);
+  const syp = interp(1360, 1438, p);
+  const spFade = land < 1 ? 1 : 1 - clamp01((t - 0.55) / 0.33);
+  const rnd = mulberry32(99);
+  x.save();
+  x.strokeStyle = CY; x.lineWidth = 6; x.lineCap = 'round';
+  for (let i = 0; i < 10; i++){
+    const ly = 1220 + rnd() * 460;
+    const len = 130 + rnd() * 260;
+    x.globalAlpha = spFade * dieP * (0.3 + rnd() * 0.5);
+    const off = Math.sin(t * 12 + i * 1.7) * 46;
+    x.beginPath(); x.moveTo(sxp + 40 + off, ly); x.lineTo(sxp + 40 + len + off, ly); x.stroke();
+  }
+  x.restore();
+  if (land < 1){
+    x.save(); x.globalAlpha = 0.35 * dieP;
+    drawScooter(sxp + 300, syp + 10, 195, -0.07);
+    x.restore();
+    x.save(); x.globalAlpha = 0.18 * dieP;
+    drawScooter(sxp + 620, syp + 22, 195, -0.09);
     x.restore();
   }
-  const bob = t > 1.15 ? Math.sin((t - 1.15) * 2.2) * 6 - 6 : 0;
+  if (land >= 1){
+    const dp = clamp01((t - 0.55) / 0.42);
+    if (dp < 1){
+      x.save(); x.globalAlpha = (1 - dp) * 0.85 * dieP;
+      x.strokeStyle = 'rgba(0, 217, 255, .9)'; x.lineWidth = 6;
+      x.beginPath(); x.ellipse(W / 2 - 10, 1495, 70 + dp * 260, 22 + dp * 70, 0, 0, 7); x.stroke();
+      x.restore();
+    }
+  }
+  const bob = land >= 1 ? (Math.sin((t - 0.55) * 3.6) * 5 - 5) : 0;
   x.save();
-  x.globalAlpha = clamp01(t / 0.35) * dieP;
-  drawScooter(sxp, 1420 + bob, 200);
+  x.globalAlpha = clamp01(t / 0.14) * dieP;
+  drawScooter(sxp, syp + bob, 205);
+  x.restore();
   x.restore();
 }
 
-// ─── مشهد 2: العنوان ───
+// ─── مشهد 2 (1.0→2.8): العنوان — أشعة + نبض ───
 function scene2(t){
-  const p = live(t, 1.25, 0.55);
-  const dieP = die(t, 2.95, 0.4);
+  const s = 1.0;
+  const p = live(t, s, 0.3);
+  const dieP = die(t, 2.5, 0.3);
   if (p <= 0 || dieP <= 0) return;
-  const pop = easeBack(p);
-  const scale = 0.4 + 0.6 * pop;
+  cam(t, s, 1.12);
+  const be = beat(t);
+  // أشعة قصيرة وخفيفة لازم ما تغطيش الشاشة
+  x.save();
+  x.translate(W / 2, 850);
+  x.rotate(t * 0.55);
+  for (let i = 0; i < 10; i++){
+    x.rotate(Math.PI / 5);
+    x.globalAlpha = (0.03 + 0.035 * be) * dieP;
+    x.fillStyle = CY;
+    x.beginPath(); x.moveTo(150, 0); x.lineTo(460, -32); x.lineTo(460, 32); x.closePath(); x.fill();
+  }
+  x.restore();
+  // عملات بتطير تحت
+  const rnd = mulberry32(31);
+  x.save();
+  for (let i = 0; i < 7; i++){
+    const cx0 = rnd() * W;
+    const spd = 300 + rnd() * 420;
+    const yy = 1560 - ((t * spd + rnd() * 1100) % 1000);
+    const sz = 36 + rnd() * 34;
+    x.globalAlpha = 0.5 * dieP;
+    emoji(rnd() > 0.5 ? '🪙' : '💰', cx0, yy, sz);
+  }
+  x.restore();
+  // العنوان بوب + wiggle
+  const pop = eob(p);
+  const sc = 0.5 + 0.5 * pop;
   x.save();
   x.globalAlpha = dieP;
-  x.translate(W/2, 850);
-  x.scale(scale, scale);
-  emoji('💰', 0, -270, 92, { glow: '#ffce4d', blur: 26 });
-  text('BH', 0, -50, 250, '#ffffff', { weight: 800, glow: CY, blur: 46 });
-  text('إدارة فلوسك يا وحش', 0, 150, 74, CY, { weight: 700, glow: CY, blur: 20 });
+  x.translate(W / 2, 850 + Math.sin(t * 5) * 3);
+  x.scale(sc, sc);
+  emoji('💰', 0, -282, 96 + 7 * be, { glow: '#ffce4d', blur: 30 });
+  text('BH', 0, -52, 268, '#ffffff', { weight: 800, glow: CY, blur: 52 });
   x.restore();
-  const p2 = live(t, 1.85, 0.5), die2 = dieP;
+  const p2 = live(t, 1.32, 0.35);
   if (p2 > 0){
     x.save();
-    x.globalAlpha = p2 * die2;
-    text('توفير • صرف • أهداف — بضغطة زرار', W/2, 1090, 46, 'rgba(224, 235, 245, .75)', { weight: 500 });
+    x.globalAlpha = p2 * dieP;
+    x.translate(0, (1 - eoc(p2)) * 50);
+    text('توفير • صرف • أهداف — بضغطة زرار', W / 2, 1112, 48, 'rgba(224, 235, 245, .78)', { weight: 500 });
     x.restore();
   }
+  x.restore();
 }
 
-// ─── مشهد 3: كارت القبضة والتقسيم ───
+// ─── مشهد 3 (2.8→4.7): كارت القبضة بيندفع من اليمين ───
 function scene3(t){
-  const p = live(t, 3.1, 0.5);
-  const dieP = die(t, 5.55, 0.35);
+  const s = 2.8;
+  const p = live(t, s, 0.32);
+  const dieP = die(t, 4.4, 0.3);
   if (p <= 0 || dieP <= 0) return;
-  const card = { x: 140, y: 480, w: 800, h: 620 };
+  cam(t, s, 1.12);
+  const card = { x: 130, y: 510, w: 820, h: 610 };
   x.save();
   x.globalAlpha = p * dieP;
-  x.translate(0, (1 - easeOutCubic(p)) * 60);
-  roundRect(card.x, card.y, card.w, card.h, 44);
-  x.fillStyle = 'rgba(10, 16, 24, .92)';
-  x.fill();
-  x.strokeStyle = 'rgba(0, 217, 255, .45)'; x.lineWidth = 3; x.stroke();
-  text('💸 قبضة جديدة', W/2, card.y + 95, 52, CY, { weight: 700 });
-  const amt = Math.round(250 * easeOutCubic(live(t, 3.45, 1.1)));
-  text(amt + ' ج.م', W/2, card.y + 225, 92, '#fff', { weight: 800, glow: CY, blur: 18 });
+  x.translate((1 - eob(p)) * 380, 0);
+  roundRect(card.x, card.y, card.w, card.h, 46);
+  x.fillStyle = 'rgba(10, 16, 24, .96)'; x.fill();
+  x.strokeStyle = 'rgba(0, 217, 255, .5)'; x.lineWidth = 3.5; x.stroke();
+  text('💸 قبضة جديدة', W / 2, card.y + 90, 54, CY, { weight: 700 });
+  const amt = Math.round(250 * eoc(live(t, s + 0.16, 0.45)));
+  text(amt + ' ج.م', W / 2, card.y + 214, 100, '#ffffff', { weight: 800, glow: CY, blur: 22 });
   const rows = [
     { label: 'التحويش 🔒', pct: 60, color: CY },
     { label: 'للصرف 💳', pct: 30, color: '#4ade80' },
     { label: 'الخرجة 🍔', pct: 10, color: '#fbbf24' }
   ];
   rows.forEach(function(r, i){
-    const bp = live(t, 4.0 + i * 0.4, 0.5);
+    const bp = live(t, s + 0.5 + i * 0.26, 0.32);
     if (bp <= 0) return;
-    const ry = card.y + 340 + i * 88;
-    const e = easeOutCubic(bp);
-    text(r.label, card.x + 60, ry - 16, 38, 'rgba(224,235,245,.85)', { align: 'left', weight: 600 });
-    const bw = 460, bx = card.x + 300;
-    roundRect(bx, ry + 12, bw, 14, 7);
-    x.fillStyle = 'rgba(255,255,255,.08)'; x.fill();
+    const e = eoc(bp);
+    const ry = card.y + 330 + i * 86;
+    text(r.label, card.x + 56, ry - 16, 40, 'rgba(224, 235, 245, .9)', { align: 'left', weight: 600 });
+    const bw = 470, bx = card.x + 300;
+    roundRect(bx, ry + 10, bw, 15, 7.5); x.fillStyle = 'rgba(255, 255, 255, .08)'; x.fill();
     if (e > 0){
-      roundRect(bx, ry + 12, bw * e, 14, 7);
-      x.fillStyle = r.color; x.shadowColor = r.color; x.shadowBlur = 14; x.fill(); noShadow();
+      roundRect(bx, ry + 10, bw * e, 15, 7.5);
+      x.fillStyle = r.color; x.shadowColor = r.color; x.shadowBlur = 16 + (bp < 1 ? 16 * (1 - bp) : 0); x.fill(); noShadow();
     }
-    text(Math.round(r.pct * e) + '%', card.x + card.w - 52, ry - 16, 38, r.color, { align: 'right', weight: 700 });
+    text(Math.round(r.pct * e) + '%', card.x + card.w - 48, ry - 16, 40, r.color, { align: 'right', weight: 700 });
   });
-  // عملة بتطير للكارت
-  const cp = live(t, 3.35, 0.85);
+  x.restore();
+  const cp = live(t, s + 0.08, 0.55);
   if (cp > 0 && cp < 1){
-    const cx0 = W/2 + 200, cy0 = 1300, cx1 = W/2 - 60, cy1 = card.y + 60;
-    const e2 = easeOutCubic(cp);
-    const cxp = interp(cx0, cx1, e2);
-    const cyp = interp(cy0, cy1, e2) - Math.sin(cp * Math.PI) * 220;
-    emoji('🪙', cxp, cyp, 80, { glow: '#ffce4d', blur: 22 });
+    const e2 = eoc(cp);
+    const cxA = interp(W / 2 + 280, W / 2 - 70, e2);
+    const cyA = interp(1230, card.y + 70, e2) - Math.sin(cp * Math.PI) * 220;
+    emoji('🪙', cxA, cyA, 86, { glow: '#ffce4d', blur: 24 });
   }
   x.restore();
 }
 
-// ─── مشهد 4: الميزات ───
+// ─── مشهد 4 (4.7→6.6): بادجات الميزات بتندقع ───
 function scene4(t){
-  const p = live(t, 5.85, 0.5);
-  const dieP = die(t, 7.5, 0.35);
-  if (p <= 0 || dieP <= 0) return;
-  const feats = ['📴 شغالة حتى بدون نت', '☁️ مزامنة حية بين أجهزتك', '🔔 تنبيهات ذكية للفلووس', '🔐 بياناتك محمية كاملة'];
+  const s = 4.7;
+  const dieP = die(t, 6.3, 0.3);
+  if (dieP <= 0) return;
+  cam(t, s, 1.1);
+  const feats = ['📴 شغالة حتى بدون نت', '☁️ مزامنة حية بين أجهزتك', '🔔 تنبيهات ذكية للفلوس', '🔐 بياناتك محمية كاملة'];
   feats.forEach(function(f, i){
-    const fp = live(t, 5.9 + i * 0.3, 0.45);
+    const fp = live(t, s + 0.05 + i * 0.2, 0.3);
     if (fp <= 0) return;
-    const pop = easeBack(fp);
-    const py = 640 + i * 155;
+    const pop = eob(fp);
+    const py = 545 + i * 162;
     x.save();
-    x.translate(W/2, py);
-    x.scale(0.5 + 0.5 * pop, 0.5 + 0.5 * pop);
-    x.globalAlpha = fp * dieP;
-    roundRect(-350, -62, 700, 124, 62);
-    x.fillStyle = 'rgba(10, 16, 24, .94)'; x.fill();
-    x.strokeStyle = 'rgba(0, 217, 255, ' + (0.25 + 0.2 * fp) + ')'; x.lineWidth = 2.5; x.stroke();
-    text(f, 0, 2, 44, 'rgba(230, 240, 250, .95)', { weight: 600 });
+    x.translate(W / 2, py);
+    x.rotate((1 - pop) * (i % 2 ? 5 : -5) * Math.PI / 180);
+    x.scale(0.55 + 0.45 * pop, 0.55 + 0.45 * pop);
+    x.globalAlpha = clamp01(fp * 2.4) * dieP;
+    const bb = fp >= 1 ? Math.sin((t - (s + 0.35 + i * 0.2)) * 7) * 3 : 0;
+    x.translate(0, bb);
+    roundRect(-355, -64, 710, 128, 64);
+    x.fillStyle = 'rgba(10, 16, 24, .97)'; x.fill();
+    const gl = fp >= 1 ? beat(t, 0.6) : 0;
+    x.strokeStyle = 'rgba(0, 217, 255, ' + (0.3 + 0.25 * gl) + ')'; x.lineWidth = 2.5; x.stroke();
+    text(f, 0, 2, 45, 'rgba(230, 240, 250, .96)', { weight: 600 });
     x.restore();
   });
+  x.restore();
 }
 
-// ─── مشهد 5: البار + الذروة ───
+// ─── مشهد 5 (6.6→8.6): البار + الذروة + سكوتر بيجري ───
 function scene5(t){
-  const p = live(t, 7.7, 0.4);
-  const dieP = die(t, 9.6, 0.3);
-  if (p <= 0 || dieP <= 0) return;
-  x.save();
-  x.globalAlpha = p * dieP;
-  const by = H - 320;
-  roundRect(30, by, W - 60, 140, 60);
-  x.fillStyle = 'rgba(8, 12, 20, .96)'; x.fill();
-  x.strokeStyle = 'rgba(255,255,255,.12)'; x.lineWidth = 2; x.stroke();
-  // 6 بادجات متوهجة
-  for (let i = 0; i < 6; i++){
-    const pw = 145;
-    const gap = (W - 90 - 6 * pw) / 5;
-    const px = 45 + i * (pw + gap);
-    roundRect(px, by + 22, pw, 96, 48);
-    x.fillStyle = 'rgba(12, 16, 22, .95)'; x.fill();
-    x.strokeStyle = 'rgba(0, 217, 255, .3)'; x.lineWidth = 2; x.stroke();
-    emoji(['🏠','💵','💳','🎯','🏆','⚙️'][i], px + pw/2, by + 56, 36);
-  }
-  // شريط ذروة فوق البار (يرسم الأول عشان السكوتر يعدّي فوقه)
-  const sp = live(t, 8.15, 0.4);
+  const s = 6.6;
+  const dieP = die(t, 8.3, 0.3);
+  if (dieP <= 0) return;
+  cam(t, s, 1.1);
+  const up = eob(live(t, s, 0.36));
+  const by = (H - 330) + (1 - up) * 360;
+  // تنبيه الذروة — الأول عشان السكوتر يمشي فوقه
+  const sp = live(t, s + 0.55, 0.32);
   if (sp > 0){
-    x.globalAlpha = p * dieP * sp;
-    roundRect(150, by - 150, W - 300, 72, 36);
-    x.fillStyle = 'rgba(0, 217, 255, .10)'; x.fill();
-    x.strokeStyle = 'rgba(0, 217, 255, .55)'; x.lineWidth = 2; x.stroke();
-    text('🚦 ذروة الصبح — كمّل شغّل نفسك!', W/2, by - 114, 38, CY, { weight: 700 });
+    x.save();
+    x.globalAlpha = sp * dieP;
+    x.translate(W / 2, by - 165);
+    x.scale(0.8 + 0.2 * eob(sp), 0.8 + 0.2 * eob(sp));
+    roundRect(-(W / 2) + 150, -36, W - 300, 72, 36);
+    x.fillStyle = 'rgba(0, 217, 255, .13)'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, ' + (0.5 + 0.25 * beat(t, 0.8)) + ')'; x.lineWidth = 3; x.stroke();
+    text('🚦 ذروة الصبح — كمّل شغّل نفسك!', 0, 0, 38, CY, { weight: 700 });
+    x.restore();
   }
-  // 🛵 بيعدي على البادجات — يمين ⇒ شمال
-  const ride = easeInOut(live(t, 7.85, 1.55));
-  const mx = interp(960, 120, ride);
-  drawScooter(mx, by - 18, 86);
+  // البار
+  x.save();
+  x.globalAlpha = clamp01(up * 1.7) * dieP;
+  roundRect(30, by, W - 60, 140, 60);
+  x.fillStyle = 'rgba(8, 12, 20, .97)'; x.fill();
+  x.strokeStyle = 'rgba(255, 255, 255, .15)'; x.lineWidth = 2.5; x.stroke();
+  for (let i = 0; i < 6; i++){
+    const pw = 145, gap = (W - 90 - 6 * pw) / 5;
+    const pcx = 45 + i * (pw + gap) + pw / 2, pcy = by + 70;
+    const pp = live(t, s + 0.14 + i * 0.09, 0.26);
+    if (pp <= 0) continue;
+    x.save();
+    x.translate(pcx, pcy);
+    x.scale(0.6 + 0.4 * eob(pp), 0.6 + 0.4 * eob(pp));
+    roundRect(-pw / 2, -48, pw, 96, 48);
+    x.fillStyle = 'rgba(12, 16, 22, .98)'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, .4)'; x.lineWidth = 2; x.stroke();
+    const flag = i === 4 ? Math.sin(t * 8) * 4 : 0;
+    emoji(['🏠','💵','💳','🎯','🏆','⚙️'][i], 0, flag, 40);
+    x.restore();
+  }
+  x.restore();
+  // السكوتر بيجري يمين⇐شمال بقفزات + سرعة + غبار
+  const ride = eio(live(t, s + 0.1, 1.5));
+  const mx = interp(990, 90, ride);
+  x.save();
+  const rnd = mulberry32(77);
+  x.strokeStyle = CY; x.lineWidth = 5; x.lineCap = 'round';
+  for (let i = 0; i < 5; i++){
+    const ly = by - 95 + rnd() * 110;
+    const nx = mx + 80 + rnd() * 70;
+    const len = 60 + rnd() * 80;
+    x.globalAlpha = dieP * (0.15 + rnd() * 0.3);
+    x.beginPath(); x.moveTo(nx, ly); x.lineTo(nx + len, ly); x.stroke();
+  }
+  for (let i = 0; i < 3; i++){
+    const ph = ((t * 6.5 + i / 3) % 1);
+    x.globalAlpha = dieP * (1 - ph) * 0.5;
+    x.fillStyle = 'rgba(0, 217, 255, .6)';
+    x.beginPath(); x.arc(mx + 46 + ph * 95, by + 2 - ph * 8, 7 + ph * 22, 0, 7); x.fill();
+  }
+  x.globalAlpha = dieP;
+  drawScooter(mx, by - 40 - Math.abs(Math.sin((t - s) * 10.5)) * 20, 95, 0.06 * Math.sin(t * 13));
+  x.restore();
   x.restore();
 }
 
-// ─── مشهد 6: الكول تو أكشن ───
+// ─── مشهد 6 (8.6→12): CTA — مطر عملات ومبيقطعش ───
 function scene6(t){
-  const p = live(t, 9.0, 0.45);
+  const s = 8.6;
+  const p = live(t, s, 0.38);
   if (p <= 0) return;
+  cam(t, s, 1.13);
   const rnd = mulberry32(1337);
-  for (let i = 0; i < 14; i++){
+  // العملات بتتخفى من عمود النص عشان القراءة تمشي
+  for (let i = 0; i < 30; i++){
     const cxp = rnd() * W;
-    const speed = 220 + rnd() * 260;
-    const yy = ((t - 9.0) * speed + rnd() * 500) % (H + 200) - 100;
-    x.globalAlpha = p * 0.85;
-    emoji(rnd() > .5 ? '🪙' : '💰', cxp, yy, 34 + rnd() * 42);
+    const spd = 260 + rnd() * 430;
+    const yy = ((t - s) * spd + rnd() * 2100) % 2260 - 90;
+    const sz = 30 + rnd() * 46;
+    x.globalAlpha = p * (0.55 + rnd() * 0.45);
+    if (yy > 620 && yy < 1350 && Math.abs(cxp - W / 2) < 400) continue;
+    emoji(rnd() > 0.45 ? '🪙' : '💰', cxp, yy, sz);
   }
-  x.globalAlpha = p;
-  const pop = easeBack(live(t, 9.05, 0.55));
+  const pop = eob(live(t, s + 0.04, 0.5));
+  const shk = Math.max(0, 1 - (t - s) / 0.45) * 9;
   x.save();
-  x.translate(W/2, 800);
-  x.scale(0.5 + 0.5 * pop, 0.5 + 0.5 * pop);
-  text('حمّل بوني دلوقتي', 0, -60, 104, '#fff', { weight: 800, glow: CY, blur: 40 });
-  drawScooter(0, 160, 190);
+  x.globalAlpha = p;
+  x.translate(W / 2 + (shk > 0 ? Math.sin(t * 71) * shk : 0), 820);
+  x.scale(0.55 + 0.45 * pop, 0.55 + 0.45 * pop);
+  text('حمّل بوني دلوقتي', 0, -62, 110, '#ffffff', { weight: 800, glow: CY, blur: 48 });
+  drawScooter(0, 150, 178, 0.05 * Math.sin(t * 9));
   x.restore();
-  text('مجانًا 100% — يفتح من المتصفح وخلاص ✅', W/2, 1030, 44, 'rgba(224,235,245,.8)', { weight: 500 });
-  text('tdrs10.github.io/-bh', W/2, 1190, 56, CY, { weight: 800, glow: CY, blur: 20 });
+  x.save();
+  x.globalAlpha = p;
+  text('مجانًا 100% — يفتح من المتصفح وخلاص ✅', W / 2, 1048, 46, 'rgba(224, 235, 245, .85)', { weight: 500 });
+  const up = live(t, s + 0.4, 0.35);
+  if (up > 0){
+    const gl = beat(t, 0.8);
+    roundRect(W / 2 - 385, 1150, 770, 124, 62);
+    x.fillStyle = 'rgba(0, 217, 255, ' + (0.1 + 0.08 * gl) + ')'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, ' + (0.45 + 0.55 * gl) + ')'; x.lineWidth = 3.5; x.stroke();
+    text('tdrs10.github.io/-bh', W / 2, 1212, 58, CY, { weight: 800, glow: CY, blur: 24 });
+  }
+  x.restore();
+  x.restore();
 }
 
 function draw(t){
@@ -313,15 +487,17 @@ function draw(t){
   scene6(t);
   scene2(t);
   scene1(t);
+  cutFX(t);
   let fade = 1;
-  if (t < 0.25) fade = t / 0.25;
-  if (t > DUR - 0.35) fade = clamp01((DUR - t) / 0.35);
+  if (t < 0.2) fade = t / 0.2;
+  if (t > DUR - 0.5) fade = clamp01((DUR - t) / 0.5);
   if (fade < 1){
     x.fillStyle = 'rgba(0, 0, 0, ' + (1 - fade) + ')';
     x.fillRect(0, 0, W, H);
   }
 }
 
+// ─── التسجيل: بيت قياس سرعة الإطارات + بترولي أعلى ───
 window.__render = draw;
 window.__state = 'idle';
 window.__blob = null;
@@ -329,16 +505,26 @@ window.__blob = null;
 window.startRec = function(){
   return new Promise(function(resolve){
     window.__state = 'starting';
+    window.__iv = [];
+    window.__last = 0;
     const stream = cv.captureStream(30);
     let rec;
-    try { rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 5000000 }); }
+    try { rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 16000000 }); }
     catch (e) {
-      try { rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 5000000 }); }
+      try { rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 16000000 }); }
       catch (e2) { window.__state = 'error'; resolve(false); return; }
     }
     const chunks = [];
     rec.ondataavailable = function(e){ if (e.data && e.data.size) chunks.push(e.data); };
     rec.onstop = function(){
+      const iv = window.__iv.slice();
+      iv.sort(function(a, b){ return a - b; });
+      window.__tickStats = {
+        frames: iv.length,
+        avg: iv.length ? iv.reduce(function(a, b){ return a + b; }, 0) / iv.length : 0,
+        p95: iv.length ? iv[Math.floor(iv.length * 0.95)] : 0,
+        max: iv.length ? iv[iv.length - 1] : 0
+      };
       window.__blob = new Blob(chunks, { type: 'video/webm' });
       window.__state = 'done';
       resolve(true);
@@ -347,12 +533,66 @@ window.startRec = function(){
     window.__state = 'recording';
     const t0 = performance.now();
     function loop(){
-      const t = (performance.now() - t0) / 1000;
+      const now = performance.now();
+      if (window.__last) window.__iv.push(now - window.__last);
+      window.__last = now;
+      const t = (now - t0) / 1000;
       if (t >= DUR){ rec.stop(); return; }
       draw(t);
       requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
+  });
+};
+// ─── التسجيل الحتمي (بدل اللحظي): كل إطار بتروتيوق مضبوط → H.264 smooth CFR ───
+window.startRecEnc = function(){
+  if (!('VideoEncoder' in window)) return Promise.resolve('no-webcodecs');
+  return new Promise(function(resolve){
+    window.__state = 'encoding';
+    window.__encErr = null;
+    window.__drawSlow = 0;
+    const fps = 30;
+    const total = Math.round(DUR * fps);
+    const parts = [];
+    const codecs = ['avc1.640029', 'avc1.640028', 'avc1.4d0028', 'avc1.420032'];
+    let enc = null;
+    (async function(){
+      for (let ci = 0; ci < codecs.length && !enc; ci++){
+        try {
+          const cfg = { codec: codecs[ci], width: W, height: H, bitrate: 8000000, framerate: fps, avc: { format: 'annexb' } };
+          const sup = await VideoEncoder.isConfigSupported(cfg);
+          if (sup && sup.supported){
+            enc = new VideoEncoder({
+              output: function(chunk){
+                const b = new Uint8Array(chunk.byteLength);
+                chunk.copyTo(b);
+                parts.push(b);
+              },
+              error: function(e){ window.__encErr = String(e); }
+            });
+            enc.configure(cfg);
+          }
+        } catch (e) { window.__encErr = String(e); }
+      }
+      if (!enc){ window.__state = 'no-codec'; resolve(false); return; }
+      const dur_us = Math.round(1e6 / fps);
+      for (let k = 0; k < total; k++){
+        const t = k / fps;
+        const t0d = performance.now();
+        draw(t);
+        if (performance.now() - t0d > 40) window.__drawSlow++;
+        const vf = new VideoFrame(cv, { timestamp: Math.round(t * 1e6), duration: dur_us });
+        enc.encode(vf, { keyFrame: k % 30 === 0 });
+        vf.close();
+        let slept = 0;
+        while (enc.encodeQueueSize > 8 && slept < 4000){ await new Promise(function(r){ setTimeout(r, 4); }); slept += 4; }
+      }
+      try { await enc.flush(); } catch (e) { window.__encErr = 'flush: ' + String(e); }
+      enc.close();
+      window.__blob = new Blob(parts, { type: 'video/h264' });
+      window.__state = 'done';
+      resolve(true);
+    })();
   });
 };
 window.__b64 = function(){
