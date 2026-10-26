@@ -285,6 +285,8 @@ class BHApp {
       } catch (e) { /* ignore */ }
     };
     this._reconcileTimer = setInterval(wantSync, 90000);
+    // 🚦 نغمة الذروة بتحدث نفسها كل دقيقة
+    this._peakTimer = setInterval(() => { try { this.renderPeakStrip(); } catch (e) { /* ignore */ } }, 60000);
     document.addEventListener('visibilitychange', () => {
       try {
         if (document.visibilityState !== 'visible') return;
@@ -2030,6 +2032,132 @@ class BHApp {
     }
   }
 
+  // ═══ 🚦 ساعية الذروة — تشجيع للورديات الصبح والليل ═══
+
+  // إعدادات الذروة (وقت الذروة الصبح + الليل — قابلين للتعديل)
+  getPeaksCfg() {
+    const p = (this.data.settings || {}).peak || {};
+    return {
+      enabled: p.enabled !== false,
+      morning: p.morning || '07:30',
+      night: p.night || '20:00'
+    };
+  }
+
+  savePeakTime(which) {
+    const id = which === 'morning' ? 'saPeakMorning' : 'saPeakNight';
+    const el = document.getElementById(id);
+    if (!el || !el.value) return;
+    if (!this.data.settings) this.data.settings = {};
+    this.data.settings.peak = Object.assign({ enabled: true, morning: '07:30', night: '20:00' }, this.data.settings.peak || {});
+    this.data.settings.peak[which] = el.value;
+    this.saveData();
+    this.renderPeakStrip();
+    this.showToast('⏰ الذروة بقى ساءتها ' + el.value, 'success');
+  }
+
+  togglePeakAlerts() {
+    if (!this.data.settings) this.data.settings = {};
+    this.data.settings.peak = Object.assign({ enabled: true, morning: '07:30', night: '20:00' }, this.data.settings.peak || {});
+    this.data.settings.peak.enabled = !(this.data.settings.peak.enabled !== false);
+    this.saveData();
+    this.renderPeakStrip();
+    this.renderSmartAlertSettings();
+    this.showToast(this.data.settings.peak.enabled ? '🚦 نغمة الذروة ON — بوني هيصحّيك' : '↩️ نغمة الذروة مغلقة', 'info');
+  }
+
+  // حساب الذروة الحالية: mode = peak / approaching / off + رسالة مخصصة
+  peakNow() {
+    const cfg = this.getPeaksCfg();
+    if (!cfg.enabled) return null;
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const parse = (s) => {
+      const [h, m] = String(s || '').split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+    const PEAK_LEN = 180;      // الذروة ساعة ونص شغالة وواحد ونص؟ 3 ساعات = نزول قبل + حدودها
+    const PRE = 75;            // قبل الذروة بقوم 75 دقيقة
+
+    const worked = (this.data.workDays || {})[this.todayKey()] === true;
+    const name = (this.data.settings && this.data.settings.mascotName) || 'بوني';
+    const R = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    const make = (shift, peakM) => {
+      const isMorning = shift === 'morning';
+      if (mins >= peakM && mins < peakM + PEAK_LEN) {
+        return {
+          mode: 'peak', shift,
+          icon: isMorning ? '🔥' : '🌙',
+          cls: 'is-peak',
+          title: isMorning ? 'ذروة الصبح في الشارع' : 'ذروة الليل في الشارع',
+          txt: worked
+            ? R(['💪 ' + (isMorning ? 'شارع حاضر في الذروة — كمل نفس النفس بالليل' : 'شارع حاضر بالليل — عقبال الرصيد يزيد')])
+            : R(['🚀 ' + name + ' بيصوت: انزل يلا يا وحش!', '⏳ فلوس الذروة مش هترجع — سجّل ' + (isMorning ? 'النهارده' : 'الليله') + ' من كده', '🛵 ' + (isMorning ? 'الصبح عشا سكوتر' : 'الليل عشا سكوتر') + ' يامعلم'])
+        };
+      }
+      if (mins >= peakM - PRE && mins < peakM) {
+        const left = peakM - mins;
+        return {
+          mode: 'approaching', shift,
+          icon: '⏰',
+          cls: 'is-approaching',
+          title: (isMorning ? 'ذروة الصبح' : 'ذروة الليل') + ' بتقرب',
+          txt: left <= 15
+            ? `⏱️ فاضل بس ${left} دقيقة — ${worked ? 'اخذ ألاعرب قهوه وحلن' : 'جيب حاجتك خليك جاهز'}`
+            : `🚦 فاضل ${Math.round(left / 60 * 10) / 10} ساعة تقريبًا — ${worked ? 'أنت مقدّم، من متسخ سطوح' : 'يلا وجّه سكوترك قبلها'}`
+        };
+      }
+      return null;
+    };
+
+    const m = make('morning', parse(cfg.morning));
+    if (m) return m;
+    const n = make('night', parse(cfg.night));
+    if (n) return n;
+
+    // بين الذروات — فترة راحة
+    return {
+      mode: 'off', shift: null,
+      icon: '🌤️',
+      cls: 'is-off',
+      title: 'هدنة الشارع',
+      txt: '☕ استريح — بوني ينامها ورده الوديه'
+    };
+  }
+
+  // الشريط الحي في كابوت النهارده — بيغير النص تلقائيًا كل دقيقة
+  renderPeakStrip() {
+    const strip = document.getElementById('peakStrip');
+    if (!strip) return;
+    const p = this.peakNow();
+    if (!p) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+    strip.style.display = '';
+    strip.className = 'peak-strip ' + p.cls;
+    strip.innerHTML = `
+      <span class="peak-icon">${p.icon}</span>
+      <div class="peak-body">
+        <b class="peak-title">${esc(p.title)}</b>
+        <small class="peak-txt">${esc(p.txt)}</small>
+      </div>`;
+  }
+
+  // رسايل إشعار الصبح — كل يوم تشجيع مختلف
+  morningPushMsg() {
+    const name = (this.data.settings && this.data.settings.mascotName) || 'بوني';
+    const worked = (this.data.workDays || {})[this.todayKey()] === true;
+    const msgs = worked
+      ? [
+        { t: '☀️ صباح الفلوس يا وحش', b: `${name} مستنيك — اسحب استكشاف وشوف مكسبك امبارح.` },
+        { t: '🔥 شايل نهارده أصلاً', b: 'كمّل سلسلة — ذروة الصبح في الطريق.' }
+      ] : [
+        { t: '🌅 امسحك نزلت؟', b: `الشارع صاحي و${name} جاهز — ذروة الصبح قربت.` },
+        { t: '🚀 يلا يا وحش', b: 'ساعة فلوس مضاعفة صباحًا — سكوتك مستنيك.' },
+        { t: '☕ فطار سكوت', b: 'جهّز نفسك — ذروة الصبح هي أكتر فلوس في اليوم.' }
+      ];
+    return msgs[Math.floor(Math.random() * msgs.length)];
+  }
+
   // تسمية السكوتر — دوسة واحدة على الشريط
   renameMascot() {
     const cur = (this.data.settings && this.data.settings.mascotName) || 'بوني';
@@ -2203,6 +2331,7 @@ class BHApp {
   renderAll() {
     this.renderHeaderWorkChip();
     this.renderMascot();
+    this.renderPeakStrip();
     this.renderBalances();
     this.renderPendingIncomes();
     this.renderDebtAlerts();
@@ -4379,8 +4508,10 @@ class BHApp {
 
     const alerts = this.getSmartAlerts();
     const top = alerts[0];
-    const title = top ? top.title : 'صباح الفلوس ☀️';
-    const body = top ? top.body : 'افتح BH وشوف رصيدك ووردية امبارح.';
+    // ☀️ لو مفيش تنبيهات مهمة — رسالة تشجيع الصبح بتاعة ساعية الذروة
+    const pep = top ? null : this.morningPushMsg();
+    const title = top ? top.title : (pep ? pep.t : 'صباح الفلوس ☀️');
+    const body = top ? top.body : (pep ? pep.b : 'افتح BH وشوف رصيدك ووردية امبارح.');
 
     try {
       navigator.serviceWorker.controller.postMessage({
@@ -4399,6 +4530,7 @@ class BHApp {
     if (!box) return;
 
     const cfg = this.getSmartAlertSettings();
+    const peaks = this.getPeaksCfg();
     const alerts = this.getSmartAlerts();
 
     box.innerHTML = `
@@ -4411,6 +4543,28 @@ class BHApp {
       </div>
 
       <div class="sa-settings-sub ${cfg.enabled ? '' : 'disabled'}">
+        <div class="sa-settings-row">
+          <div>
+            <strong>🚦 نغمة الذروة</strong>
+            <small>تشجيع حي صبح وبليل حسب ساعة الذروة</small>
+          </div>
+          <button class="sa-toggle ${peaks.enabled ? 'on' : ''}" onclick="app.togglePeakAlerts()">${peaks.enabled ? '✓' : '○'}</button>
+        </div>
+
+        ${peaks.enabled ? `
+        <div class="sa-settings-row">
+          <div><small>🌅 ذروة الصبح</small></div>
+          <div style="display:flex;">
+            <input type="time" id="saPeakMorning" class="form-control" value="${peaks.morning}" onchange="app.savePeakTime('morning')" style="width:100px; padding:4px 8px !important; text-align:center; font-size:.8rem;">
+          </div>
+        </div>
+        <div class="sa-settings-row">
+          <div><small>🌙 ذروة الليل</small></div>
+          <div style="display:flex;">
+            <input type="time" id="saPeakNight" class="form-control" value="${peaks.night}" onchange="app.savePeakTime('night')" style="width:100px; padding:4px 8px !important; text-align:center; font-size:.8rem;">
+          </div>
+        </div>` : ''}
+
         <div class="sa-settings-row">
           <div>
             <strong>💸 رصيدك قارب يعمل</strong>
