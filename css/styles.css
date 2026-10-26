@@ -1493,7 +1493,6 @@ select.form-control option {
 .nav-item span:last-child { position: relative; z-index: 2; }
 
 /* دوسة → رنطة الـ spring بتاعة framer (scale + bounce) */
-.nav-item.nav-launch .nav-icon { filter: drop-shadow(0 0 6px rgba(0, 217, 255, 0.35)); }
 .nav-item:active { transform: scale(.92); }
 
 /* المفتوح (Active) = Ultra tier: حدود أقوى + vignette أحوّل + ورقة لوليان + حلقة بيضاء بتلسع */
