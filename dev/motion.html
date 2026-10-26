@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>BH Motion Renderer</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; }
+  #c { display: block; margin: 0 auto; max-width: 40vh; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+"use strict";
+const cv = document.getElementById('c');
+const x = cv.getContext('2d');
+const W = 1080, H = 1920;
+const CY = '#00D9FF';
+const DUR = 16.0;
+const CUTS = [1.2, 3.8, 6.4, 8.8, 11.0, 13.2];
+
+// ─── أدوات ───
+function clamp01(v){ return v < 0 ? 0 : v > 1 ? 1 : v; }
+function eoc(p){ return 1 - Math.pow(1 - p, 3); }
+function eob(p){ const c = 2.0; p = clamp01(p); return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
+function eio(p){ return p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+function interp(a, b, p){ return a + (b - a) * p; }
+function live(t, s, d){ return clamp01((t - s) / d); }
+function die(t, end, dur){ return 1 - clamp01((t - end) / dur); }
+function beat(t, pr){ pr = pr || 0.6; return 1 - (t % pr) / pr; }
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function text(str, sx, sy, size, color, opts){
+  opts = opts || {};
+  x.save();
+  x.font = (opts.weight || 700) + ' ' + size + 'px ' + (opts.font || '"Segoe UI", Tahoma, sans-serif');
+  x.textAlign = opts.align || 'center';
+  x.textBaseline = opts.baseline || 'middle';
+  if (opts.glow){ x.shadowColor = opts.glow; x.shadowBlur = opts.blur || 24; }
+  x.fillStyle = color;
+  x.fillText(str, sx, sy);
+  x.restore();
+}
+function emoji(str, sx, sy, size, opts){
+  text(str, sx, sy, size, '#fff', Object.assign({ font: '"Segoe UI Emoji", "Segoe UI", sans-serif' }, opts));
+}
+function noShadowO(o){ o.shadowBlur = 0; o.shadowColor = 'transparent'; }
+function rt(o, str, sx, sy, size, color, weight, align, font){
+  o.save();
+  o.font = (weight || 600) + ' ' + size + 'px ' + (font || '"Segoe UI", Tahoma, sans-serif');
+  o.textAlign = align || 'right';
+  o.textBaseline = 'middle';
+  o.fillStyle = color;
+  o.fillText(str, sx, sy);
+  o.restore();
+}
+function fmt(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+// ─── 🛵 السكوتر الفكتور ───
+function drawScooter(cx, cy, s, tilt){
+  x.save();
+  x.translate(cx, cy);
+  if (tilt) x.rotate(tilt);
+  x.scale(s / 100, s / 100);
+  x.lineCap = 'round';
+  x.lineJoin = 'round';
+  x.shadowColor = CY; x.shadowBlur = 26;
+  x.strokeStyle = CY; x.lineWidth = 13;
+  x.beginPath();
+  x.moveTo(-52, -6);
+  x.quadraticCurveTo(-66, -26, -38, -34);
+  x.lineTo(2, -40);
+  x.quadraticCurveTo(30, -44, 36, -72);
+  x.stroke();
+  x.beginPath();
+  x.moveTo(-62, -4); x.lineTo(-38, -28); x.lineTo(-20, -22); x.lineTo(-40, 6);
+  x.closePath();
+  x.fillStyle = CY; x.fill();
+  x.beginPath(); x.arc(40, -66, 7, 0, 7); x.fillStyle = '#fff'; x.fill();
+  noShadowO(x);
+  x.fillStyle = CY;
+  x.beginPath(); x.roundRect(-90, -46, 40, 38, 9); x.fill();
+  x.fillStyle = '#0a0f16';
+  x.lineWidth = 6; x.strokeStyle = CY;
+  [[54, 8, 25], [-54, 8, 25]].forEach(function(w){
+    x.beginPath(); x.arc(w[0], w[1], w[2], 0, 7); x.stroke();
+    x.beginPath(); x.arc(w[0], w[1], w[2] - 8, 0, 7); x.fillStyle = 'rgba(0,217,255,.22)'; x.fill();
+    x.fillStyle = '#0a0f16';
+  });
+  const gg = x.createRadialGradient(0, 36, 2, 0, 36, 46);
+  gg.addColorStop(0, 'rgba(0, 217, 255, .45)');
+  gg.addColorStop(1, 'rgba(0, 217, 255, 0)');
+  x.fillStyle = gg;
+  x.beginPath(); x.ellipse(0, 40, 46, 10, 0, 0, 7); x.fill();
+  x.restore();
+}
+
+// ─── كاميرا + قطع ───
+function shakeAmp(t){
+  let a = 0;
+  for (let i = 0; i < CUTS.length; i++){
+    const d = Math.abs(t - CUTS[i]);
+    if (d < 0.3) a = Math.max(a, 1 - d / 0.3);
+  }
+  return a * 10;
+}
+function cam(t, s, z0){
+  const kick = z0 + (1 - z0) * eoc(clamp01((t - s) / 0.45));
+  const zoom = kick * (1 + 0.012 * Math.sin(t * 1.2));
+  const amp = shakeAmp(t);
+  x.save();
+  x.translate(W / 2, H / 2);
+  x.scale(zoom, zoom);
+  x.translate(-W / 2, -H / 2);
+  if (amp > 0) x.translate(Math.sin(t * 63) * amp, Math.cos(t * 51) * amp * 0.7);
+}
+function cutFX(t){
+  for (let i = 0; i < CUTS.length; i++){
+    const c = CUTS[i];
+    if (t < c) continue;
+    const fp = 1 - clamp01((t - c) / 0.13);
+    if (fp > 0){
+      x.fillStyle = 'rgba(0, 217, 255, ' + (fp * 0.2) + ')';
+      x.fillRect(0, 0, W, H);
+    }
+    const bp = clamp01((t - c) / 0.32);
+    if (bp > 0 && bp < 1){
+      const rnd = mulberry32((c * 100) | 0);
+      x.save();
+      x.translate(W / 2, H * 0.5);
+      x.strokeStyle = CY; x.lineWidth = 5; x.lineCap = 'round';
+      x.globalAlpha = (1 - bp) * 0.7;
+      for (let k = 0; k < 14; k++){
+        const ang = (k / 14) * Math.PI * 2 + rnd() * 0.2;
+        const r0 = 60 + bp * 620 + rnd() * 60;
+        const r1 = r0 + 70 + rnd() * 90;
+        x.beginPath();
+        x.moveTo(Math.cos(ang) * r0, Math.sin(ang) * r0);
+        x.lineTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+        x.stroke();
+      }
+      x.restore();
+    }
+  }
+}
+
+// ─── خلفية ───
+function bg(t){
+  x.fillStyle = '#05080e';
+  x.fillRect(0, 0, W, H);
+  const horizon = 1560;
+  x.save();
+  x.strokeStyle = CY; x.lineWidth = 3;
+  const sp = (t * 1.6) % 1;
+  for (let i = 0; i < 8; i++){
+    const z = (i / 8 + sp) % 1;
+    const yy = horizon + Math.pow(z, 2.6) * (H - horizon + 120);
+    x.globalAlpha = 0.10 * z;
+    x.beginPath(); x.moveTo(0, yy); x.lineTo(W, yy); x.stroke();
+  }
+  x.restore();
+  x.save(); x.globalAlpha = 0.05; x.fillStyle = CY;
+  const rnd = mulberry32(42);
+  for (let i = 0; i < 60; i++){ x.beginPath(); x.arc(rnd() * W, rnd() * H, 2, 0, 7); x.fill(); }
+  x.restore();
+  x.save();
+  x.strokeStyle = CY; x.lineWidth = 5; x.lineCap = 'round';
+  const r2 = mulberry32(5);
+  for (let i = 0; i < 8; i++){
+    const spd = 320 + r2() * 500;
+    const yy = 180 + r2() * 1500;
+    const len = 90 + r2() * 170;
+    const xx = W + 300 - ((t * spd + r2() * 2400) % (W + 500));
+    x.globalAlpha = 0.06 + 0.06 * Math.abs(Math.sin(t * 2.4 + i));
+    x.beginPath(); x.moveTo(xx, yy); x.lineTo(xx + len, yy); x.stroke();
+  }
+  x.restore();
+  const b = beat(t) * 0.035;
+  const g = x.createRadialGradient(W / 2, H + 200, 100, W / 2, H + 200, 950);
+  g.addColorStop(0, 'rgba(0, 217, 255, ' + (0.10 + b) + ')');
+  g.addColorStop(1, 'rgba(0, 217, 255, 0)');
+  x.fillStyle = g;
+  x.fillRect(0, H - 950, W, 950);
+}
+
+// ═════════ شاشات التطبيق الحقيقية (900×1450) ═════════
+const OFF = document.createElement('canvas');
+OFF.width = 900; OFF.height = 1450;
+const octx = OFF.getContext('2d');
+
+function scrBg(o){
+  o.fillStyle = '#070b12'; o.fillRect(0, 0, 900, 1450);
+  const g = o.createRadialGradient(450, 1450, 60, 450, 1450, 700);
+  g.addColorStop(0, 'rgba(0,217,255,.07)'); g.addColorStop(1, 'rgba(0,217,255,0)');
+  o.fillStyle = g; o.fillRect(0, 750, 900, 700);
+}
+function statusBar(o){
+  o.fillStyle = 'rgba(10, 17, 25, .9)'; o.fillRect(0, 0, 900, 48);
+  rt(o, '٩:٤١', 860, 26, 21, 'rgba(210,225,240,.9)', 600, 'right');
+  rt(o, '📶 🔋', 40, 26, 19, '#fff', 400, 'left');
+}
+function headerBar(o, title, sub){
+  statusBar(o);
+  rt(o, 'BH', 860, 92, 34, CY, 800, 'right');
+  rt(o, title, 860, 132, 27, 'rgba(226,238,250,.95)', 700, 'right');
+  if (sub) rt(o, sub, 860, 166, 21, 'rgba(160,180,200,.72)', 500, 'right');
+}
+function cardBase(o, y, h){
+  o.beginPath(); o.roundRect(40, y, 820, h, 24);
+  o.fillStyle = 'rgba(14, 22, 34, .95)'; o.fill();
+  o.strokeStyle = 'rgba(0, 217, 255, .16)'; o.lineWidth = 2; o.stroke();
+}
+function navBar(o, active){
+  o.fillStyle = 'rgba(8, 13, 20, .98)'; o.fillRect(0, 1330, 900, 120);
+  o.strokeStyle = 'rgba(255,255,255,.08)'; o.lineWidth = 2;
+  o.beginPath(); o.moveTo(0, 1330); o.lineTo(900, 1330); o.stroke();
+  const icons = ['🏠','💵','💳','🎯','🏆','⚙️'];
+  const labels = ['الرئيسية','القبض','المصاريف','الأهداف','التحديات','المزيد'];
+  for (let i = 0; i < 6; i++){
+    const pw = 120, gap = (900 - 60 - 6 * pw) / 5;
+    const pcx = 30 + i * (pw + gap) + pw / 2, pcy = 1390;
+    if (i === active){
+      o.beginPath(); o.roundRect(pcx - pw / 2, pcy - 44, pw, 88, 44);
+      o.fillStyle = 'rgba(0, 217, 255, .16)'; o.fill();
+      o.strokeStyle = 'rgba(0, 217, 255, .65)'; o.lineWidth = 2; o.stroke();
+    }
+    rt(o, icons[i], pcx, pcy - 14, 30, '#fff', 400, 'center', '"Segoe UI Emoji", "Segoe UI", sans-serif');
+    rt(o, labels[i], pcx, pcy + 24, 13, i === active ? CY : 'rgba(150,170,190,.7)', i === active ? 700 : 500, 'center');
+  }
+}
+
+// ─── الشاشة 1: الرئيسية ───
+function s1(o, u){
+  scrBg(o);
+  headerBar(o, 'مساء الخير يا وحش 🌙', 'الأحد ٢٦ أكتوبر — يوم مبارك 🌿');
+  cardBase(o, 195, 240);
+  rt(o, '💰 إجمالي الرصيد الكلّي', 820, 245, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  const amt = 3450 * eoc(live(u, 0.25, 0.9));
+  rt(o, fmt(Math.round(amt)) + ' ج.م', 820, 320, 58, '#ffffff', 800, 'right');
+  rt(o, '🔒 المحجوز للتحويش/الديون: 1,200 ج.م', 820, 385, 22, 'rgba(0,217,255,.85)', 600, 'right');
+  rt(o, 'متاح للصرف: ' + fmt(Math.round(2250 * eoc(live(u, 0.35, 0.9)))) + ' ج.م', 820, 415, 22, 'rgba(74,222,128,.9)', 600, 'right');
+  cardBase(o, 460, 180);
+  rt(o, '⚡ كبسولة النهارده', 820, 505, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  rt(o, 'قبض: 480 ج.م', 820, 562, 26, CY, 700, 'right');
+  rt(o, 'صرف: 130 ج.م', 510, 562, 26, '#f87171', 700, 'right');
+  rt(o, 'الصافي: +350 ج.م', 200, 562, 26, '#4ade80', 700, 'right');
+  rt(o, 'كمّل كده — أنت ماشي صح 🚀', 820, 608, 21, 'rgba(160,180,200,.72)', 500, 'right');
+  cardBase(o, 665, 335);
+  rt(o, '🕒 أحدث العمليات', 820, 710, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  const rows = [
+    ['🛵', 'طلب مطعم الجونة', '+120 ج.م', '12:40 م', '#4ade80'],
+    ['🛵', 'شحن كشري — دمياط', '+180 ج.م', '2:10 م', '#4ade80'],
+    ['🍔', 'سندوتشات وشاي', '-35 ج.م', '3:05 م', '#f87171']
+  ];
+  rows.forEach(function(r, i){
+    const y = 762 + i * 74;
+    const rp = live(u, 0.6 + i * 0.15, 0.3);
+    if (rp <= 0) return;
+    o.save(); o.globalAlpha = rp;
+    rt(o, r[0], 820, y, 26, '#fff', 400, 'right', '"Segoe UI Emoji", "Segoe UI", sans-serif');
+    rt(o, r[1], 778, y, 24, 'rgba(226,238,250,.92)', 600, 'right');
+    rt(o, r[2], 330, y, 24, r[4], 800, 'right');
+    rt(o, r[3], 120, y, 19, 'rgba(150,170,190,.6)', 500, 'right');
+    o.restore();
+  });
+  rt(o, 'كل حاجة بتتسجّل لوحدها — حتى وأنت في الشغل 🛵', 820, 1040, 20, 'rgba(150,170,190,.6)', 500, 'right');
+  navBar(o, 0);
+}
+
+// ─── الشاشة 2: القبض + مودال قبضة جديدة ───
+function s2(o, u){
+  scrBg(o);
+  headerBar(o, '💵 سجل القبض والدخل', '٣ عمليات النهارده — إجمالي 480 ج.م');
+  cardBase(o, 195, 220);
+  const rows = [['🛵','طلبات الدليفري','310 ج.م'],['📱','شحن موبايلات','90 ج.م'],['💼','شغل خاص','80 ج.م']];
+  rows.forEach(function(r, i){
+    const y = 250 + i * 56;
+    rt(o, r[0], 820, y, 24, '#fff', 400, 'right', '"Segoe UI Emoji", "Segoe UI", sans-serif');
+    rt(o, r[1], 778, y, 23, 'rgba(226,238,250,.9)', 600, 'right');
+    rt(o, r[2], 200, y, 23, CY, 800, 'right');
+  });
+  navBar(o, 1);
+  const mp = live(u, 0.15, 0.35);
+  if (mp > 0){
+    o.save();
+    o.fillStyle = 'rgba(0, 0, 0, .55)'; o.fillRect(0, 0, 900, 1450);
+    o.globalAlpha = mp;
+    const oy = (1 - eob(live(u, 0.15, 0.5))) * 280;
+    o.translate(0, oy);
+    o.beginPath(); o.roundRect(60, 380, 780, 700, 30);
+    o.fillStyle = 'rgba(12, 19, 30, .98)'; o.fill();
+    o.strokeStyle = 'rgba(0, 217, 255, .45)'; o.lineWidth = 2.5; o.stroke();
+    rt(o, '💸 قبضة جديدة', 450, 437, 30, CY, 800, 'center');
+    o.beginPath(); o.roundRect(100, 480, 700, 92, 18);
+    o.fillStyle = 'rgba(8, 13, 20, .95)'; o.fill();
+    o.strokeStyle = 'rgba(0, 217, 255, .3)'; o.lineWidth = 2; o.stroke();
+    rt(o, 'مبلغ القبض (ج.م)', 770, 512, 20, 'rgba(150,170,190,.85)', 600, 'right');
+    const amt = Math.round(250 * eoc(live(u, 0.5, 0.7)));
+    rt(o, fmt(amt), 150, 530, 40, '#fff', 800, 'right');
+    const splits = [
+      ['🔒 التحويش/الديون', 50, CY],
+      ['🏠 المصاريف الأساسية', 30, '#4ade80'],
+      ['🎉 الخروجات', 20, '#fbbf24']
+    ];
+    splits.forEach(function(sp2, i){
+      const y = 625 + i * 92;
+      const bp = live(u, 0.9 + i * 0.3, 0.4);
+      rt(o, sp2[0], 770, y, 23, 'rgba(226,238,250,.92)', 700, 'right');
+      rt(o, sp2[1] + '%', 150, y, 23, sp2[2], 800, 'right');
+      o.beginPath(); o.roundRect(130, y + 22, 640, 14, 7);
+      o.fillStyle = 'rgba(255,255,255,.07)'; o.fill();
+      if (bp > 0){
+        const e = eoc(bp);
+        o.beginPath(); o.roundRect(130, y + 22, 640 * e, 14, 7);
+        o.fillStyle = sp2[2]; o.fill();
+      }
+    });
+    const gp = live(u, 2.0, 0.3);
+    if (gp > 0){
+      o.beginPath(); o.roundRect(100, 925, 700, 92, 46);
+      o.fillStyle = 'rgba(0, 217, 255, ' + (0.72 + 0.2 * beat(u)) + ')'; o.fill();
+      rt(o, '✅ حفظ عملية القبض', 450, 972, 30, '#04121a', 800, 'center');
+    }
+    o.restore();
+  }
+}
+
+// ─── الشاشة 3: تقارير ───
+function s3(o, u){
+  scrBg(o);
+  headerBar(o, '📊 تقارير ملخصة', 'أرباحك خلال الأسبوع');
+  cardBase(o, 195, 490);
+  rt(o, '💰 إيراد الأسبوع', 820, 245, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  const days = ['أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
+  const vals = [320, 410, 260, 550, 620, 480, 300];
+  vals.forEach(function(v, i){
+    const bp = live(u, 0.25 + i * 0.12, 0.45);
+    if (bp <= 0) return;
+    const e = eoc(bp);
+    const bw = 76, gap = (760 - 7 * bw) / 6;
+    const bx = 60 + i * (bw + gap);
+    const bh = (v / 620) * 270 * e;
+    o.beginPath(); o.roundRect(bx, 520 - bh, bw, Math.max(bh, 6), 10);
+    o.fillStyle = v === 620 ? CY : 'rgba(0, 217, 255, .35)';
+    if (v === 620){ o.shadowColor = CY; o.shadowBlur = 16; }
+    o.fill(); noShadowO(o);
+    rt(o, v, bx + bw / 2, 548, 16, 'rgba(180,200,220,.7)', 600, 'center');
+    rt(o, days[i], bx + bw / 2, 576, 16, 'rgba(180,200,220,.8)', 600, 'center');
+  });
+  rt(o, '🏆 أعلى يوم: الخميس — 620 ج.م', 820, 630, 22, '#fbbf24', 700, 'right');
+  rt(o, 'السبت والخميس أكتر أيام الزحمة — استغلهم! 💪', 820, 665, 20, 'rgba(150,170,190,.65)', 500, 'right');
+  cardBase(o, 715, 210);
+  rt(o, '📈 إحصائيات "قبضي مش ثابت"', 820, 760, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  const avg = Math.round(312 * eoc(live(u, 0.6, 0.6)));
+  rt(o, 'متوسط القبض: ' + avg + ' ج.م يوميًا', 820, 815, 30, '#fff', 800, 'right');
+  rt(o, '▲ 18% عن الأسبوع اللي فات', 820, 868, 24, '#4ade80', 700, 'right');
+  cardBase(o, 955, 200);
+  rt(o, '💵 صافي الأسبوع', 820, 1000, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  rt(o, '2,940 ج.م — اتتحويشوا 1,470 🔒', 820, 1055, 28, '#4ade80', 800, 'right');
+  navBar(o, -1);
+}
+
+// ─── الشاشة 4: الأهداف والديون ───
+function s4(o, u){
+  scrBg(o);
+  headerBar(o, '🎯 أهدافي المالية', 'خطوة بخطوة توصل 💪');
+  cardBase(o, 195, 340);
+  rt(o, '🏍️ موتوسيكل إنترسيتي', 820, 250, 28, '#fff', 800, 'right');
+  const gp = live(u, 0.3, 1.1);
+  const pct = 60 * eoc(gp);
+  o.beginPath(); o.roundRect(100, 305, 700, 26, 13);
+  o.fillStyle = 'rgba(255,255,255,.07)'; o.fill();
+  o.beginPath(); o.roundRect(100, 305, Math.max(700 * (pct / 100), 10), 26, 13);
+  o.fillStyle = CY; o.shadowColor = CY; o.shadowBlur = 14; o.fill(); noShadowO(o);
+  rt(o, Math.round(pct) + '%', 450, 372, 20, CY, 800, 'center');
+  rt(o, fmt(Math.round(1800 * eoc(gp))) + ' / 3,000 ج.م', 820, 372, 26, 'rgba(226,238,250,.9)', 700, 'right');
+  rt(o, 'باقي 1,200 بس — قربت! 🔥', 820, 425, 22, '#fbbf24', 700, 'right');
+  rt(o, 'نسبة التحويش من القبض: 60% — بيتحجز لوحده', 820, 472, 20, 'rgba(150,170,190,.7)', 500, 'right');
+  cardBase(o, 565, 270);
+  rt(o, '📌 ديوني وسدادها', 820, 610, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  rt(o, 'إجمالي الديون المتبقية: 450 ج.م', 820, 662, 25, '#f87171', 800, 'right');
+  rt(o, '👩 مريم — باقي 200 ج.م', 820, 715, 23, 'rgba(226,238,250,.9)', 600, 'right');
+  o.beginPath(); o.roundRect(100, 742, 640, 12, 6); o.fillStyle = 'rgba(255,255,255,.07)'; o.fill();
+  o.beginPath(); o.roundRect(100, 742, 640 * 0.6 * eoc(live(u, 0.5, 0.7)), 12, 6); o.fillStyle = '#4ade80'; o.fill();
+  rt(o, 'سدّدت 60% — كمّل! 💪', 820, 790, 21, '#4ade80', 700, 'right');
+  const sp = live(u, 1.2, 0.4);
+  if (sp > 0){
+    o.save();
+    o.translate(450, 920);
+    o.scale(0.8 + 0.2 * eob(sp), 0.8 + 0.2 * eob(sp));
+    o.beginPath(); o.roundRect(-330, -46, 660, 92, 46);
+    o.fillStyle = 'rgba(251, 191, 36, .12)'; o.fill();
+    o.strokeStyle = 'rgba(251, 191, 36, .55)'; o.lineWidth = 2.5; o.stroke();
+    rt(o, '🔥 12 يوم متتالي — استمر يا نجم!', 0, 0, 26, '#fbbf24', 800, 'center');
+    o.restore();
+  }
+  navBar(o, 3);
+}
+
+// ─── الشاشة 5: التحديات والشارات ───
+function s5(o, u){
+  scrBg(o);
+  headerBar(o, '🏆 التحديات والشارات', 'اليوم التالت عشر 🔥');
+  cardBase(o, 195, 340);
+  rt(o, '🎯 تحديات النهارده', 820, 245, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  const ch = [
+    ['قيّد كل قبض النهارده ✅', 100, '#4ade80'],
+    ['تحويش 100 ج.م 🔒', 70, CY],
+    ['مصاريف أقل من 150 ج.م ⛽', 35, '#fbbf24']
+  ];
+  ch.forEach(function(c2, i){
+    const y = 308 + i * 76;
+    rt(o, c2[0], 800, y, 24, 'rgba(226,238,250,.92)', 600, 'right');
+    o.beginPath(); o.roundRect(110, y + 20, 500, 12, 6);
+    o.fillStyle = 'rgba(255,255,255,.07)'; o.fill();
+    const bp = live(u, 0.3 + i * 0.25, 0.5);
+    if (bp > 0){
+      o.beginPath(); o.roundRect(110, y + 20, Math.max(500 * c2[1] / 100 * eoc(bp), 6), 12, 6);
+      o.fillStyle = c2[2]; o.fill();
+    }
+    rt(o, c2[1] + '%', 90, y + 26, 17, c2[2], 700, 'right');
+  });
+  rt(o, 'جايزة التحديات: نجمة تحرير + 50 ج.م تحويش 🎁', 820, 500, 21, 'rgba(150,170,190,.7)', 500, 'right');
+  cardBase(o, 565, 340);
+  rt(o, '🏅 الشارات', 820, 610, 26, 'rgba(220,235,250,.92)', 700, 'right');
+  const badges = ['أول قبض ⭐','أسبوع كامل 🔥','1000 ج.م 💎','بدون ديون 🛡️','قارئ الحكمة 📖','قارئ الديون 🧮'];
+  badges.forEach(function(b, i){
+    const col = i % 2, row = Math.floor(i / 2);
+    const bx = 60 + col * 400, by = 660 + row * 76;
+    const bp = live(u, 0.5 + i * 0.12, 0.35);
+    if (bp <= 0) return;
+    o.save();
+    o.globalAlpha = bp;
+    o.translate(bx + 180, by + 30);
+    o.scale(0.7 + 0.3 * eob(bp), 0.7 + 0.3 * eob(bp));
+    o.beginPath(); o.roundRect(-180, -30, 360, 60, 30);
+    o.fillStyle = 'rgba(0, 217, 255, .08)'; o.fill();
+    o.strokeStyle = 'rgba(0, 217, 255, .35)'; o.lineWidth = 2; o.stroke();
+    rt(o, b, 0, 1, 20, 'rgba(226,238,250,.92)', 600, 'center');
+    o.restore();
+  });
+  rt(o, 'كمّل التحديات — فلوسك في رجلك 🛵', 820, 945, 22, CY, 700, 'right');
+  navBar(o, 4);
+}
+
+// ─── تركيب الشاشة في موبايل معلّق ───
+function drawPhone(t, u, sx, sy, skew, alpha, screenFn){
+  screenFn(octx, u);
+  x.save();
+  x.globalAlpha = alpha;
+  x.translate(W / 2 + sx, H / 2 + sy);
+  x.rotate(0.012 * Math.sin(t * 1.1));
+  x.transform(1, skew * 0.3, -skew * 0.55, 1, 0, 0);
+  const sc = 0.98 + 0.02 * Math.sin(t * 1.3);
+  x.scale(sc, sc);
+  x.shadowColor = 'rgba(0, 217, 255, .35)'; x.shadowBlur = 60;
+  x.beginPath(); x.roundRect(-470, -745, 940, 1490, 56);
+  x.fillStyle = 'rgba(6, 10, 16, .98)'; x.fill();
+  x.shadowBlur = 0;
+  x.drawImage(OFF, -450, -725, 900, 1450);
+  x.beginPath(); x.roundRect(-470, -745, 940, 1490, 56);
+  x.strokeStyle = 'rgba(0, 217, 255, .4)'; x.lineWidth = 4; x.stroke();
+  x.beginPath(); x.roundRect(-70, -745, 140, 26, 13);
+  x.fillStyle = '#0a0f16'; x.fill();
+  x.restore();
+}
+function phoneScene(t, s, end, screenFn, caption){
+  const p = live(t, s, 0.5);
+  const dieP = die(t, end - 0.15, 0.3);
+  if (p <= 0 || dieP <= 0) return;
+  cam(t, s, 1.06);
+  const e = eob(p);
+  const sx = interp(W * 0.9, 0, e);
+  const sy = Math.sin((t - s) * 1.5) * 12;
+  const skew = (1 - clamp01(e)) * 0.3 + 0.05 * Math.sin((t - s) * 0.9);
+  drawPhone(t, t - s, sx, sy, skew, clamp01(p * 2.2) * dieP, screenFn);
+  const cp = live(t, s + 0.3, 0.35);
+  if (cp > 0){
+    x.save();
+    x.globalAlpha = cp * dieP;
+    x.translate(W / 2, 140 - (1 - eob(cp)) * 30);
+    x.scale(0.8 + 0.2 * eob(cp), 0.8 + 0.2 * eob(cp));
+    text(caption, 0, 0, 56, '#ffffff', { weight: 800, glow: CY, blur: 26 });
+    x.restore();
+  }
+  x.restore();
+}
+
+// ─── المقدمة ───
+function intro(t){
+  const dieP = die(t, 1.1, 0.2);
+  if (dieP <= 0) return;
+  cam(t, 0, 1.08);
+  const p = eoc(live(t, 0, 0.5));
+  const sx = interp(W + 300, W / 2, p);
+  x.save();
+  x.globalAlpha = clamp01(t / 0.15) * dieP;
+  drawScooter(sx, 1210, 215);
+  x.restore();
+  x.save();
+  x.globalAlpha = dieP;
+  const pop = eob(live(t, 0.2, 0.4));
+  x.translate(W / 2, 930);
+  x.scale(0.5 + 0.5 * pop, 0.5 + 0.5 * pop);
+  text('BH', 0, -80, 220, '#ffffff', { weight: 800, glow: CY, blur: 52 });
+  text('موقعك بالكامل في جيبك 🌙', 0, 110, 56, CY, { weight: 700 });
+  x.restore();
+  x.restore();
+}
+
+// ─── الكول تو أكشن ───
+function cta(t){
+  const s = 13.2;
+  const p = live(t, s, 0.35);
+  if (p <= 0) return;
+  cam(t, s, 1.1);
+  const rnd = mulberry32(1337);
+  for (let i = 0; i < 28; i++){
+    const cxp = rnd() * W;
+    const spd = 260 + rnd() * 430;
+    const yy = ((t - s) * spd + rnd() * 2100) % 2260 - 90;
+    const sz = 30 + rnd() * 46;
+    x.globalAlpha = p * (0.55 + rnd() * 0.45);
+    if (yy > 590 && yy < 1390 && Math.abs(cxp - W / 2) < 420) continue;
+    emoji(rnd() > 0.45 ? '🪙' : '💰', cxp, yy, sz);
+  }
+  const pop = eob(live(t, s + 0.05, 0.5));
+  x.save();
+  x.globalAlpha = p;
+  x.translate(W / 2, 800);
+  x.scale(0.55 + 0.45 * pop, 0.55 + 0.45 * pop);
+  text('جرّبه دلوقتي', 0, -60, 118, '#ffffff', { weight: 800, glow: CY, blur: 48 });
+  drawScooter(0, 160, 180, 0.05 * Math.sin(t * 9));
+  x.restore();
+  x.save();
+  x.globalAlpha = p;
+  text('مجانًا 100% — يفتح من المتصفح وخلاص ✅', W / 2, 1040, 46, 'rgba(224, 235, 245, .85)', { weight: 500 });
+  const up = live(t, s + 0.35, 0.35);
+  if (up > 0){
+    const gl = beat(t, 0.8);
+    x.beginPath(); x.roundRect(W / 2 - 385, 1140, 770, 124, 62);
+    x.fillStyle = 'rgba(0, 217, 255, ' + (0.1 + 0.08 * gl) + ')'; x.fill();
+    x.strokeStyle = 'rgba(0, 217, 255, ' + (0.45 + 0.55 * gl) + ')'; x.lineWidth = 3.5; x.stroke();
+    text('tdrs10.github.io/-bh', W / 2, 1202, 58, CY, { weight: 800, glow: CY, blur: 24 });
+  }
+  x.restore();
+  x.restore();
+}
+
+function draw(t){
+  bg(t);
+  intro(t);
+  phoneScene(t, 1.2, 3.8, s1, 'كل فلوسك قدامك 👀');
+  phoneScene(t, 3.8, 6.4, s2, 'سجّل قبضك على طول 💸');
+  phoneScene(t, 6.4, 8.8, s3, 'شوف أرباح الأسبوع 📊');
+  phoneScene(t, 8.8, 11.0, s4, 'هدفك قدام عينك 🎯');
+  phoneScene(t, 11.0, 13.2, s5, 'تحديات وشارات 🏆');
+  cta(t);
+  cutFX(t);
+  let fade = 1;
+  if (t < 0.2) fade = t / 0.2;
+  if (t > DUR - 0.5) fade = clamp01((DUR - t) / 0.5);
+  if (fade < 1){
+    x.fillStyle = 'rgba(0, 0, 0, ' + (1 - fade) + ')';
+    x.fillRect(0, 0, W, H);
+  }
+}
+
+// ─── الترميز الحتمي: WebCodecs H.264 annexb 30fps CFR ───
+window.__render = draw;
+window.__state = 'idle';
+window.__blob = null;
+
+window.startRecEnc = function(){
+  if (!('VideoEncoder' in window)) return Promise.resolve('no-webcodecs');
+  return new Promise(function(resolve){
+    window.__state = 'encoding';
+    window.__encErr = null;
+    window.__drawSlow = 0;
+    const fps = 30;
+    const total = Math.round(DUR * fps);
+    const parts = [];
+    const codecs = ['avc1.640029', 'avc1.640028', 'avc1.4d0028', 'avc1.420032'];
+    let enc = null;
+    (async function(){
+      for (let ci = 0; ci < codecs.length && !enc; ci++){
+        try {
+          const cfg = { codec: codecs[ci], width: W, height: H, bitrate: 8000000, framerate: fps, avc: { format: 'annexb' } };
+          const sup = await VideoEncoder.isConfigSupported(cfg);
+          if (sup && sup.supported){
+            enc = new VideoEncoder({
+              output: function(chunk){
+                const b = new Uint8Array(chunk.byteLength);
+                chunk.copyTo(b);
+                parts.push(b);
+              },
+              error: function(e){ window.__encErr = String(e); }
+            });
+            enc.configure(cfg);
+          }
+        } catch (e) { window.__encErr = String(e); }
+      }
+      if (!enc){ window.__state = 'no-codec'; resolve(false); return; }
+      const dur_us = Math.round(1e6 / fps);
+      for (let k = 0; k < total; k++){
+        const t = k / fps;
+        const t0d = performance.now();
+        draw(t);
+        if (performance.now() - t0d > 40) window.__drawSlow++;
+        const vf = new VideoFrame(cv, { timestamp: Math.round(t * 1e6), duration: dur_us });
+        enc.encode(vf, { keyFrame: k % 30 === 0 });
+        vf.close();
+        let slept = 0;
+        while (enc.encodeQueueSize > 8 && slept < 4000){ await new Promise(function(r){ setTimeout(r, 4); }); slept += 4; }
+      }
+      try { await enc.flush(); } catch (e) { window.__encErr = 'flush: ' + String(e); }
+      enc.close();
+      window.__blob = new Blob(parts, { type: 'video/h264' });
+      window.__state = 'done';
+      resolve(true);
+    })();
+  });
+};
+window.__b64 = function(){
+  if (!window.__blob) return '';
+  const fr = new FileReader();
+  return new Promise(function(res){
+    fr.onload = function(){ res(fr.result.split(',')[1]); };
+    fr.readAsDataURL(window.__blob);
+  });
+};
+</script>
+</body>
+</html>
