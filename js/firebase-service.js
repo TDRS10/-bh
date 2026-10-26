@@ -284,6 +284,7 @@ window.BHFirebase = (function () {
     push: push,
     subscribe: subscribe,
     unsubscribeRealtime: unsubscribeRealtime,
+    isSubscribed: function () { return !!(dataRef && dataCallback); },
     onStatusChange: onStatusChange,
     getState: function () { return state; },
     getUser: function () { return state.user; }

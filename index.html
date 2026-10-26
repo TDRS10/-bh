@@ -580,7 +580,17 @@
 
       <!-- ================= 6. MORE / TOOLS VIEW ================= -->
       <section id="moreView" class="view-page">
-        
+
+        <!-- 🧪 فحص شامل — سلامة + حماية + تقرير -->
+        <div class="card audit-card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🧪</span> فحص شامل للموقع</span>
+            <span class="sub-balance-label">سلامة + حماية</span>
+          </div>
+          <button class="btn btn-primary audit-run-btn" id="runAuditBtn" onclick="app.runFullAudit()">🚀 ابدأ الفحص — تقرير كامل</button>
+          <div id="fullAuditReport"></div>
+        </div>
+
         <!-- "Can I Spend?" Tool -->
         <div class="card">
           <div class="card-header">

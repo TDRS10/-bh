@@ -50,6 +50,7 @@ class BHApp {
         reservedSavings: 0,
         spendableBalance: 0
       },
+      balancesAt: 0,
       workDaysAt: {},
       incomes: [],
       expenses: [],
@@ -416,15 +417,22 @@ class BHApp {
     if (tombKilled) changed = true;
     if (JSON.stringify(out.workDays || {}) !== wdBefore) changed = true;
 
-    // Balances: الأحدث يكسب — لكن ملف سحابي ناقص من غير رصيد ما يصفرّش رصيدنا
+    // Balances: عندهم ساعة خاصة (balancesAt) بتتحرك بس بالتغييرات الحقيقية —
+    // ساعة الحفظ العامة كانت تخلّي أي حفظ إعدادات يتغلب على رصيد جديد من جهاز تاني
     const remoteIsNewer = remoteUpdatedAt > (localUpdatedAt || 0);
+    const localBalAt = (local && local.balancesAt) || 0, remoteBalAt = (remote && remote.balancesAt) || 0;
     const hasRemoteBal = !!(remote && remote.balances && Object.keys(remote.balances).length);
-    const src = (remoteIsNewer && hasRemoteBal) ? remote : local;
+    let balFromRemote;
+    if (!hasRemoteBal) balFromRemote = false;
+    else if (remoteBalAt !== localBalAt) balFromRemote = remoteBalAt > localBalAt;
+    else balFromRemote = remoteIsNewer;   // بيانات قديمة مالهاش ساعة — ساعة الحفظ تبقى الفيصل
+    const balSrc = (balFromRemote && remote.balances) ? remote : local;
     const localBal = (local.balances || {});
     out.balances = {
-      reservedSavings: (src.balances && src.balances.reservedSavings) || 0,
-      spendableBalance: (src.balances && src.balances.spendableBalance) || 0
+      reservedSavings: (balSrc.balances && balSrc.balances.reservedSavings) || 0,
+      spendableBalance: (balSrc.balances && balSrc.balances.spendableBalance) || 0
     };
+    out.balancesAt = Math.max(localBalAt, remoteBalAt);
     if (out.balances.reservedSavings !== localBal.reservedSavings ||
         out.balances.spendableBalance !== localBal.spendableBalance) changed = true;
 
@@ -625,9 +633,228 @@ class BHApp {
     ta.remove();
   }
 
+  // ═══ 🧪 فحص شامل — سلامة بيانات + حماية الموقع + تقرير ═══
+  async runFullAudit() {
+    const btn = document.getElementById('runAuditBtn');
+    const box = document.getElementById('fullAuditReport');
+    if (!box) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ بيشتغل الفحص...'; }
+    box.innerHTML = '<div class="audit-running">⏳ بيجهز الفحص... ثواني</div>';
+
+    const checks = [];
+    const add = (cat, name, level, detail) => checks.push({ cat, name, level, detail: detail || '' });
+    const t0 = Date.now();
+
+    try {
+      // ── 1) الحماية الأساسية ─────────────────────────────
+      const isHttps = location.protocol === 'https:';
+      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      add('الحماية', 'الاتصال المشفّر HTTPS', isHttps ? 'ok' : (isLocal ? 'warn' : 'fail'),
+        isHttps ? 'مؤمّن ✓' : (isLocal ? 'تشرغولة محلية — مقبولة بس للتجربة' : '⚠️ الموقع شغال بدون تشفير!'));
+
+      const cfg = window.BH_FIREBASE_CONFIG;
+      add('الحماية', 'مفتاح Firebase', cfg && cfg.apiKey ? 'info' : 'fail',
+        cfg && cfg.apiKey
+          ? 'المفتاح ظاهر في المتصفح — ده طبيعي لتطبيقات الويب Twitter؛ الحماية الحقيقية في قواعد القاعدة (شغل تحدى كتابة)'
+          : 'الإعدادات مش موجودة — المزامنة مقفولة');
+
+      // حالة تسجيل الدخول
+      const fb = (typeof window.BHFirebase !== 'undefined') ? window.BHFirebase : null;
+      const user = fb ? fb.getUser() : null;
+      add('الحماية', 'حساب المزامنة', user ? 'ok' : 'warn',
+        user ? 'داخل (' + (user.isAnonymous ? 'مجهول' : 'جوجل') + ') — ' + user.uid.slice(0, 8)
+             : 'مش مسجل — المزامنة والفحص السحابي هيتخطّوا (منقول للفحص: شخّص المشكلة)');
+
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const dbUrl = cfg && cfg.databaseURL;
+          if (dbUrl) {
+            const rnd = 'probe_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            // ⛊️ اختبار 1: كتابة جوه مسار مستخدم تاني — لازم DENIED
+            let crossDenied = false;
+            try {
+              const r = await fetch(dbUrl + '/users/AUDIT_FAKE_OTHER_UID/app.json?auth=' + token,
+                { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"probe":1}' });
+              crossDenied = r.status === 401 || r.status === 403;
+            } catch (e) { crossDenied = false; }
+            add('الحماية', 'عزل بيانات المستخدمين', crossDenied ? 'ok' : 'fail',
+              crossDenied ? 'القواعد تمنع أي حد يلمس غير صاحبه ✓'
+                : '⚠️ حد تاني ممكن يقرأ أو يعدّل بياناتك! لازم تحدّث Rules من صفحة Rules (زرار نسخ القواعد تحت)');
+
+            // ⛊️ اختبار 2: كتابة في الجذر خارج users/ — برضه لازم DENIED
+            let rootDenied = false;
+            try {
+              const r2 = await fetch(dbUrl + '/_audit_' + rnd + '.json?auth=' + token,
+                { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"probe":1}' });
+              rootDenied = r2.status === 401 || r2.status === 403;
+            } catch (e) { rootDenied = false; }
+            add('الحماية', 'قفل باقي الداتابيز', rootDenied ? 'ok' : 'warn',
+              rootDenied ? 'مفيش كتابة خارج مسار المستخدمين ✓' : 'مسموح كتابة خارج users/ — يفضّل تقفلها في الـ Rules');
+
+            // ⛊️ اختبار 3: كتابة في مسار المستخدم نفسه (آمن — في مسار مؤقت وبينضف)
+            let selfWrite = false;
+            try {
+              const r3 = await fetch(dbUrl + '/users/' + user.uid + '/_audit_' + rnd + '.json?auth=' + token,
+                { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"probe":1}' });
+              selfWrite = r3.ok;
+              if (selfWrite) fetch(dbUrl + '/users/' + user.uid + '/_audit_' + rnd + '.json?auth=' + token, { method: 'DELETE' }).catch(() => {});
+            } catch (e) {}
+            add('الحماية', 'مسارك المسموح بيشتغل', selfWrite ? 'ok' : 'warn',
+              selfWrite ? 'كتابة/محي تتم بحرية في مسارك ✓' : 'الكتابة في مسارك اترفضت — الـ Rules شايطة أضيق من اللازم');
+          } else {
+            add('الحماية', 'رابط الداتابيز', 'warn', 'databaseURL مش موجود في الإعدادات');
+          }
+        } catch (e) {
+          add('الحماية', 'اختبارات القاعدة', 'warn', 'تعذرت: ' + (e.message || e));
+        }
+      }
+
+      // ── 2) سلامة البيانات المحلية ───────────────────────
+      try {
+        localStorage.setItem('_bh_audit_ping', '1');
+        const pingOk = localStorage.getItem('_bh_audit_ping') === '1';
+        localStorage.removeItem('_bh_audit_ping');
+        add('البيانات', 'ذاكرة الجهاز (localStorage)', pingOk ? 'ok' : 'fail', pingOk ? 'قراءة/كتابة تتم ✓' : 'مرفوضة — الوضع الخاص/Private؟');
+      } catch (e) {
+        add('البيانات', 'ذاكرة الجهاز (localStorage)', 'fail', 'مقفولة تمامًا — ممكن الوضع الخاص');
+      }
+
+      const blob = JSON.stringify(this.data || {});
+      const blobKB = Math.round(blob.length / 1024);
+      add('البيانات', 'حجم بياناتك', blobKB < 1500 ? 'ok' : 'warn',
+        blobKB + ' KB' + (blobKB < 1500 ? ' — خفيفة على الجهاز والحاجة ✓' : ' — كبيرة نسبيًا، بتفضل على السحابة وتدفع أبطأ'));
+
+      // جودة السجلات: آي ديز ممكررة/تايهة
+      let noId = 0, dupes = 0;
+      ['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments'].forEach(c0 => {
+        if (!Array.isArray(this.data[c0])) return;
+        const seen = new Set();
+        this.data[c0].forEach(x => {
+          if (!x.id) noId++;
+          else if (seen.has(x.id)) dupes++;
+          else seen.add(x.id);
+        });
+      });
+      add('البيانات', 'سليمنة السجلات', (noId + dupes) === 0 ? 'ok' : 'warn',
+        (noId + dupes) === 0 ? 'كل السجلات معرّفة ومافي تكرار ✓' : (noId + dupes) + ' سجل به مشكلة (بدون معرف أو مكرر) — هتظبت أوتوماتيك عند أول مزامنة');
+
+      const tombs = this.data._tombstones || {};
+      const tombCount = Object.keys(tombs).reduce((n, k) => n + Object.keys(tombs[k] || {}).length, 0);
+      add('البيانات', 'قبر المسح (tombstones)', 'ok', tombCount + ' مسح محفور — بيمنع رجوع المحذوفات من أي جهاز ✓'); 
+
+      // اختلاف الرصيد مع الحسبة من السجلات (معلومة — مش حكم، فيه تسويات يدوية بتعدل الرصيد)
+      const reRes = Math.round((this.data.incomes || []).reduce((n, i) => n + (Number(i.savingsAmt) || 0), 0));
+      const reSpend = Math.round((this.data.incomes || []).reduce((n, i) => n + ((Number(i.essentialsAmt) || 0) + (Number(i.outingsAmt) || 0)), 0)
+        - (this.data.expenses || []).reduce((n, e) => n + (Number(e.amount) || 0), 0));
+      const bal = (this.data.balances || {});
+      const diff = Math.abs(((bal.reservedSavings || 0) + (bal.spendableBalance || 0)) - (reRes + reSpend));
+      add('البيانات', 'تطابق الرصيد مع السجلات', diff <= 1 ? 'info' : 'warn',
+        diff <= 1 ? 'مطابق تمامًا ✓' : 'فرق ' + diff.toLocaleString() + ' ج.م — طبيعي بعد تسويات يدوية، بس لو الرقم كتير شوف سجل التسويات');
+
+      // ── 3) الصحة والميزات ──────────────────────────────
+      const reg = await navigator.serviceWorker.getRegistration();
+      add('الصحة', 'أوفلاين (Service Worker)', reg ? 'ok' : 'fail', reg ? 'مسجل ويعمل ✓' : 'مش مسجل — التطبيق مش هتشتغل أوفلاين');
+      try {
+        const swTxt = await (await fetch('./service-worker.js', { cache: 'no-store' })).text();
+        const m = swTxt.match(/bh-finance-v(\d+)/);
+        add('الصحة', 'نسخة الكاش', m ? 'ok' : 'warn',
+          m ? ('v' + m[1] + ' — آخر نسخة مرفوعة ✓') : 'مش لاقي رقم النسخة');
+      } catch (e) {
+        add('الصحة', 'نسخة الكاش', 'warn', 'تعذر قراءة الـ SW: ' + (e.message || e));
+      }
+
+      const manifestEl = document.querySelector('link[rel="manifest"]');
+      let manifestOk = false, manifestNote = 'مش موجود في الصفحة';
+      if (manifestEl) {
+        try {
+          const mf = await (await fetch(manifestEl.href, { cache: 'no-store' })).json();
+          manifestOk = !!(mf.name && mf.icons && mf.icons.length);
+          manifestNote = manifestOk ? ('"' + mf.short_name + '" — ' + mf.icons.length + ' أيقونة ✓') : 'ناقص حقول';
+        } catch (e) { manifestNote = 'مش لاقيها: ' + (e.message || e); }
+      }
+      add('الصحة', 'ملف الـ PWA (manifest)', manifestOk ? 'ok' : 'warn', manifestNote);
+
+      add('الصحة', 'الاتصال بالنت', navigator.onLine ? 'ok' : 'warn',
+        navigator.onLine ? 'متصل ✓' : 'أوفلاين — الفحوص السحابية اتخطت');
+
+      // Firebase SDK
+      const sdkOk = typeof window.firebase !== 'undefined' && !!window.firebase;
+      add('الصحة', 'مكتبة Firebase SDK', sdkOk ? 'ok' : 'warn', sdkOk ? 'محمّلة ✓' : 'مش محمّلة (نت ضعيف؟) — التطبيق شغال أوفلاين عادي');
+      add('الصحة', 'مستمع المزامنة الحي', fb && fb.isSubscribed && fb.isSubscribed() ? 'ok' : 'warn',
+        fb && fb.isSubscribed && fb.isSubscribed() ? 'شغّال ✓' : 'مش شغّال حاليًا — هيشتغل أول ما تدخل');
+
+      // الإشعارات
+      if ('Notification' in window) {
+        const perm = Notification.permission;
+        add('الصحة', 'إذن الإشعارات', perm === 'granted' ? 'ok' : 'warn',
+          perm === 'granted' ? 'مسموح — التنبيهات الذكية هتوصلك ✓'
+            : perm === 'denied' ? 'مرفوض — تقدر تفعله من إعدادات المتصفح للموقع'
+            : 'مش مطلوب بعد — زرار التفعيل في المزيد');
+      }
+    } catch (e) {
+      add('الفحص', 'وقف الفحص', 'fail', e.message || String(e));
+    }
+
+    const sec = checks.filter(c => c.cat === 'الحماية');
+    const sFail = checks.filter(c => c.level === 'fail').length;
+    const sWarn = checks.filter(c => c.level === 'warn').length;
+    const sOk = checks.filter(c => c.level === 'ok').length;
+    const secs = ['الحماية', 'البيانات', 'الصحة'];
+    const LBL = { fail: '❌', warn: '⚠️', ok: '✅', info: 'ℹ️' };
+    const stamp = new Date().toLocaleString('ar-EG');
+    let html = `
+      <div class="audit-summary ${sFail ? 'has-fail' : (sWarn ? 'has-warn' : 'all-good')}">
+        <b>${sFail ? '❌ في حاجة لازم تتصَلح' : (sWarn ? '⚠️ شغال، بس تحسينات' : '✅ كل حاجة تمام')}</b>
+        <span>✅ ${sOk} • ⚠️ ${sWarn} • ❌ ${sFail} — خلال ${((Date.now() - t0) / 1000).toFixed(1)} ثانية</span>
+      </div>`;
+    secs.forEach(c0 => {
+      const rows = checks.filter(c => c.cat === c0);
+      if (!rows.length) return;
+      html += `<div class="audit-cat">${c0}</div>`;
+      html += rows.map(c => `
+        <div class="audit-item ${c.level}">
+          <span class="audit-badge">${LBL[c.level]}</span>
+          <div class="audit-txt"><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div>
+        </div>`).join('');
+    });
+    html += `
+      <div class="audit-actions">
+        <button class="btn audit-copy-btn" onclick="app.copyAuditReport()">📋 انسخ التقرير</button>
+        <small class="audit-stamp">${esc(stamp)}</small>
+      </div>`;
+    box.innerHTML = html;
+
+    this._lastAudit = { checks, stamp, sFail, sWarn, sOk, secs };
+    if (btn) { btn.disabled = false; btn.innerHTML = '🔁 اعمل الفحص تاني'; }
+    if (sFail) this.showToast('❌ الفحص لقى مشاكل — شوف التقرير', 'error');
+    else if (sWarn) this.showToast('⚠️ في تحسينات — التقرير جاهز', 'info');
+    else this.showToast('✅ الموقع سليم — التقرير جاهز', 'success');
+  }
+
+  copyAuditReport() {
+    const a = this._lastAudit;
+    if (!a) return;
+    const LBL = { fail: '❌', warn: '⚠️', ok: '✅', info: 'ℹ️' };
+    let txt = '🧪 تقرير فحص شامل — BH\n' + a.stamp + '\n';
+    txt += 'النتيجة: ✅ ' + a.sOk + ' • ⚠️ ' + a.sWarn + ' • ❌ ' + a.sFail + '\n\n';
+    a.secs.forEach(cat => {
+      const rows = (a.checks || []).filter(c => c.cat === cat);
+      if (!rows.length) return;
+      txt += '◆ ' + cat + '\n';
+      rows.forEach(c => { txt += '  ' + LBL[c.level] + ' ' + c.name + (c.detail ? ' — ' + c.detail : '') + '\n'; });
+      txt += '\n';
+    });
+    const done = () => this.showToast('📋 التقرير اتنسخ — الصقه في أي حتة', 'success');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done).catch(() => this.fallbackCopy(txt, done));
+    } else {
+      this.fallbackCopy(txt, done);
+    }
+  }
+
   // ── Diagnostics: find out exactly what's broken ──────────
-  async runCloudDiagnostics() {
-    const results = [];
+  async runCloudDiagnostics() {    const results = [];
     const add = (name, ok, detail) => results.push({ name, ok, detail: detail || '' });
 
     const cfg = window.BH_FIREBASE_CONFIG;
@@ -688,9 +915,12 @@ class BHApp {
       return;
     }
 
-    // 4. Read / Write test against the real database
+    // 4. Read / Write test against the real database — ⛑️ في مسار سلامة مؤقت
+    // (كان كان بيصفّر نسخة السحابة كلها لما بيتعمل وانت داخل بحسابك الحقيقي!)
     const dbUrl = cfg.databaseURL;
-    const testUrl = dbUrl + '/users/' + uid + '/app.json?auth=' + token;
+    const diagPath = 'users/' + uid + '/app/_diag_' + Date.now();
+    const testUrl = dbUrl + '/' + diagPath + '.json?auth=' + token;
+    const cleanupDiag = () => fetch(testUrl, { method: 'DELETE' }).catch(() => {});
 
     try {
       const res = await fetch(testUrl, {
@@ -699,7 +929,8 @@ class BHApp {
         body: JSON.stringify({ updatedAt: Date.now(), data: { test: true } })
       });
       if (res.ok) {
-        add('الكتابة في القاعدة', true, 'نجحت — المسار: users/' + uid.slice(0, 8) + '/app');
+        add('الكتابة في القاعدة', true, 'نجحت — مسار تجريبي آمن');
+        cleanupDiag();
       } else {
         const err = await res.json().catch(() => ({}));
         add('الكتابة في القاعدة', false,
@@ -719,8 +950,7 @@ class BHApp {
       const data = await res.json();
       if (res.ok) {
         add('القراءة من القاعدة', true, 'نجحت');
-        // clean up the test node
-        fetch(dbUrl + '/users/' + uid + '/app.json?auth=' + token, { method: 'DELETE' }).catch(() => {});
+        cleanupDiag();
       } else {
         add('القراءة من القاعدة', false, 'HTTP ' + res.status);
       }
@@ -1184,6 +1414,7 @@ class BHApp {
     // Update Balances
     this.data.balances.reservedSavings += savingsAmt;
     this.data.balances.spendableBalance += (essentialsAmt + outingsAmt);
+    this.touchBalances();
 
     const incomeEntry = {
       id: 'inc_' + Date.now(),
@@ -1233,6 +1464,7 @@ class BHApp {
 
     this.data.balances.reservedSavings += savingsAmt;
     this.data.balances.spendableBalance += (essentialsAmt + outingsAmt);
+    this.touchBalances();
 
     this.data.incomes.unshift({
       id: 'inc_' + Date.now(),
@@ -1352,6 +1584,7 @@ class BHApp {
   saveExpenseData({ amount, category, note, date }) {
     // Deduct from spendable balance
     this.data.balances.spendableBalance -= amount;
+    this.touchBalances();
 
     const expenseEntry = {
       id: 'exp_' + Date.now(),
@@ -1393,6 +1626,7 @@ class BHApp {
     // Transfer from savings to spendable
     this.data.balances.reservedSavings -= amount;
     this.data.balances.spendableBalance += amount;
+    this.touchBalances();
 
     // Reset Streak!
     this.data.settings.lastSavingsWithdrawalDate = new Date().toISOString().split('T')[0];
@@ -1626,6 +1860,7 @@ class BHApp {
 
       debt.paidAmount += payAmt;
       this.data.balances.spendableBalance -= payAmt;
+      this.touchBalances();
 
       // Log expense
       this.data.expenses.unshift({
@@ -1682,6 +1917,12 @@ class BHApp {
     delete map[key];
     if (this.data.workDaysAt) delete this.data.workDaysAt[key];
     this.tombstone('workDays', key);
+  }
+
+  // 🕒 ساعة الرصيد — بتتحرك بس بالتغييرات الحقيقية في الرصيد
+  // (ساعة الحفظ العامة كانت تخلّي أي حفظ إعدادات يغلب رصيد جديد من جهاز تاني)
+  touchBalances() {
+    this.data.balancesAt = Date.now();
   }
 
   // Ratios Configuration
@@ -1767,6 +2008,7 @@ class BHApp {
       reservedSavings: Math.max(this.data.balances.reservedSavings || 0, imported.balances?.reservedSavings || 0),
       spendableBalance: Math.max(this.data.balances.spendableBalance || 0, imported.balances?.spendableBalance || 0)
     };
+    this.touchBalances();
 
     this.saveData();
   }
@@ -3934,6 +4176,7 @@ class BHApp {
 
       this.data.balances.reservedSavings += savingsAmt;
       this.data.balances.spendableBalance += (essentialsAmt + outingsAmt);
+      this.touchBalances();
       this.data.incomes.unshift({
         id: 'inc_' + Date.now(),
         amount, savingsAmt, essentialsAmt, outingsAmt,
@@ -3941,6 +4184,7 @@ class BHApp {
       });
     } else {
       this.data.balances.spendableBalance -= amount;
+      this.touchBalances();
       this.data.expenses.unshift({
         id: 'exp_' + Date.now(),
         amount, category, note, date
@@ -4099,6 +4343,7 @@ class BHApp {
     // Apply
     this.data.balances.reservedSavings = newReserved;
     this.data.balances.spendableBalance = newSpendable;
+    this.touchBalances();
 
     // Keep an audit log of adjustments (not counted as income/expenses)
     if (!this.data.adjustments) this.data.adjustments = [];
