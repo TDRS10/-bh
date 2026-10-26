@@ -1578,6 +1578,96 @@ select.form-control option {
   #navMascot > span { animation: none; }
 }
 
+/* ── 🪙 فلوس دايجة على السكوتر ── */
+.fly-token {
+  position: fixed;
+  z-index: 70;
+  font-size: 1.15rem;
+  pointer-events: none;
+  line-height: 1;
+  filter: drop-shadow(0 0 7px rgba(0, 217, 255, .55));
+  transition:
+    top .72s cubic-bezier(.42, -0.1, .3, 1),
+    left .72s ease,
+    transform .72s ease,
+    opacity .72s ease;
+}
+/* نطة فرح / نزلة-حزن */
+#navMascot > span.mood-up { animation: moodJumpUp .65s cubic-bezier(.3, 1.5, .4, 1); }
+#navMascot > span.mood-down { animation: moodDip .65s cubic-bezier(.4, 0, .6, 1); }
+@keyframes moodJumpUp {
+  0%   { transform: translateY(0) rotate(0); }
+  35%  { transform: translateY(-9px) rotate(9deg); }
+  70%  { transform: translateY(1px) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+@keyframes moodDip {
+  0%   { transform: translateY(0) rotate(0); }
+  40%  { transform: translateY(4px) rotate(-7deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+
+/* ── 💨 تنة أتربة — أول ما يبص على التاب ── */
+.dust {
+  position: absolute;
+  bottom: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(0, 217, 255, .32);
+  filter: blur(1px);
+  pointer-events: none;
+  animation: dustPop .55s ease-out forwards;
+}
+@keyframes dustPop {
+  from { transform: translate(0, 0) scale(1); opacity: .75; }
+  to   { transform: translate(var(--dx, 0), -9px) scale(0); opacity: 0; }
+}
+
+/* ── 🔥 لهوة السلسلة — لما والبد يوم ... ── */
+.mascot-flame {
+  position: absolute;
+  right: -9px;
+  top: -10px;
+  font-size: .78rem;
+  display: none;
+  pointer-events: none;
+  animation: flameWob .85s ease-in-out infinite;
+  filter: drop-shadow(0 0 5px rgba(255, 140, 0, .45));
+}
+#navMascot.ride-fire .mascot-flame { display: block; }
+@keyframes flameWob {
+  0%, 100% { transform: scale(1) rotate(0); opacity: .95; }
+  50%      { transform: scale(1.18) rotate(7deg); opacity: 1; }
+}
+
+/* ── 💡 شعاع الضي الستوب ── */
+#navMascot.ride-night::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: -22px;
+  width: 34px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 240, 200, .38), transparent 72%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* ── 🤸 الويلي — لفل جديد! ── */
+#navMascot.wheelie > span {
+  animation: mascotWheelie 1.25s cubic-bezier(.3, 1.4, .4, 1);
+}
+@keyframes mascotWheelie {
+  0%   { transform: translateY(0) rotate(0); }
+  22%  { transform: translateY(-11px) rotate(-22deg) scale(1.06); }
+  42%  { transform: translateY(-3px) rotate(-17deg); }
+  62%  { transform: translateY(-6px) rotate(7deg); }
+  82%  { transform: translateY(1px) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-item, .nav-item:active { transform: none; transition: none; }
   .nav-item.active::before { animation: none; }

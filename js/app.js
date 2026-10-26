@@ -1290,8 +1290,10 @@ class BHApp {
 
     const navActive = navEl || document.querySelector('.bottom-nav .nav-item.active');
     if (navActive) this.moveNavMascot(navActive);
-    // رزة لمسة خفيفة عند تبديل التب
+    // 💨 تنة أتربة أول ما يوصل
+    clearTimeout(this._dustTimer);
     if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* ignore */ } }
+    this._dustTimer = setTimeout(() => { try { this.dustPuff(); } catch (e) { /* ignore */ } }, 520);
 
     this.currentTab = viewId;
     if (viewId === 'moreView') {
@@ -1326,6 +1328,77 @@ class BHApp {
           this.moveNavMascot(document.querySelector('.bottom-nav .nav-item.active'));
         } catch (e) { /* ignore */ }
       });
+    } catch (e) { /* ignore */ }
+  }
+
+  // ═══ 🛵 حياة السكوتر على البار — أحداث كريتيف ═══
+
+  // 🪙 عملة بتطير من نصف الشاشة للسكوتر (قبض = 🪙 نطة فرح، مصروف = 💸 نزل يبكت)
+  flyToken(emoji, mood) {
+    try {
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const m = document.getElementById('navMascot');
+      if (!m) return;
+      const r = m.getBoundingClientRect();
+      const el = document.createElement('i');
+      el.className = 'fly-token';
+      el.textContent = emoji || '🪙';
+      el.style.left = (r.left + r.width / 2 + (Math.random() * 140 - 70)) + 'px';
+      el.style.top = Math.max(80, window.innerHeight * 0.22) + 'px';
+      document.body.appendChild(el);
+      // إجبار الريلوت قبل الحركة عشان الترانزيشن يشتغل
+      void el.offsetWidth;
+      el.style.left = (r.left + r.width / 2) + 'px';
+      el.style.top = (r.top - 4) + 'px';
+      el.style.transform = 'scale(.35)';
+      el.style.opacity = '0.1';
+      setTimeout(() => {
+        el.remove();
+        try { this.mascotMood(mood || 'up'); } catch (e) { /* ignore */ }
+      }, 780);
+    } catch (e) { /* ignore */ }
+  }
+
+  // نطة استجابة السكوتر للعملة
+  mascotMood(type) {
+    const m = document.getElementById('navMascot');
+    if (!m) return;
+    const icon = m.querySelector('span#navMascotIcon') || m.querySelector('span');
+    if (!icon) return;
+    const cls = type === 'down' ? 'mood-down' : 'mood-up';
+    icon.classList.remove('mood-up', 'mood-down');
+    void icon.offsetWidth;   // إعادة تشغيل الأنيميشن
+    icon.classList.add(cls);
+    setTimeout(() => icon.classList.remove(cls), 700);
+  }
+
+  // 💨 تنة أتربة — بيتعمل لما السكوتر يوصل للتاب الجديد
+  dustPuff() {
+    try {
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const m = document.getElementById('navMascot');
+      if (!m) return;
+      for (let i = 0; i < 3; i++) {
+        const d = document.createElement('i');
+        d.className = 'dust';
+        d.style.left = (25 + Math.random() * 50) + '%';
+        d.style.setProperty('--dx', ((Math.random() * 14 - 7).toFixed(1)) + 'px');
+        m.appendChild(d);
+        setTimeout(() => d.remove(), 600);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // 🤸 ولفي — السكوتر يرفع الضفر والمود يقول لفل جديد!
+  mascotWheelie() {
+    try {
+      const m = document.getElementById('navMascot');
+      if (!m || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+      m.classList.remove('wheelie');
+      void m.offsetWidth;
+      m.classList.add('wheelie');
+      try { this.dustPuff(); } catch (e) { /* ignore */ }
+      setTimeout(() => m.classList.remove('wheelie'), 1350);
     } catch (e) { /* ignore */ }
   }
 
@@ -1375,6 +1448,11 @@ class BHApp {
     const lastWithdraw = this.data.settings.lastSavingsWithdrawalDate;
     if (!lastWithdraw) {
       this.data.settings.savingsStreakDays = 0;
+      // 🔥 مفيش سلسلة → بوني من غير لهوة
+      try {
+        const m0 = document.getElementById('navMascot');
+        if (m0) m0.classList.remove('ride-fire');
+      } catch (e) { /* ignore */ }
       return;
     }
 
@@ -1396,6 +1474,11 @@ class BHApp {
     const badgeMotivation = document.getElementById('motivationStreakText');
     if (badgeHeader) badgeHeader.textContent = text;
     if (badgeMotivation) badgeMotivation.textContent = text;
+    // 🔥 سلسلة التحويش 3+ أيام → بوني يلبس لهوة على ضهره
+    try {
+      const m = document.getElementById('navMascot');
+      if (m) m.classList.toggle('ride-fire', diffDays >= 3);
+    } catch (e) { /* ignore */ }
   }
 
   // Handle New Income Addition (+ قبض جديد أو قيد الانتظار)
@@ -1473,7 +1556,8 @@ class BHApp {
 
     this.openModal('incomeCelebrationModal');
     this.renderAll();
-    
+    this.flyToken('🪙', 'up');
+
     // Reset Form
     document.getElementById('incomeAmount').value = '';
     document.getElementById('incomeNote').value = '';
@@ -1523,6 +1607,7 @@ class BHApp {
 
     this.openModal('incomeCelebrationModal');
     this.renderAll();
+    this.flyToken('🪙', 'up');
     this.showToast(`🎉 تم استلام ${amount.toLocaleString()} ج.م وتقسيمها للتحويش والصرف بنجاح!`, 'success');
   }
 
@@ -1631,6 +1716,7 @@ class BHApp {
     this.renderAll();
 
     this.showToast(`✅ تم خصم ${amount} ج.م بنجاح من المتاح للصرف`);
+    this.flyToken('💸', 'down');
     
     const amtEl = document.getElementById('expenseAmount');
     const noteEl = document.getElementById('expenseNote');
@@ -2295,6 +2381,8 @@ class BHApp {
       actor.classList.remove('lvl-up');
       void actor.offsetWidth;   // إعادة تشغيل الأنيميشن
       actor.classList.add('lvl-up');
+      // 🤸 السكوتر يعمل ولفي على البار!
+      try { this.mascotWheelie(); } catch (e) { /* ignore */ }
       const flare = document.getElementById('mascotFlare');
       if (flare) {
         flare.style.display = '';
@@ -2403,6 +2491,14 @@ class BHApp {
   renderPeakStrip() {
     const strip = document.getElementById('peakStrip');
     if (!strip) return;
+    // 💡 شعاع ضي ليلي على البار — بعد 8 مساءً لحد 5 صبحاً
+    try {
+      const m0 = document.getElementById('navMascot');
+      if (m0) {
+        const h = new Date().getHours();
+        m0.classList.toggle('ride-night', h >= 20 || h < 5);
+      }
+    } catch (e) { /* ignore */ }
     const p = this.peakNow();
     if (!p) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
     strip.style.display = '';
