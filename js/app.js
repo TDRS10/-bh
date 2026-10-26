@@ -832,8 +832,26 @@ class BHApp {
     else this.showToast('✅ الموقع سليم — التقرير جاهز', 'success');
   }
 
-  copyAuditReport() {
-    const a = this._lastAudit;
+  // 🍽️ زرار الطلبات — يفتح تطبيق تلبات رايدر لو متسطب، وإلا المتجر
+  openTalabat() {
+    const PLAY = 'https://play.google.com/store/apps/details?id=com.logistics.rider.talabat';
+    const APPSTORE = 'https://apps.apple.com/app/talabat-rider/id1610333074';
+    try {
+      if (/Android/i.test(navigator.userAgent)) {
+        // intent: يفتح التطبيق لو متسطب - وإلا Chrome بيروح للمتجر (browser_fallback_url)
+        const fb = encodeURIComponent(PLAY);
+        location.href = 'intent://launch/#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.logistics.rider.talabat;S.browser_fallback_url=' + fb + ';end';
+      } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        window.location.href = APPSTORE;
+      } else {
+        window.open(PLAY, '_blank');
+      }
+    } catch (e) {
+      window.open(PLAY, '_blank');
+    }
+  }
+
+  copyAuditReport() {    const a = this._lastAudit;
     if (!a) return;
     const LBL = { fail: '❌', warn: '⚠️', ok: '✅', info: 'ℹ️' };
     let txt = '🧪 تقرير فحص شامل — BH\n' + a.stamp + '\n';

@@ -1449,12 +1449,17 @@ select.form-control option {
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  width: 16.66%;
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
   cursor: pointer;
   transition: var(--trans-fast);
   border-top: 2px solid transparent;
 }
+
+/* زرار المُطلق (طلابات تلبات) — لمسة مميزة */
+.nav-item.nav-launch .nav-icon { filter: drop-shadow(0 0 6px rgba(0, 217, 255, 0.35)); }
+.nav-item.nav-launch:active { transform: scale(.9); }
 
 .nav-icon { font-size: 1.1rem; }
 
