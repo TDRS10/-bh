@@ -836,19 +836,37 @@ class BHApp {
   openTalabat() {
     const PLAY = 'https://play.google.com/store/apps/details?id=com.logistics.rider.talabat';
     const APPSTORE = 'https://apps.apple.com/app/talabat-rider/id1610333074';
-    try {
-      if (/Android/i.test(navigator.userAgent)) {
-        // intent: يفتح التطبيق لو متسطب - وإلا Chrome بيروح للمتجر (browser_fallback_url)
-        const fb = encodeURIComponent(PLAY);
-        location.href = 'intent://launch/#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.logistics.rider.talabat;S.browser_fallback_url=' + fb + ';end';
-      } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        window.location.href = APPSTORE;
-      } else {
-        window.open(PLAY, '_blank');
-      }
-    } catch (e) {
-      window.open(PLAY, '_blank');
-    }
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isAndroid && !isIOS) { window.open(PLAY, '_blank'); return; }
+
+    // Chrome بيرفض أنوية MAIN/LAUNCHER من المتصفح → عشان كده كانت بتروح المتجر علطول.
+    // الصح: deep link بـ scheme + intent مُقيّد بالباكدج (مع fallback آمن للمتجر).
+    const PKG = 'com.logistics.rider.talabat';
+    const fbPlay = ';S.browser_fallback_url=' + encodeURIComponent(PLAY) + ';end';
+    const links = isAndroid
+      ? [
+          'talabat-rider://',                                                                      // السكيوم الأشهر المتوقع
+          'talabatrider://',                                                                       // بديل مضمون التسمية
+          'intent://rider/#Intent;scheme=talabat-rider;package=' + PKG + fbPlay,                    // مُقيّد للتطبيق + فولباك تلقائي
+          'intent://rider/#Intent;scheme=talabatrider;package=' + PKG + fbPlay
+        ]
+      : ['talabat-rider://', 'talabatrider://'];
+
+    let idx = 0, opened = false;
+    // لو الصفحة هربت من النظر (الطبيق فتح) → نوقف أي محاولة تانية فورًا
+    document.addEventListener('visibilitychange', function vis() {
+      if (document.visibilityState === 'hidden') { opened = true; document.removeEventListener('visibilitychange', vis); }
+    });
+    const goStore = () => { window.location.href = isIOS ? APPSTORE : PLAY; };
+    const attempt = () => {
+      if (opened) return;                                             // التطبيق فعلًا مفتوح
+      if (idx >= links.length) { opened = true; goStore(); return; }   // ولا لينك نفع → المتجر
+      const href = links[idx++];
+      try { window.location.href = href; } catch (e) { attempt(); return; }
+      setTimeout(attempt, 750);                                       // ما فتحش؟ نجرب اللي بعده
+    };
+    attempt();
   }
 
   copyAuditReport() {    const a = this._lastAudit;
