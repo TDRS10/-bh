@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#00D9FF">
-  <meta name="description" content="تطبيق BH - إدارة القبض والمصاريف لسائقي وفرسان الدليفري">
-  <title>BH - إدارة الفلوس والقبض</title>
+  <meta name="description" content="تطبيق بوني - إدارة القبض والمصاريف لسائقي وفرسان الدليفري">
+  <title>بوني - إدارة الفلوس والقبض</title>
   
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
@@ -51,7 +51,7 @@
     <!-- Top App Header -->
     <header class="app-header">
       <div class="brand">
-        <img src="assets/logo.jpg" alt="BH Logo" class="brand-icon-img">
+        <img src="assets/logo.jpg" alt="شعار بوني" class="brand-icon-img">
         <div class="brand-text">
           <div class="brand-title"><span>B</span>H</div>
           <div class="brand-sub">إدارة الفلوس</div>
@@ -482,7 +482,7 @@
         <div class="share-hint">
           <span class="share-hint-icon">📤</span>
           <span>
-            <strong>سجّل من أي تطبيق:</strong> من واتساب أو أي تطبيق، اختار <strong>مشاركة → BH</strong>
+            <strong>سجّل من أي تطبيق:</strong> من واتساب أو أي تطبيق، اختار <strong>مشاركة → بوني</strong>
             واكتب "<strong>50 بنزين</strong>" والتطبيق هيقرأ المبلغ والتصنيف لوحده.
           </span>
         </div>
@@ -1154,7 +1154,7 @@
 
       function loadNext(cdnIdx) {
         if (loaded >= FILES.length) {
-          console.warn('[BH] Firebase SDK unavailable — cloud sync disabled, app works normally');
+          console.warn('[بوني] Firebase SDK unavailable — cloud sync disabled, app works normally');
           return;
         }
         var s = document.createElement('script');
@@ -1167,7 +1167,7 @@
         s.onerror = function () {
           s.remove();
           if (cdnIdx + 1 >= CDNS.length) {
-            console.warn('[BH] Firebase SDK could not be loaded from any CDN');
+            console.warn('[بوني] Firebase SDK could not be loaded from any CDN');
             return;
           }
           loadNext(cdnIdx + 1);

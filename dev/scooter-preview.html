@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>BH — معاينة شكل الموتوسكل (أشكال جديدة)</title>
+<style>
+  html, body { margin:0; padding:0; background:#05080e; color:#e6f0fa;
+               font-family:"Segoe UI", Tahoma, sans-serif; }
+  h1 { font-size:22px; text-align:center; color:#00D9FF; margin:26px 0 6px; }
+  p.sub { text-align:center; color:#8aa0b5; font-size:14px; margin:0 0 22px; }
+  .grid { display:flex; flex-wrap:wrap; gap:18px; justify-content:center; padding:0 18px 40px; }
+  .card { background:#0b1119; border:1px solid rgba(0,217,255,.25); border-radius:18px;
+          padding:14px; text-align:center; }
+  .card h2 { font-size:16px; margin:6px 0 4px; color:#fff; }
+  .card small { color:#7f96ab; font-size:12px; display:block; margin-bottom:6px; }
+  canvas { display:block; background:#05080e; border-radius:12px; }
+  .tag { display:inline-block; background:rgba(0,217,255,.12); border:1px solid rgba(0,217,255,.4);
+         color:#00D9FF; font-size:12px; padding:3px 10px; border-radius:99px; margin-top:8px; }
+</style>
+</head>
+<body>
+<h1>🛵 الموتوسكل — أشكال جديدة</h1>
+<p class="sub">تلات تصميمات مختلفة تمامًا — أي واحد تعجبك هو اللي هيوصلك في الفيديو</p>
+<div class="grid" id="grid"></div>
+
+<script>
+"use strict";
+const CY = '#00D9FF';
+
+function ground(x){
+  const g = x.createRadialGradient(0, 44, 2, 0, 44, 70);
+  g.addColorStop(0, 'rgba(0, 217, 255, .35)');
+  g.addColorStop(1, 'rgba(0, 217, 255, 0)');
+  x.fillStyle = g;
+  x.beginPath(); x.ellipse(0, 46, 74, 12, 0, 0, 7); x.fill();
+  x.strokeStyle = 'rgba(0, 217, 255, .45)'; x.lineWidth = 4;
+  x.beginPath(); x.moveTo(-90, 44); x.lineTo(90, 44); x.stroke();
+}
+function wheels(x, fx, rx, y, r){
+  [[fx, r], [rx, r]].forEach(function(w){
+    x.fillStyle = '#0a0f16';
+    x.beginPath(); x.arc(w[0], y, w[1], 0, 7); x.fill();
+    x.strokeStyle = CY; x.lineWidth = 6;
+    x.beginPath(); x.arc(w[0], y, w[1] - 3, 0, 7); x.stroke();
+    x.beginPath(); x.arc(w[0], y, w[1] - 13, 0, 7); x.fillStyle = 'rgba(0,217,255,.22)'; x.fill();
+    x.fillStyle = CY;
+    x.beginPath(); x.arc(w[0], y, 6, 0, 7); x.fill();
+  });
+}
+function noShadow(x){ x.shadowBlur = 0; x.shadowColor = 'transparent'; }
+
+// ─── D: سكوتر كلاسيك (فيسبا) — درع أمامي منحني + مقصورة ───
+function scooterD(x, size){
+  x.save(); x.scale(size / 100, size / 100);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  ground(x);
+  x.shadowColor = CY; x.shadowBlur = 18;
+  // الدرع الأمامي المنحني (توقيع الفيسبا)
+  x.fillStyle = 'rgba(0,217,255,.28)'; x.strokeStyle = CY; x.lineWidth = 7;
+  x.beginPath();
+  x.moveTo(-50, 12);
+  x.quadraticCurveTo(-56, -20, -40, -46);
+  x.quadraticCurveTo(-32, -56, -24, -52);
+  x.lineTo(-22, -34);
+  x.quadraticCurveTo(-32, -10, -30, 12);
+  x.closePath(); x.fill(); x.stroke();
+  // المقصورة (الرِّجل)
+  x.fillStyle = CY;
+  x.beginPath(); x.roundRect(-30, 8, 62, 13, 6); x.fill();
+  // جسم الخلف المنحني
+  x.fillStyle = 'rgba(0,217,255,.28)'; x.strokeStyle = CY; x.lineWidth = 7;
+  x.beginPath();
+  x.moveTo(26, 10);
+  x.lineTo(54, 10);
+  x.quadraticCurveTo(76, 6, 74, -22);
+  x.quadraticCurveTo(72, -46, 50, -48);
+  x.lineTo(26, -44);
+  x.quadraticCurveTo(18, -18, 26, 10);
+  x.closePath(); x.fill(); x.stroke();
+  // المقعد
+  noShadow(x); x.fillStyle = CY;
+  x.beginPath(); x.roundRect(22, -58, 50, 13, 6); x.fill();
+  // المقود
+  x.shadowColor = CY; x.shadowBlur = 16; x.strokeStyle = CY; x.lineWidth = 8;
+  x.beginPath(); x.moveTo(-40, -58); x.lineTo(-16, -54); x.stroke();
+  // الكشاف
+  x.fillStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 14;
+  x.beginPath(); x.arc(-36, -40, 9, 0, 7); x.fill();
+  noShadow(x);
+  wheels(x, -52, 56, 16, 24);
+  x.restore();
+}
+
+// ─── E: موتوسيكل توصيل — خزان صغير + مقعد مسطّح + صندوق على رف ورا ───
+function scooterE(x, size){
+  x.save(); x.scale(size / 100, size / 100);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  ground(x);
+  x.shadowColor = CY; x.shadowBlur = 18;
+  x.strokeStyle = CY;
+  // الشوكة الأمامية (عمود المقود)
+  x.lineWidth = 7;
+  x.beginPath(); x.moveTo(-56, 18); x.lineTo(-38, -30); x.stroke();
+  // المقود
+  x.lineWidth = 8;
+  x.beginPath(); x.moveTo(-52, -38); x.lineTo(-28, -34); x.stroke();
+  // الكشاف
+  x.fillStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 14;
+  x.beginPath(); x.arc(-46, -22, 9, 0, 7); x.fill();
+  noShadow(x); x.shadowColor = CY;
+  // الخزان الصغير
+  x.fillStyle = 'rgba(0,217,255,.3)'; x.strokeStyle = CY; x.lineWidth = 6;
+  x.beginPath();
+  x.moveTo(-36, -34);
+  x.quadraticCurveTo(-32, -50, -12, -50);
+  x.quadraticCurveTo(4, -50, 6, -36);
+  x.closePath(); x.fill(); x.stroke();
+  // الشاسيه للمقعد
+  x.strokeStyle = CY; x.lineWidth = 8;
+  x.beginPath(); x.moveTo(-6, -36); x.lineTo(48, -38); x.stroke();
+  // المحرك
+  noShadow(x); x.fillStyle = CY;
+  x.beginPath(); x.roundRect(-14, -16, 30, 22, 6); x.fill();
+  // الذراع الخلفي
+  x.shadowColor = CY; x.shadowBlur = 14; x.strokeStyle = CY; x.lineWidth = 7;
+  x.beginPath(); x.moveTo(54, 18); x.lineTo(10, 4); x.stroke();
+  // العوادم
+  x.lineWidth = 6;
+  x.beginPath(); x.moveTo(-4, 6); x.quadraticCurveTo(30, 12, 52, 2); x.stroke();
+  // المقعد المسطّح الطويل
+  noShadow(x); x.fillStyle = CY;
+  x.beginPath(); x.roundRect(4, -48, 58, 12, 6); x.fill();
+  // رف الصندوق
+  x.shadowColor = CY; x.shadowBlur = 12; x.strokeStyle = CY; x.lineWidth = 5;
+  x.beginPath(); x.moveTo(48, -40); x.lineTo(72, -46); x.stroke();
+  noShadow(x);
+  // صندوق التوصيل
+  x.fillStyle = CY;
+  x.beginPath(); x.roundRect(56, -90, 50, 44, 10); x.fill();
+  x.strokeStyle = 'rgba(4,18,26,.85)'; x.lineWidth = 4;
+  x.beginPath(); x.roundRect(66, -80, 30, 24, 6); x.stroke();
+  wheels(x, -56, 54, 18, 24);
+  x.restore();
+}
+
+// ─── F: موتوسيكل سبورت — فريم مكشوف + ذيل حاد ───
+function scooterF(x, size){
+  x.save(); x.scale(size / 100, size / 100);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  ground(x);
+  x.shadowColor = CY; x.shadowBlur = 18;
+  // الفريم الأمامي (زاوي)
+  x.fillStyle = 'rgba(0,217,255,.3)'; x.strokeStyle = CY; x.lineWidth = 6;
+  x.beginPath();
+  x.moveTo(-58, 14); x.lineTo(-52, -32);
+  x.quadraticCurveTo(-46, -56, -24, -58);
+  x.lineTo(-14, -42); x.lineTo(-20, -14); x.lineTo(-36, 14);
+  x.closePath(); x.fill(); x.stroke();
+  // الشاسيه
+  x.strokeStyle = CY; x.lineWidth = 9;
+  x.beginPath(); x.moveTo(-20, -42); x.lineTo(30, -44); x.stroke();
+  // الذيل الحاد
+  x.fillStyle = 'rgba(0,217,255,.3)'; x.lineWidth = 6;
+  x.beginPath();
+  x.moveTo(28, -40); x.lineTo(68, -54); x.lineTo(72, -42); x.lineTo(34, -28);
+  x.closePath(); x.fill(); x.stroke();
+  // المحرك
+  noShadow(x); x.fillStyle = CY;
+  x.beginPath(); x.roundRect(-6, -18, 32, 22, 6); x.fill();
+  // المقعد
+  x.beginPath(); x.roundRect(16, -42, 36, 11, 5); x.fill();
+  // الشوكة
+  x.shadowColor = CY; x.shadowBlur = 14; x.strokeStyle = CY; x.lineWidth = 8;
+  x.beginPath(); x.moveTo(-54, 16); x.lineTo(-32, -40); x.stroke();
+  // الذراع الخلفي
+  x.lineWidth = 7;
+  x.beginPath(); x.moveTo(54, 16); x.lineTo(12, 4); x.stroke();
+  // العوادم
+  x.lineWidth = 6;
+  x.beginPath(); x.moveTo(2, 6); x.quadraticCurveTo(36, 12, 58, 0); x.stroke();
+  // المقود المنخفض
+  x.lineWidth = 7;
+  x.beginPath(); x.moveTo(-38, -50); x.lineTo(-20, -46); x.stroke();
+  // الكشاف
+  x.fillStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 12;
+  x.beginPath(); x.arc(-50, -42, 8, 0, 7); x.fill();
+  noShadow(x);
+  wheels(x, -54, 54, 16, 24);
+  x.restore();
+}
+
+function draw(fn, size){
+  const c = document.createElement('canvas');
+  c.width = size * 2.7; c.height = size * 1.6;
+  c.style.width = (c.width / 2) + 'px'; c.style.height = (c.height / 2) + 'px';
+  const x = c.getContext('2d');
+  x.translate(c.width / 2, c.height / 2 + size * 0.16);
+  fn(x, size);
+  return c;
+}
+function card(title, note, fn, size, tag){
+  const d = document.createElement('div'); d.className = 'card';
+  const h = document.createElement('h2'); h.textContent = title; d.appendChild(h);
+  const s = document.createElement('small'); s.textContent = note; d.appendChild(s);
+  d.appendChild(draw(fn, size));
+  const t = document.createElement('span'); t.className = 'tag'; t.textContent = tag; d.appendChild(t);
+  document.getElementById('grid').appendChild(d);
+}
+
+card('D — سكوتر كلاسيك (فيسبا)', 'درع أمامي منحني + مقصورة — شكل السكوتر الأصلي', scooterD, 160, 'سكوتر');
+card('E — موتوسيكل توصيل', 'خزان + محرك + عوادم + صندوق التوصيل ورا — أقرب لشكل شغلك', scooterE, 160, 'توصيل');
+card('F — موتوسيكل سبورت', 'فريم مكشوف + ذيل حاد — إحساس سرعة', scooterF, 160, 'سبورت');
+card('E بمقاس صغير (زي في الفيديو)', 'ده مقاسه الفعلي جوه الفيديو', scooterE, 80, 'حجم صغير الفيديو');
+card('D بمقاس صغير', 'مقاس الفيديو', scooterD, 80, 'حجم صغير');
+card('F بمقاس صغير', 'مقاس الفيديو', scooterF, 80, 'حجم صغير');
+</script>
+</body>
+</html>

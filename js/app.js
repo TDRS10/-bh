@@ -1,5 +1,5 @@
 /**
- * BH Personal Finance Application - Core Logic
+ * بوني (Boni) Personal Finance Application - Core Logic
  * Tailored for Delivery Riders with Variable Income
  */
 
@@ -835,7 +835,7 @@ class BHApp {
   copyAuditReport() {    const a = this._lastAudit;
     if (!a) return;
     const LBL = { fail: '❌', warn: '⚠️', ok: '✅', info: 'ℹ️' };
-    let txt = '🧪 تقرير فحص شامل — BH\n' + a.stamp + '\n';
+    let txt = '🧪 تقرير فحص شامل — بوني\n' + a.stamp + '\n';
     txt += 'النتيجة: ✅ ' + a.sOk + ' • ⚠️ ' + a.sWarn + ' • ❌ ' + a.sFail + '\n\n';
     a.secs.forEach(cat => {
       const rows = (a.checks || []).filter(c => c.cat === cat);
@@ -4106,7 +4106,7 @@ class BHApp {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  SHARE TARGET  (شارك → BH)
+  //  SHARE TARGET  (شارك → بوني)
   //  Parse shared text like "50 بنزين" into an expense
   // ═══════════════════════════════════════════════════════════
 
@@ -4691,7 +4691,7 @@ class BHApp {
     el.innerHTML = `
       <div class="modal-container welcome-box">
         <div class="welcome-logo">💰</div>
-        <h2 class="welcome-title">أهلاً بيك في BH 👋</h2>
+        <h2 class="welcome-title">أهلاً بيك في بوني 👋</h2>
         <p class="welcome-sub">
           سجّل دخول بـ Google مرة واحدة، وم بعدها<b> بياناتك هتتنزّل على السحابة</b> وتتفتح من أي جهاز — ومن غير ما تضيع أبداً.
         </p>
@@ -4939,7 +4939,7 @@ class BHApp {
     // ☀️ لو مفيش تنبيهات مهمة — رسالة تشجيع الصبح بتاعة ساعية الذروة
     const pep = top ? null : this.morningPushMsg();
     const title = top ? top.title : (pep ? pep.t : 'صباح الفلوس ☀️');
-    const body = top ? top.body : (pep ? pep.b : 'افتح BH وشوف رصيدك ووردية امبارح.');
+    const body = top ? top.body : (pep ? pep.b : 'افتح بوني وشوف رصيدك ووردية امبارح.');
 
     try {
       navigator.serviceWorker.controller.postMessage({
@@ -5065,7 +5065,7 @@ class BHApp {
   // Fire a test notification right now
   async testSmartNotification() {
     const alerts = this.getSmartAlerts();
-    const title = alerts.length ? alerts[0].title : '🔔 تنبيه تجريبي من BH';
+    const title = alerts.length ? alerts[0].title : '🔔 تنبيه تجريبي من بوني';
     const body = alerts.length ? alerts[0].body : 'ده إشعار تجريبي — التنبيهات شغالة تمام!';
 
     // In-app toast (always works)
@@ -5095,10 +5095,10 @@ class BHApp {
   // Share the app (Web Share API, with a copy-link fallback)
   async shareApp() {
     const url = window.location.origin + window.location.pathname;
-    const text = 'BH — تطبيق إدارة القبض والمصاريف لفرسان الدليفري. جرّبه من هنا:';
+    const text = 'بوني — تطبيق إدارة القبض والمصاريف لفرسان الدليفري. جرّبه من هنا:';
 
     if (navigator.share) {
-      try { await navigator.share({ title: 'BH — إدارة الفلوس', text: text, url: url }); } catch (e) { /* cancelled */ }
+      try { await navigator.share({ title: 'بوني — إدارة الفلوس', text: text, url: url }); } catch (e) { /* cancelled */ }
       return;
     }
     // Fallback: copy the link
@@ -5155,7 +5155,7 @@ class BHApp {
       if (permission === 'granted') {
         this.showToast('🎉 تم تفعيل إشعارات التحديث بنجاح!', 'success');
         try {
-          new Notification('🔔 تطبيق BH', {
+          new Notification('🔔 تطبيق بوني', {
             body: 'تم تفعيل إشعارات التحديثات بنجاح!',
             icon: 'assets/icon-192.png'
           });
@@ -5235,7 +5235,7 @@ class BHApp {
           if (this._lastNotifiedSHA !== latestSHA) {
             this._lastNotifiedSHA = latestSHA;
             try {
-              var notif = new Notification('🆕 تحديث جديد متاح لتطبيق BH', {
+              var notif = new Notification('🆕 تحديث جديد متاح لتطبيق بوني', {
                 body: commitMsg,
                 icon: 'assets/icon-192.png',
                 tag: 'bh-update-' + latestSHA

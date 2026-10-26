@@ -54,7 +54,7 @@ function emoji(str, sx, sy, size, opts){
   text(str, sx, sy, size, '#fff', Object.assign({ font: '"Segoe UI Emoji", "Segoe UI", sans-serif' }, opts));
 }
 
-// ─── 🛵 السكوتر الفكتور السماوي (بدل emoji الأحمر) ───
+// ─── 🛵 موتوسيكل التوصيل (شكل E المختار — خزان + محرك + عوادم + صندوق) ───
 function drawScooter(cx, cy, s, tilt){
   x.save();
   x.translate(cx, cy);
@@ -62,37 +62,67 @@ function drawScooter(cx, cy, s, tilt){
   x.scale(s / 100, s / 100);
   x.lineCap = 'round';
   x.lineJoin = 'round';
-  x.shadowColor = CY; x.shadowBlur = 26;
-  x.strokeStyle = CY; x.lineWidth = 13;
-  x.beginPath();
-  x.moveTo(-52, -6);
-  x.quadraticCurveTo(-66, -26, -38, -34);
-  x.lineTo(2, -40);
-  x.quadraticCurveTo(30, -44, 36, -72);
-  x.stroke();
-  x.beginPath();
-  x.moveTo(-62, -4);
-  x.lineTo(-38, -28);
-  x.lineTo(-20, -22);
-  x.lineTo(-40, 6);
-  x.closePath();
-  x.fillStyle = CY; x.fill();
-  x.beginPath(); x.arc(40, -66, 7, 0, 7); x.fillStyle = '#fff'; x.fill();
-  noShadow();
-  x.fillStyle = CY;
-  roundRect(-90, -46, 40, 38, 9); x.fill();
-  x.fillStyle = '#0a0f16';
-  x.lineWidth = 6; x.strokeStyle = CY;
-  [[54, 8, 25], [-54, 8, 25]].forEach(function(w){
-    x.beginPath(); x.arc(w[0], w[1], w[2], 0, 7); x.stroke();
-    x.beginPath(); x.arc(w[0], w[1], w[2] - 8, 0, 7); x.fillStyle = 'rgba(0,217,255,.22)'; x.fill();
-    x.fillStyle = '#0a0f16';
-  });
-  const gg = x.createRadialGradient(0, 36, 2, 0, 36, 46);
-  gg.addColorStop(0, 'rgba(0, 217, 255, .45)');
+  // هالة الطريق
+  const gg = x.createRadialGradient(0, 44, 2, 0, 44, 70);
+  gg.addColorStop(0, 'rgba(0, 217, 255, .35)');
   gg.addColorStop(1, 'rgba(0, 217, 255, 0)');
   x.fillStyle = gg;
-  x.beginPath(); x.ellipse(0, 40, 46, 10, 0, 0, 7); x.fill();
+  x.beginPath(); x.ellipse(0, 46, 74, 12, 0, 0, 7); x.fill();
+  x.strokeStyle = 'rgba(0, 217, 255, .45)'; x.lineWidth = 4;
+  x.beginPath(); x.moveTo(-90, 44); x.lineTo(90, 44); x.stroke();
+  x.shadowColor = CY; x.shadowBlur = 18;
+  x.strokeStyle = CY;
+  // الشوكة الأمامية
+  x.lineWidth = 7;
+  x.beginPath(); x.moveTo(-56, 18); x.lineTo(-38, -30); x.stroke();
+  // المقود
+  x.lineWidth = 8;
+  x.beginPath(); x.moveTo(-52, -38); x.lineTo(-28, -34); x.stroke();
+  // الكشاف
+  x.fillStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 14;
+  x.beginPath(); x.arc(-46, -22, 9, 0, 7); x.fill();
+  x.shadowColor = CY; x.shadowBlur = 18;
+  // الخزان الصغير
+  x.fillStyle = 'rgba(0,217,255,.3)'; x.strokeStyle = CY; x.lineWidth = 6;
+  x.beginPath();
+  x.moveTo(-36, -34);
+  x.quadraticCurveTo(-32, -50, -12, -50);
+  x.quadraticCurveTo(4, -50, 6, -36);
+  x.closePath(); x.fill(); x.stroke();
+  // الشاسيه للمقعد
+  x.strokeStyle = CY; x.lineWidth = 8;
+  x.beginPath(); x.moveTo(-6, -36); x.lineTo(48, -38); x.stroke();
+  // المحرك
+  noShadow(); x.fillStyle = CY;
+  roundRect(-14, -16, 30, 22, 6); x.fill();
+  // الذراع الخلفي
+  x.shadowColor = CY; x.shadowBlur = 14; x.strokeStyle = CY; x.lineWidth = 7;
+  x.beginPath(); x.moveTo(54, 18); x.lineTo(10, 4); x.stroke();
+  // العوادم
+  x.lineWidth = 6;
+  x.beginPath(); x.moveTo(-4, 6); x.quadraticCurveTo(30, 12, 52, 2); x.stroke();
+  // المقعد المسطّح الطويل
+  noShadow(); x.fillStyle = CY;
+  roundRect(4, -48, 58, 12, 6); x.fill();
+  // رف الصندوق
+  x.shadowColor = CY; x.shadowBlur = 12; x.strokeStyle = CY; x.lineWidth = 5;
+  x.beginPath(); x.moveTo(48, -40); x.lineTo(72, -46); x.stroke();
+  noShadow();
+  // صندوق التوصيل
+  x.fillStyle = CY;
+  roundRect(56, -90, 50, 44, 10); x.fill();
+  x.strokeStyle = 'rgba(4,18,26,.85)'; x.lineWidth = 4;
+  x.beginPath(); x.roundRect(66, -80, 30, 24, 6); x.stroke();
+  // العجلتين
+  [[-56, 18, 24], [54, 18, 24]].forEach(function(w){
+    x.fillStyle = '#0a0f16';
+    x.beginPath(); x.arc(w[0], w[1], w[2], 0, 7); x.fill();
+    x.strokeStyle = CY; x.lineWidth = 6;
+    x.beginPath(); x.arc(w[0], w[1], w[2] - 3, 0, 7); x.stroke();
+    x.beginPath(); x.arc(w[0], w[1], w[2] - 13, 0, 7); x.fillStyle = 'rgba(0,217,255,.22)'; x.fill();
+    x.fillStyle = CY;
+    x.beginPath(); x.arc(w[0], w[1], 6, 0, 7); x.fill();
+  });
   x.restore();
 }
 
@@ -281,7 +311,7 @@ function scene2(t){
   x.translate(W / 2, 850 + Math.sin(t * 5) * 3);
   x.scale(sc, sc);
   emoji('💰', 0, -282, 96 + 7 * be, { glow: '#ffce4d', blur: 30 });
-  text('BH', 0, -52, 268, '#ffffff', { weight: 800, glow: CY, blur: 52 });
+  text('بوني', 0, -52, 200, '#ffffff', { weight: 800, glow: CY, blur: 52 });
   x.restore();
   const p2 = live(t, 1.32, 0.35);
   if (p2 > 0){

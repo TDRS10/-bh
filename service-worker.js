@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v36';
+const CACHE_NAME = 'bh-finance-v37';
 const ASSETS = [
   './',
   './index.html',
@@ -141,10 +141,10 @@ async function scheduleSmartAlert(timestamp, title, body, tag) {
   try {
     if (typeof TimestampTrigger !== 'undefined') {
       options.showTrigger = new TimestampTrigger(timestamp);
-      await self.registration.showNotification(title || 'BH', options);
+      await self.registration.showNotification(title || 'بوني', options);
     } else {
       // Fallback: show it now if we can't schedule (still useful info)
-      await self.registration.showNotification(title || 'BH', options);
+      await self.registration.showNotification(title || 'بوني', options);
     }
   } catch (err) {
     console.warn('[SW] Could not schedule smart alert:', err);
@@ -170,10 +170,10 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch (e) {
-    payload = { title: 'BH', body: event.data ? event.data.text() : 'لديك إشعار جديد' };
+    payload = { title: 'بوني', body: event.data ? event.data.text() : 'لديك إشعار جديد' };
   }
 
-  const title = payload.title || 'BH';
+  const title = payload.title || 'بوني';
   const options = {
     body: payload.body || '',
     icon: payload.icon || './icon-192.png',

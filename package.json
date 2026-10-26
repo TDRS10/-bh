@@ -1,7 +1,7 @@
 {
   "name": "bh-finance",
   "version": "1.0.0",
-  "description": "BH — إدارة الفلوس والقبض لفرسان الدليفري (PWA)",
+  "description": "بوني — إدارة الفلوس والقبض لفرسان الدليفري (PWA)",
   "private": true,
   "scripts": {
     "start": "python -m http.server 8899"

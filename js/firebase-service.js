@@ -1,5 +1,5 @@
 /* ============================================================
-   BH — Firebase Service Layer
+   بوني — Firebase Service Layer
    --------------------------------------------------------
    Responsibilities:
    • init Firebase (if configured)
