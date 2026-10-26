@@ -1171,6 +1171,17 @@
   <script>
     // Register Service Worker for Offline PWA
     if ('serviceWorker' in navigator) {
+      // ⚠️ مضاد "الكود القديم": أول ما سيرفس-ووركر جديد ياخد التحكم → reload مرة واحدة
+      // (بدل ما المستخدم يفضل شغال بالنسخة القديمة في الذاكرة ويقول "مش شغال")
+      let _bhHadController = !!navigator.serviceWorker.controller;
+      let _bhRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!_bhHadController) { _bhHadController = true; return; } // أول تشغيل على الجهاز — مش محتاجين reload
+        if (_bhRefreshing) return;
+        _bhRefreshing = true;
+        location.reload();
+      });
+
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
           .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
