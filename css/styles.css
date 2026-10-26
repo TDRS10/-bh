@@ -1534,6 +1534,50 @@ select.form-control option {
   .nav-icon { font-size: .95rem; }
 }
 
+/* ══ 🛵 بوني بيعدي على البار — السكوتر بينتقل بين التباس ══ */
+#navMascot {
+  position: absolute;
+  top: -17px;
+  left: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  transform: translateX(48px);           /* المكان بيتحدد من JS */
+  transition: transform .55s cubic-bezier(.34, 1.35, .36, 1);
+  pointer-events: none;
+  z-index: 60;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .55)) drop-shadow(0 0 9px rgba(0, 217, 255, .28));
+}
+#navMascot > span {
+  display: inline-block;
+  animation: navMascotHover 2.8s ease-in-out infinite;
+}
+@keyframes navMascotHover {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-3px) rotate(-2.5deg); }
+}
+/* هالة الطريق تحت العجلة */
+#navMascot::before {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(0, 217, 255, .5), transparent 70%);
+  filter: blur(1px);
+  transition: width .3s ease;
+}
+/* في ذروة الدروة → هالة أقوى وتنقل أسرع (إحساس الشغل) */
+#navMascot.ride-peak::before { width: 34px; background: radial-gradient(ellipse, rgba(0, 217, 255, .9), transparent 70%); }
+#navMascot.ride-peak > span { animation-duration: 1.1s; }
+@media (max-width: 360px) { #navMascot { font-size: 1.15rem; top: -15px; } }
+@media (prefers-reduced-motion: reduce) {
+  #navMascot { transition: none; }
+  #navMascot > span { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-item, .nav-item:active { transform: none; transition: none; }
   .nav-item.active::before { animation: none; }

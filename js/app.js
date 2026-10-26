@@ -1134,6 +1134,7 @@ class BHApp {
     this.initCloudSync();
     this.updateUserAvatar();
     this.initCardTilt();
+    this.initNavMascot();
     this.maybeShowWelcome();
     this.scheduleSmartNotification();
 
@@ -1287,6 +1288,11 @@ class BHApp {
       });
     }
 
+    const navActive = navEl || document.querySelector('.bottom-nav .nav-item.active');
+    if (navActive) this.moveNavMascot(navActive);
+    // رزة لمسة خفيفة عند تبديل التب
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* ignore */ } }
+
     this.currentTab = viewId;
     if (viewId === 'moreView') {
       this.renderReportChart();
@@ -1295,6 +1301,32 @@ class BHApp {
       this.renderWorkCalendar();
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // 🛵 السكوتر بيعدي على البار — بينتقل فوق التب النشط
+  moveNavMascot(navEl) {
+    const m = document.getElementById('navMascot');
+    if (!m || !navEl || !m.parentElement) return;
+    try {
+      const navRect = m.parentElement.getBoundingClientRect();
+      const r = navEl.getBoundingClientRect();
+      const x = (r.left + r.width / 2) - navRect.left;
+      m.style.transform = 'translateX(' + Math.max(6, x) + 'px)';
+    } catch (e) { /* ignore */ }
+  }
+
+  initNavMascot() {
+    const m = document.getElementById('navMascot');
+    if (!m) return;
+    try {
+      const act = document.querySelector('.bottom-nav .nav-item.active') || document.querySelector('.bottom-nav .nav-item');
+      if (act) this.moveNavMascot(act);
+      window.addEventListener('resize', () => {
+        try {
+          this.moveNavMascot(document.querySelector('.bottom-nav .nav-item.active'));
+        } catch (e) { /* ignore */ }
+      });
+    } catch (e) { /* ignore */ }
   }
 
   // Modal Controllers
@@ -2381,6 +2413,9 @@ class BHApp {
         <b class="peak-title">${esc(p.title)}</b>
         <small class="peak-txt">${esc(p.txt)}</small>
       </div>`;
+    // 🛵 إحساس الذروة على البار — توهج الطريق يج أقوى (ذروة حقيقية بس)
+    const m = document.getElementById('navMascot');
+    if (m) m.classList.toggle('ride-peak', p.cls === 'is-peak');
   }
 
   // رسايل إشعار الصبح — كل يوم تشجيع مختلف
