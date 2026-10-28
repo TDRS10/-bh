@@ -617,7 +617,8 @@ window.startRecEnc = function(){
     window.__encErr = null;
     window.__drawSlow = 0;
     const fps = 30;
-    const total = Math.round(DUR * fps);
+    const speed = window.__speed || 1;                 // <1 = أبطأ (رسم أصلي ناعم)
+    const total = Math.round((DUR / speed) * fps);
     const parts = [];
     const codecs = ['avc1.640029', 'avc1.640028', 'avc1.4d0028', 'avc1.420032'];
     let enc = null;
@@ -642,11 +643,11 @@ window.startRecEnc = function(){
       if (!enc){ window.__state = 'no-codec'; resolve(false); return; }
       const dur_us = Math.round(1e6 / fps);
       for (let k = 0; k < total; k++){
-        const t = k / fps;
+        const tv = k / fps;
         const t0d = performance.now();
-        draw(t);
+        draw(tv * speed);
         if (performance.now() - t0d > 40) window.__drawSlow++;
-        const vf = new VideoFrame(cv, { timestamp: Math.round(t * 1e6), duration: dur_us });
+        const vf = new VideoFrame(cv, { timestamp: Math.round(tv * 1e6), duration: dur_us });
         enc.encode(vf, { keyFrame: k % 30 === 0 });
         vf.close();
         let slept = 0;
