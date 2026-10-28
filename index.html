@@ -147,6 +147,9 @@
               <span class="sub-balance-val val-spendable"><span id="spendableBalanceVal">0</span> <small>ج.م</small></span>
             </div>
           </div>
+
+          <!-- 🔒 الخزنة المقفولة (وضع القسوة) — بيظهر تلقائيًا لما يكون فيه فلوس مقفولة -->
+          <div id="vaultLockedChip" style="display:none; margin-top:10px; padding:8px 10px; border-radius:10px; background:rgba(0,217,255,0.08); border:1px solid rgba(0,217,255,0.3); color:#00D9FF; font-size:0.82rem; font-weight:700; text-align:center;"></div>
         </div>
 
         <!-- كابسولة النهارده — عينك على الشغل -->
@@ -637,6 +640,43 @@
           <button class="btn btn-secondary btn-full btn-sm" onclick="app.saveRatios()">تحديث النسب</button>
         </div>
 
+        <!-- 🛡️ وضع القسوة — بوني الشرس -->
+        <div class="card" style="border-top: 2px solid #00D9FF;">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">👹</span> وضع القسوة — "بوني الشرس"</span>
+            <button class="btn btn-secondary btn-sm" onclick="app.toggleStrictMode()" id="strictToggleBtn">تفعيل 😈</button>
+          </div>
+          <p class="card-desc" style="margin-bottom:8px;">
+            أدوات تجبرك على التحويش من غير ما تحس: تقريب كل قبض، سقف صرف يومي، خزنة مقفولة، وغرامة على أي سحب.
+          </p>
+          <div id="strictVaultInfo" style="font-size:0.85rem; font-weight:700; color:#00D9FF; background:rgba(0,217,255,0.07); border:1px solid rgba(0,217,255,0.25); padding:9px 10px; border-radius:10px; margin-bottom:8px;"></div>
+          <div id="strictDailyInfo" style="font-size:0.85rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:9px 10px; border-radius:10px; margin-bottom:12px;"></div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            <div class="form-group">
+              <label class="form-label">🪙 تقريب القبض لأقرب (ج.م)</label>
+              <input type="number" id="strictRoundUp" class="form-control" value="50" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">💳 سقف الصرف اليومي (ج.م)</label>
+              <input type="number" id="strictDailyCap" class="form-control" value="300" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔒 قفل الخزنة (يوم)</label>
+              <select id="strictLockDays" class="form-control">
+                <option value="0">بدون قفل</option>
+                <option value="7">7 أيام</option>
+                <option value="15">15 يوم</option>
+                <option value="30">30 يوم</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">👹 غرامة السحب %</label>
+              <input type="number" id="strictPenalty" class="form-control" value="10" min="0" max="50">
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.saveStrictSettings()">حفظ إعدادات القسوة</button>
+        </div>
+
         <!-- Appearance Settings Card -->
         <div class="card">
           <div class="card-header">
@@ -887,6 +927,9 @@
           </div>
         </div>
 
+        <!-- 🪙 سطر التقريب الذكي (وضع القسوة) -->
+        <div id="celebRoundUpLine" style="display:none; margin-top:10px; padding:9px 10px; border-radius:10px; background:rgba(0,217,255,0.08); border:1px solid rgba(0,217,255,0.3); color:#00D9FF; font-size:0.86rem; font-weight:700;"></div>
+
         <button class="btn btn-savings btn-full" onclick="app.closeModal('incomeCelebrationModal')">
           تمام، أنا ماسك فلوسي 💪
         </button>
@@ -943,6 +986,8 @@
         أنت على وشك استخدام فلوس التحويش. هل أنت متأكد؟<br>
         <small style="font-weight: normal; color: var(--text-muted);">السحب من التحويش سيقوم بإعادة ضبط شريط الأيام التحفيزي (Streak).</small>
       </div>
+      <!-- 🛡️ تحذير وضع القسوة (بيتعبى تلقائيًا لو القسوة شغالة) -->
+      <div id="withdrawStrictInfo" style="display:none; background: rgba(0, 217, 255, 0.07); border: 1px solid rgba(0, 217, 255, 0.3); padding: 11px 12px; border-radius: var(--radius-md); color: #00D9FF; font-size: 0.85rem; font-weight: 700; margin-bottom: 14px; line-height: 1.6;"></div>
       <form id="withdrawSavingsForm" onsubmit="app.handleWithdrawSavings(event)">
         <div class="form-group">
           <label class="form-label">المبلغ السحوب من التحويش (ج.م)</label>

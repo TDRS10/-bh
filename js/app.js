@@ -44,7 +44,15 @@ class BHApp {
         bigNumbersMode: false,
         challenges: {},
         badges: {},
-        welcomeSeen: false
+        welcomeSeen: false,
+        // 😈 وضع القسوة — بوني يجبرك على التحويش
+        strict: {
+          enabled: false,
+          roundUpTo: 50,    // تقريب كل قبض لأقرب مضاعف (الفرق يتحوّش بصمت)
+          dailyCap: 300,    // سقف الصرف اليومي (0 = بدون سقف)
+          lockDays: 7,      // قفل الخزنة على التحويش الجديد (0 = بدون قفل)
+          penaltyPct: 10    // غرامة على أي سحب من التحويش (بتتحرق)
+        }
       },
       balances: {
         reservedSavings: 0,
@@ -86,6 +94,7 @@ class BHApp {
       merged.settings = { ...this.getDefaultData().settings, ...(parsed.settings || {}) };
       merged.settings.challenges = merged.settings.challenges || {};
       merged.settings.badges = merged.settings.badges || {};
+      merged.settings.strict = { ...this.getDefaultData().settings.strict, ...(parsed.settings && parsed.settings.strict) };
       return merged;
     } catch (e) {
       console.error('Error loading LocalStorage data', e);
@@ -1574,7 +1583,11 @@ class BHApp {
     const eRatio = this.data.settings.essentialsRatio / 100;
     const oRatio = this.data.settings.outingsRatio / 100;
 
-    const savingsAmt = Math.round(amount * sRatio);
+    // 🛡️ وضع القسوة: تقريب ذكي — الفرق بيروح للتحويش بصمت
+    const stStrict = this.getStrict();
+    const roundUp = this.roundUpExtra(amount);
+
+    const savingsAmt = Math.round(amount * sRatio) + roundUp;
     const essentialsAmt = Math.round(amount * eRatio);
     const outingsAmt = Math.round(amount * oRatio);
 
@@ -1589,6 +1602,10 @@ class BHApp {
       savingsAmt,
       essentialsAmt,
       outingsAmt,
+      roundUp,
+      ...(stStrict.enabled && stStrict.lockDays > 0
+        ? { lockedUntil: Date.now() + stStrict.lockDays * 86400000 }
+        : {}),
       date,
       source,
       notes
@@ -1604,6 +1621,11 @@ class BHApp {
     document.getElementById('celebOutingsRatio').textContent = this.data.settings.outingsRatio;
 
     document.getElementById('celebSavingsAmt').textContent = savingsAmt + ' ج.م';
+    const ruLine = document.getElementById('celebRoundUpLine');
+    if (ruLine) {
+      ruLine.style.display = roundUp > 0 ? '' : 'none';
+      if (roundUp > 0) ruLine.textContent = `🪙 التقريب الذكي ضاف ${roundUp} ج.م للتحويش — من غير ما تحس`;
+    }
     document.getElementById('celebEssentialsAmt').textContent = essentialsAmt + ' ج.م';
     document.getElementById('celebOutingsAmt').textContent = outingsAmt + ' ج.م';
 
@@ -1626,7 +1648,11 @@ class BHApp {
     const eRatio = this.data.settings.essentialsRatio / 100;
     const oRatio = this.data.settings.outingsRatio / 100;
 
-    const savingsAmt = Math.round(amount * sRatio);
+    // 🛡️ وضع القسوة: تقريب ذكي + قفل الخزنة
+    const stStrict = this.getStrict();
+    const roundUp = this.roundUpExtra(amount);
+
+    const savingsAmt = Math.round(amount * sRatio) + roundUp;
     const essentialsAmt = Math.round(amount * eRatio);
     const outingsAmt = Math.round(amount * oRatio);
 
@@ -1640,6 +1666,10 @@ class BHApp {
       savingsAmt,
       essentialsAmt,
       outingsAmt,
+      roundUp,
+      ...(stStrict.enabled && stStrict.lockDays > 0
+        ? { lockedUntil: Date.now() + stStrict.lockDays * 86400000 }
+        : {}),
       date: new Date().toISOString().split('T')[0],
       source: item.source,
       notes: item.notes ? `استلام قبض منتظر: ${item.notes}` : 'استلام قبض كان قيد الانتظار'
@@ -1655,6 +1685,11 @@ class BHApp {
     document.getElementById('celebOutingsRatio').textContent = this.data.settings.outingsRatio;
 
     document.getElementById('celebSavingsAmt').textContent = savingsAmt + ' ج.م';
+    const ruLine = document.getElementById('celebRoundUpLine');
+    if (ruLine) {
+      ruLine.style.display = roundUp > 0 ? '' : 'none';
+      if (roundUp > 0) ruLine.textContent = `🪙 التقريب الذكي ضاف ${roundUp} ج.م للتحويش — من غير ما تحس`;
+    }
     document.getElementById('celebEssentialsAmt').textContent = essentialsAmt + ' ج.م';
     document.getElementById('celebOutingsAmt').textContent = outingsAmt + ' ج.م';
 
@@ -1685,6 +1720,19 @@ class BHApp {
     if (isNaN(amount) || amount <= 0) {
       this.showToast('⚠️ يرجى إدخال مبلغ مصروف صحيح');
       return;
+    }
+
+    // 🛡️ وضع القسوة: سقف صرف يومي — مفيش بعده
+    const stStrict = this.getStrict();
+    if (stStrict.enabled && stStrict.dailyCap > 0) {
+      const spentToday = this.getSpentOn(date);
+      if (spentToday + amount > stStrict.dailyCap) {
+        const remaining = Math.max(0, stStrict.dailyCap - spentToday);
+        this.showToast(
+          `🚨 سقف اليوم خلص! صرفت ${spentToday.toLocaleString()} من ${stStrict.dailyCap.toLocaleString()} ج.م — فاضلك ${remaining.toLocaleString()} ج.م بس. أي حاجة أكتر بكرة تاني 👹`,
+          'error');
+        return;
+      }
     }
 
     if (amount > this.data.balances.spendableBalance) {
@@ -1793,10 +1841,39 @@ class BHApp {
       return;
     }
 
-    // Transfer from savings to spendable
+    // 🛡️ وضع القسوة: الخزنة المقفولة بتمنع السحب لحد ما الموعد يعدي
+    const stStrict = this.getStrict();
+    const unlocked = this.getUnlockedSavings();
+    if (amount > unlocked) {
+      const ts = this.earliestUnlockTs();
+      this.showToast(
+        `🔒 الخزنة مقفولة! متاح السحب منه ${unlocked.toLocaleString()} ج.م بس${ts ? ' — وأقرب فتح ' + this.fmtDay(ts) : ''}. صبر يا بطل 💪`,
+        'error');
+      return;
+    }
+
+    // 🛡️ وضع القسوة: غرامة السحب — بتتحرق من عندك عشان تفكّر تاني
+    const penalty = (stStrict.enabled && stStrict.penaltyPct > 0)
+      ? Math.round(amount * stStrict.penaltyPct / 100)
+      : 0;
+
+    // Transfer from savings to spendable (بالغرامة محسوبة)
     this.data.balances.reservedSavings -= amount;
-    this.data.balances.spendableBalance += amount;
+    this.data.balances.spendableBalance += (amount - penalty);
     this.touchBalances();
+
+    // تحرير المبلغ من القبض المقفول (الأقدم الأول) — للحساب الدقيق للخزنة
+    let toRelease = amount;
+    const nowTs = Date.now();
+    for (let i = (this.data.incomes || []).length - 1; i >= 0 && toRelease > 0; i--) {
+      const inc = this.data.incomes[i];
+      if (inc.lockedUntil && inc.lockedUntil > nowTs) continue;       // مقفول لسه
+      const free = (Number(inc.savingsAmt) || 0) - (Number(inc.savingsReleased) || 0);
+      if (free <= 0) continue;
+      const take = Math.min(free, toRelease);
+      inc.savingsReleased = (Number(inc.savingsReleased) || 0) + take;
+      toRelease -= take;
+    }
 
     // Reset Streak!
     this.data.settings.lastSavingsWithdrawalDate = new Date().toISOString().split('T')[0];
@@ -1806,7 +1883,7 @@ class BHApp {
       id: 'exp_' + Date.now(),
       amount: 0,
       category: 'سحب تحويش',
-      note: `سحب ${amount} ج.م من التحويش (سبب: ${reason})`,
+      note: `سحب ${amount} ج.م من التحويش${penalty ? ` + غرامة ${penalty} ج.م (${stStrict.penaltyPct}%) بتتحرق` : ''} (سبب: ${reason})`,
       date: new Date().toISOString().split('T')[0]
     });
 
@@ -1815,7 +1892,9 @@ class BHApp {
     this.updateStreakCount();
     this.renderAll();
 
-    this.showToast('⚠️ تم السحب من التحويش وتحويله للمتاح للصرف. تم إعادة ضبط أيام التماسك (Streak).');
+    this.showToast(penalty > 0
+      ? `⚠️ تم سحب ${amount.toLocaleString()} ج.م — وندفعت غرامة ${penalty.toLocaleString()} ج.م بتتحرق 👹 + السلسلة اترست`
+      : '⚠️ تم السحب من التحويش وتحويله للمتاح للصرف. تم إعادة ضبط أيام التماسك (Streak).', penalty > 0 ? 'error' : undefined);
     
     document.getElementById('withdrawAmount').value = '';
     document.getElementById('withdrawReason').value = '';
@@ -1938,6 +2017,19 @@ class BHApp {
     box.style.display = 'flex';
     const spendable = this.data.balances.spendableBalance;
     const outingsRemaining = Math.max(0, this.data.settings.weeklyOutingsBudget - this.getWeeklyOutingsSpent());
+
+    // 🛡️ وضع القسوة: السقف اليومي بيغلب أي حاجة
+    const stStrict = this.getStrict();
+    if (stStrict.enabled && stStrict.dailyCap > 0) {
+      const spent = this.getSpentOn(new Date().toISOString().split('T')[0]);
+      const rem = Math.max(0, stStrict.dailyCap - spent);
+      if (amt > rem) {
+        box.className = 'decision-card decision-red';
+        badge.textContent = '🚨 سقف اليوم خلص!';
+        text.textContent = `صرفت ${spent.toLocaleString()} من سقف ${stStrict.dailyCap.toLocaleString()} ج.م — فاضل ${rem.toLocaleString()} ج.م بس النهارده. أي حاجة أكتر بكرة تاني 👹`;
+        return;
+      }
+    }
 
     if (amt <= spendable && amt <= outingsRemaining) {
       box.className = 'decision-card decision-green';
@@ -2111,6 +2203,142 @@ class BHApp {
     this.data.settings.outingsRatio = o;
     this.saveData();
     this.showToast('✅ تم حفظ نسب تقسيم القبض بنجاح');
+  }
+
+  // ── 🛡️ وضع القسوة — بوني الشرس (Strict Savings Mode) ──────────
+  getStrict() {
+    const d = this.getDefaultData().settings.strict;
+    return { ...d, ...((this.data.settings && this.data.settings.strict) || {}) };
+  }
+
+  // تقريب ذكي: أي قبض يتقرب لأقرب مضاعف — الفرق بيتحوّش بصمت من غير ما تحس
+  roundUpExtra(amount) {
+    const st = this.getStrict();
+    const to = Number(st.roundUpTo) || 0;
+    if (!st.enabled || to <= 0 || !(amount > 0)) return 0;
+    const extra = Math.ceil(amount / to) * to - amount;
+    return extra === to ? 0 : extra;   // مبلغ مضاعف بالظبط = مفيش تقريب
+  }
+
+  // إجمالي التحويش المقفول في الخزنة دلوقتي (من القبض اللي لسه مقفول موعده)
+  getLockedNow(nowTs) {
+    const now = nowTs || Date.now();
+    let locked = 0;
+    (this.data.incomes || []).forEach(i => {
+      if (i.lockedUntil && i.lockedUntil > now) {
+        locked += Math.max(0, (Number(i.savingsAmt) || 0) - (Number(i.savingsReleased) || 0));
+      }
+    });
+    return Math.min(locked, Math.max(0, this.data.balances.reservedSavings || 0));
+  }
+
+  // المتاح للسحب من الخزنة (المحجوز - المقفول)
+  getUnlockedSavings() {
+    return Math.max(0, (this.data.balances.reservedSavings || 0) - this.getLockedNow());
+  }
+
+  // أقرب موعد فتح للخزنة (timestamp أو 0)
+  earliestUnlockTs() {
+    const now = Date.now();
+    let min = 0;
+    (this.data.incomes || []).forEach(i => {
+      if (i.lockedUntil && i.lockedUntil > now &&
+          (Number(i.savingsAmt) || 0) > (Number(i.savingsReleased) || 0)) {
+        if (!min || i.lockedUntil < min) min = i.lockedUntil;
+      }
+    });
+    return min;
+  }
+
+  fmtDay(ts) {
+    const d = new Date(ts);
+    return d.getDate() + '/' + (d.getMonth() + 1);
+  }
+
+  // إجمالي مصروفات يوم معيّن (للسقف اليومي)
+  getSpentOn(dateStr) {
+    return (this.data.expenses || []).reduce(
+      (n, e) => n + (e.date === dateStr ? (Number(e.amount) || 0) : 0), 0);
+  }
+
+  toggleStrictMode() {
+    const st = this.getStrict();
+    st.enabled = !st.enabled;
+    this.data.settings.strict = st;
+    this.saveData();
+    this.renderStrictSettings();
+    this.showToast(st.enabled
+      ? '😈 وضع القسوة اتفعّل — بوني مش هيسمحلك تسرق فلوسك بعد كده!'
+      : '😇 وضع القسوة اتقفل — رجعت زي الأول', st.enabled ? 'success' : 'info');
+  }
+
+  saveStrictSettings() {
+    const st = this.getStrict();
+    st.roundUpTo  = Math.max(0, parseFloat(document.getElementById('strictRoundUp').value) || 0);
+    st.dailyCap   = Math.max(0, parseFloat(document.getElementById('strictDailyCap').value) || 0);
+    st.lockDays   = Math.max(0, parseInt(document.getElementById('strictLockDays').value, 10) || 0);
+    st.penaltyPct = Math.min(50, Math.max(0, parseFloat(document.getElementById('strictPenalty').value) || 0));
+    this.data.settings.strict = st;
+    this.saveData();
+    this.renderStrictSettings();
+    this.showToast('🛡️ اتحفظت إعدادات وضع القسوة', 'success');
+  }
+
+  renderStrictSettings() {
+    const st = this.getStrict();
+
+    const setIfIdle = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && document.activeElement !== el) el.value = val;
+    };
+    setIfIdle('strictRoundUp', st.roundUpTo);
+    setIfIdle('strictDailyCap', st.dailyCap);
+    setIfIdle('strictLockDays', st.lockDays);
+    setIfIdle('strictPenalty', st.penaltyPct);
+
+    const btn = document.getElementById('strictToggleBtn');
+    if (btn) btn.textContent = st.enabled ? 'شغّال ✅ (إيقاف)' : 'تفعيل 😈';
+
+    // معلومة الخزنة + السقف اليومي داخل كارت الإعدادات
+    const vInfo = document.getElementById('strictVaultInfo');
+    if (vInfo) {
+      if (!st.enabled) {
+        vInfo.innerHTML = 'وضع القسوة مطفأ — فلوسك مرتاحة 😉';
+      } else {
+        const locked = this.getLockedNow();
+        const ts = this.earliestUnlockTs();
+        vInfo.innerHTML = locked > 0
+          ? `🔒 في الخزنة دلوقتي <strong>${locked.toLocaleString()} ج.م</strong> مقفولة${ts ? ' — أقرب فتح: ' + this.fmtDay(ts) : ''}`
+          : `✅ مفيش فلوس مقفولة — كل التحويش متاح للسحب بس بغرامة ${st.penaltyPct}% 👹`;
+      }
+    }
+
+    const dInfo = document.getElementById('strictDailyInfo');
+    if (dInfo) {
+      if (st.enabled && st.dailyCap > 0) {
+        const spent = this.getSpentOn(new Date().toISOString().split('T')[0]);
+        const rem = Math.max(0, st.dailyCap - spent);
+        dInfo.innerHTML = `💳 صرفت النهارده <strong>${spent.toLocaleString()} ج.م</strong> من سقف ${st.dailyCap.toLocaleString()} — فاضل ${rem.toLocaleString()} ج.م بس`;
+      } else {
+        dInfo.innerHTML = '💳 سقف الصرف اليومي مطفأ';
+      }
+    }
+
+    // تحذير داخل مودال السحب
+    const wInfo = document.getElementById('withdrawStrictInfo');
+    if (wInfo) {
+      if (st.enabled) {
+        const unlocked = this.getUnlockedSavings();
+        const locked = this.getLockedNow();
+        const ts = this.earliestUnlockTs();
+        wInfo.style.display = '';
+        wInfo.innerHTML = `👹 وضع القسوة شغّال: متاح السحب <strong>${unlocked.toLocaleString()} ج.م</strong>` +
+          (locked > 0 ? ` — و<strong>${locked.toLocaleString()} ج.م</strong> مقفولة لحد ${ts ? this.fmtDay(ts) : 'تاريخ لاحق'}` : '') +
+          ` • غرامة السحب ${st.penaltyPct}% بتتحرق من عندك`;
+      } else {
+        wInfo.style.display = 'none';
+      }
+    }
   }
 
   // Data Import/Reset  (export lives in downloadBackup)
@@ -2777,6 +3005,7 @@ class BHApp {
     this.renderAdjustHistory();
     this.renderSmartAlerts();
     this.renderSmartAlertSettings();
+    this.renderStrictSettings();
     this.renderWorkTracker();
   }
 
@@ -2919,6 +3148,20 @@ class BHApp {
 
     // Header balance chip — always visible on every tab
     this.animateNumber(document.getElementById('headerBalanceVal'), total);
+
+    // 🔒 شريحة الخزنة المقفولة (وضع القسوة)
+    const chip = document.getElementById('vaultLockedChip');
+    if (chip) {
+      const st = this.getStrict();
+      const locked = st.enabled ? this.getLockedNow() : 0;
+      if (locked > 0) {
+        const ts = this.earliestUnlockTs();
+        chip.style.display = '';
+        chip.textContent = `🔒 الخزنة مقفولة: ${locked.toLocaleString()} ج.م${ts ? ' — تتفتح ' + this.fmtDay(ts) : ''}`;
+      } else {
+        chip.style.display = 'none';
+      }
+    }
 
     // الخلفية الحية — لون الإضاءة حسب حالة الفلوس
     const mood = total <= 0 ? 'poor' : (spendable < 100 ? 'tight' : 'rich');
