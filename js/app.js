@@ -1242,7 +1242,7 @@ class BHApp {
     overlay.className = 'splash-force';
     overlay.innerHTML = `
       <div class="splash-ring">
-        <div class="splash-logo"><span class="splash-B">B</span>H</div>
+        <div class="splash-logo"><span class="splash-B">B</span>ONY</div>
       </div>
       <div class="splash-subtitle">إدارة أموالك</div>
     `;
