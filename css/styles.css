@@ -1437,26 +1437,33 @@ select.form-control option {
 /* ═══════════════════════════════════════════════════
    BOTTOM NAV  — بادجات متوهجة (ستايل TierBadge بالظبط)
 ═══════════════════════════════════════════════════ */
-/* ══ Creative Dock — أيقونات SVG + بلاطات نور ══ */
+/* ══ Creative Dock — أيقونات SVG + بلاطات نور + إطار نيون نانو ══ */
 .bottom-nav {
   position: fixed;
-  bottom: 0;
+  bottom: 10px;
   left: 50%;
   transform: translateX(-50%) translateZ(0);
-  width: 100%;
-  max-width: var(--max-w);
+  width: calc(100% - 16px);
+  max-width: calc(var(--max-w) - 16px);
   height: var(--nav-h);
+  border-radius: 18px;
+  border: 1px solid rgba(0, 217, 255, 0.5);
   background:
-    linear-gradient(180deg, rgba(66, 76, 94, 0.14) 0%, rgba(255, 255, 255, 0) 24%),
-    rgba(6, 10, 17, 0.93);
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+    linear-gradient(180deg, rgba(66, 76, 94, 0.16) 0%, rgba(255, 255, 255, 0) 26%),
+    rgba(5, 9, 16, 0.95);
+  box-shadow:
+    0 0 12px rgba(0, 217, 255, 0.3),
+    0 0 30px rgba(0, 217, 255, 0.16),
+    0 12px 26px rgba(0, 0, 0, 0.55),
+    inset 0 0 16px rgba(0, 217, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: stretch;
   justify-content: space-around;
   z-index: 50;
-  padding: 7px 6px 9px;
+  padding: 7px 8px 8px;
   gap: 0;
 }
 
