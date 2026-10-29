@@ -1322,7 +1322,8 @@ class BHApp {
     try {
       const navRect = m.parentElement.getBoundingClientRect();
       const r = navEl.getBoundingClientRect();
-      const x = (r.left + r.width / 2) - navRect.left;
+      // تمركز الوتد على نص الأيقونة (مش نص عرض السكوتر) عشان ميتقطعش عند حرف البار
+      const x = (r.left + r.width / 2) - navRect.left - (m.offsetWidth / 2);
       m.style.transform = 'translateX(' + Math.max(6, x) + 'px)';
     } catch (e) { /* ignore */ }
   }
