@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#00D9FF">
   <meta name="description" content="تطبيق بوني - إدارة القبض والمصاريف لسائقي وفرسان الدليفري">
   <title>بوني - إدارة الفلوس والقبض</title>
-  
+
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/wallet.css">
   <link rel="stylesheet" href="css/desktop.css">
   <link rel="stylesheet" href="css/boni-scooter.css">
+  <link rel="stylesheet" href="css/layout.css">
   <!-- Paint the dark background immediately — prevents any white flash -->
   <style>
     html, body { background: #04060A; }
@@ -50,7 +51,7 @@
 <body>
 
   <div class="app-container">
-    
+
     <!-- Top App Header -->
     <header class="app-header">
       <div class="brand">
@@ -129,10 +130,9 @@
 
       <!-- ================= 1. DASHBOARD VIEW ================= -->
       <section id="dashboardView" class="view-page active">
-        <button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>الأرصدة والتحويلات ←</span></button>
+<div class="section-heading"><h2>رصيدك ويومك</h2><p>الأرقام المهمة قدامك، أول ما تفتح.</p></div>
 
-        <!-- Main Balance Card — أول حاجة في الصفحة -->
-        <div class="card balance-card">
+<div class="card balance-card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💰</span> إجمالي الرصيد الكلّي</span>
             <span class="sub-balance-label" id="dashboardDateText"></span>
@@ -157,8 +157,7 @@
           <div id="vaultLockedChip" style="display:none; margin-top:10px; padding:8px 10px; border-radius:10px; background:rgba(0,217,255,0.08); border:1px solid rgba(0,217,255,0.3); color:#00D9FF; font-size:0.82rem; font-weight:700; text-align:center;"></div>
         </div>
 
-        <!-- كابسولة النهارده — عينك على الشغل -->
-        <div class="card today-hub-card" id="todayHubCard">
+<div class="card today-hub-card" id="todayHubCard">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">⚡</span> كبسولة النهارده</span>
             <span class="work-today-name" id="workTodayName"></span>
@@ -198,70 +197,7 @@
           </div>
         </div>
 
-        <!-- Work & Rest Tracker — نزلت الشغل ولا لا -->
-        <div class="card" id="workTrackerCard">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">🛵</span> جدول الشغل والراحة</span>
-          </div>
-          <div class="work-stats-grid">
-            <div class="work-stat"><span class="work-stat-val" id="workStatWorked">0</span><span class="work-stat-label">يوم شغل الشهر ده</span></div>
-            <div class="work-stat"><span class="work-stat-val" id="workStatOff">0</span><span class="work-stat-label">يوم راحة</span></div>
-            <div class="work-stat"><span class="work-stat-val" id="workStatMoney">0</span><span class="work-stat-label">قبض أيام الشغل (ج.م)</span></div>
-            <div class="work-stat"><span class="work-stat-val" id="workStatAvg">—</span><span class="work-stat-label">متوسط يوم قبض</span></div>
-          </div>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="app.switchTab('workView')">📅 الجدول الكامل — كم يوم نزلت؟</button>
-        </div>
-
-        <!-- Action Grid -->
-        <div class="action-grid">
-          <button class="btn btn-primary" onclick="app.openModal('newIncomeModal')">
-            <span>➕</span> قبض جديد
-          </button>
-          <button class="btn btn-danger" onclick="app.openModal('newExpenseModal')">
-            <span>➖</span> مصروف جديد
-          </button>
-        </div>
-
-        <!-- Withdraw Savings Special Button -->
-        <button class="btn btn-secondary btn-full" onclick="app.openModal('withdrawSavingsModal')">
-          <span>🔓</span> استخدام من التحويش
-        </button>
-
-        <!-- Pending Incomes Card (قبض قيد الانتظار) -->
-        <div class="card" id="pendingIncomesCard" style="display:none; border-top: 2px solid var(--essentials);">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">⏳</span> قبض قيد الانتظار</span>
-            <span class="sub-balance-label" id="pendingCountBadge">0 عمليات</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(255,170,0,0.06); padding: 10px; border-radius: var(--r-ctrl); border: 1px solid rgba(255,170,0,0.2);">
-            <span style="font-size: 0.85rem; color: var(--text-secondary);">إجمالي المنتظر تحويله:</span>
-            <strong class="val-outings" style="font-size: 1.3rem;" id="pendingTotalAmountVal">0 ج.م</strong>
-          </div>
-          <div id="dashboardPendingList" class="history-list"></div>
-        </div>
-
-        <!-- Debt Due Date Alerts -->
-        <div class="card" id="debtAlertsCard" style="display:none; border-top: 2px solid var(--danger);">
-          <!-- populated by renderDebtAlerts() -->
-        </div>
-
-        <!-- Outings Progress Card -->
-        <div class="card outings-widget">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">❤️</span> ميزانية الخروجات الأسبوعية</span>
-            <span class="sub-balance-label" id="outingsBudgetStatus">0 من 300 ج.م</span>
-          </div>
-          <div class="progress-bar-container">
-            <div id="outingsProgressFill" class="progress-fill fill-outings" style="width: 0%;"></div>
-          </div>
-          <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
-            <span>المتبقي للخروج: <strong class="val-outings" id="outingsRemainingVal">300 ج.م</strong></span>
-            <span id="outingsUsagePercent">0% مستهلك</span>
-          </div>
-        </div>
-
-        <!-- Monthly Overview Grid -->
-        <div class="stats-grid">
+<div class="stats-grid" id="overviewStats">
           <div class="stat-box">
             <span class="title">📅 مصروفات الأسبوع</span>
             <span class="value val-danger"><span id="weeklyExpensesVal">0</span> <small>ج.م</small></span>
@@ -280,13 +216,81 @@
           </div>
         </div>
 
-        <!-- Month-over-Month Comparison Card -->
-        <div class="card" id="monthComparisonCard">
+<div class="card quick-actions-card" id="quickActionsCard"><div class="card-header"><span class="card-title">إجراءات سريعة</span></div><div class="quick-actions-grid">
+          <button class="btn btn-primary" onclick="app.openModal('newIncomeModal')">
+            <span>➕</span> قبض جديد
+          </button>
+          <button class="btn btn-danger" onclick="app.openModal('newExpenseModal')">
+            <span>➖</span> مصروف جديد
+          </button>
+        <button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>الأرصدة والتحويلات ←</span></button><button class="btn btn-secondary btn-full" onclick="app.openModal('withdrawSavingsModal')">
+          <span>🔓</span> استخدام من التحويش
+        </button></div></div>
+
+<div class="card" id="pendingIncomesCard" style="display:none; border-top: 2px solid var(--essentials);">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">⏳</span> قبض قيد الانتظار</span>
+            <span class="sub-balance-label" id="pendingCountBadge">0 عمليات</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(255,170,0,0.06); padding: 10px; border-radius: var(--r-ctrl); border: 1px solid rgba(255,170,0,0.2);">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">إجمالي المنتظر تحويله:</span>
+            <strong class="val-outings" style="font-size: 1.3rem;" id="pendingTotalAmountVal">0 ج.م</strong>
+          </div>
+          <div id="dashboardPendingList" class="history-list"></div>
+        </div>
+
+<div class="card" id="debtAlertsCard" style="display:none; border-top: 2px solid var(--danger);">
+          <!-- populated by renderDebtAlerts() -->
+        </div>
+
+<div class="card" id="recentActivityCard">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🕒</span> أحدث العمليات</span>
+          </div>
+          <div id="recentTransactionsList" class="history-list">
+            <div class="empty-state">
+              <div class="empty-state-icon">📝</div>
+              لا توجد عمليات مسجلة بعد
+            </div>
+          </div>
+        </div>
+
+<div class="section-heading"><h2>الشغل والمصاريف</h2><p>تابع نزولك وميزانيتك خلال الأسبوع.</p></div>
+
+<div class="card" id="workTrackerCard">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🛵</span> جدول الشغل والراحة</span>
+          </div>
+          <div class="work-stats-grid">
+            <div class="work-stat"><span class="work-stat-val" id="workStatWorked">0</span><span class="work-stat-label">يوم شغل الشهر ده</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatOff">0</span><span class="work-stat-label">يوم راحة</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatMoney">0</span><span class="work-stat-label">قبض أيام الشغل (ج.م)</span></div>
+            <div class="work-stat"><span class="work-stat-val" id="workStatAvg">—</span><span class="work-stat-label">متوسط يوم قبض</span></div>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.switchTab('workView')">📅 الجدول الكامل — كم يوم نزلت؟</button>
+        </div>
+
+<div class="card outings-widget">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">❤️</span> ميزانية الخروجات الأسبوعية</span>
+            <span class="sub-balance-label" id="outingsBudgetStatus">0 من 300 ج.م</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="outingsProgressFill" class="progress-fill fill-outings" style="width: 0%;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
+            <span>المتبقي للخروج: <strong class="val-outings" id="outingsRemainingVal">300 ج.م</strong></span>
+            <span id="outingsUsagePercent">0% مستهلك</span>
+          </div>
+        </div>
+
+<div class="section-heading"><h2>صورة أكبر</h2><p>قارن الشهر الحالي واعرف نمط دخلك.</p></div>
+
+<div class="card" id="monthComparisonCard">
           <!-- populated by renderMonthComparison() -->
         </div>
 
-        <!-- Variable Income Overview ("قبضي مش ثابت") -->
-        <div class="card">
+<div class="card" id="variableIncomeCard">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">📊</span> إحصائيات "قبضي مش ثابت"</span>
           </div>
@@ -309,21 +313,7 @@
             </div>
           </div>
         </div>
-
-        <!-- Recent Transactions -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">🕒</span> أحدث العمليات</span>
-          </div>
-          <div id="recentTransactionsList" class="history-list">
-            <div class="empty-state">
-              <div class="empty-state-icon">📝</div>
-              لا توجد عمليات مسجلة بعد
-            </div>
-          </div>
-        </div>
-
-      </section>
+</section>
 
       <!-- ================= 1b. WORK TRACKER (جدول الشغل) ================= -->
       <section id="workView" class="view-page">
@@ -350,13 +340,18 @@
 
       <!-- ================= 2. INCOMES & RIDER SHIFT VIEW ================= -->
       <section id="incomesView" class="view-page">
-        
-        <button class="btn btn-primary btn-full" onclick="app.openModal('newIncomeModal')">
+<button class="btn btn-primary btn-full" onclick="app.openModal('newIncomeModal')">
           <span>➕</span> تسجيل قبض جديد
         </button>
 
-        <!-- Smart Rider Daily Shift Calculator -->
-        <div class="card">
+<div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">💵</span> سجل القبض والدخل</span>
+          </div>
+          <div id="incomeHistoryList" class="history-list"></div>
+        </div>
+
+<div class="card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">🚴‍♂️</span> حاسبة وردية الدليفري والكفاءة الذكية</span>
           </div>
@@ -460,16 +455,7 @@
           </form>
         </div>
 
-        <!-- Incomes History List -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">💵</span> سجل القبض والدخل</span>
-          </div>
-          <div id="incomeHistoryList" class="history-list"></div>
-        </div>
-
-        <!-- 🗺️ Work Heatmap (خريطة شغلك) -->
-        <div class="card">
+<div class="card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">🗺️</span> خريطة شغلك</span>
             <span class="sub-balance-label">أيام × ساعات</span>
@@ -480,8 +466,7 @@
           <div id="heatmapWrap"></div>
           <div id="heatmapStats" class="heat-stats"></div>
         </div>
-
-      </section>
+</section>
 
       <!-- ================= 3. EXPENSES VIEW ================= -->
       <section id="expensesView" class="view-page">
@@ -505,7 +490,7 @@
             <span class="card-title"><span class="card-icon">❤️</span> ميزانية الخروجات هذا الأسبوع</span>
           </div>
           <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-            <input type="number" id="weeklyOutingsInput" class="form-control" placeholder="أدخل الميزانية الأسبوعية" value="300">
+            <input type="number" id="weeklyOutingsInput" aria-label="ميزانية الخروجات الأسبوعية بالجنيه" class="form-control" placeholder="أدخل الميزانية الأسبوعية" value="300">
             <button class="btn btn-secondary btn-sm" onclick="app.updateWeeklyOutingsBudget()">حفظ الميزانية</button>
           </div>
           <div style="font-size: 0.85rem; color: var(--text-muted);" id="outingsBudgetDetailText">
@@ -525,7 +510,7 @@
 
       <!-- ================= 4. GOALS & DEBTS VIEW ================= -->
       <section id="goalsView" class="view-page">
-        
+
         <!-- Financial Goals Section -->
         <div class="card">
           <div class="card-header">
@@ -619,20 +604,20 @@
 
       <!-- ================= 6. MORE / TOOLS VIEW ================= -->
       <section id="moreView" class="view-page">
-        <button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>إدارة الكروت والأرصدة ←</span></button>
+<button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>إدارة الكروت والأرصدة ←</span></button>
 
-        <!-- 🧪 فحص شامل — سلامة + حماية + تقرير -->
-        <div class="card audit-card">
+<div class="section-heading"><h2>التخطيط والتقارير</h2><p>راجع أداءك وخطط للخطوة الجاية.</p></div>
+
+<div class="card">
           <div class="card-header">
-            <span class="card-title"><span class="card-icon">🧪</span> فحص شامل للموقع</span>
-            <span class="sub-balance-label">سلامة + حماية</span>
+            <span class="card-title"><span class="card-icon">📈</span> تقارير ملخصة</span>
           </div>
-          <button class="btn btn-primary audit-run-btn" id="runAuditBtn" onclick="app.runFullAudit()">🚀 ابدأ الفحص — تقرير كامل</button>
-          <div id="fullAuditReport"></div>
+          <div class="chart-container">
+            <canvas id="financeReportChart"></canvas>
+          </div>
         </div>
 
-        <!-- "Can I Spend?" Tool -->
-        <div class="card">
+<div class="card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">🤔</span> ميزة "هل أقدر أصرف؟"</span>
           </div>
@@ -646,108 +631,14 @@
           </div>
         </div>
 
-        <!-- Financial Reports & Chart -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">📈</span> تقارير ملخصة</span>
-          </div>
-          <div class="chart-container">
-            <canvas id="financeReportChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Income Ratios Settings -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">⚙️</span> نسب تقسيم القبض الافتراضية</span>
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-            <div class="form-group">
-              <label class="form-label" for="ratioSavings">🔒 التحويش %</label>
-              <input type="number" id="ratioSavings" class="form-control" value="50">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ratioEssentials">🏠 مصاريف %</label>
-              <input type="number" id="ratioEssentials" class="form-control" value="30">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ratioOutings">❤️ خروجات %</label>
-              <input type="number" id="ratioOutings" class="form-control" value="20">
-            </div>
-          </div>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="app.saveRatios()">تحديث النسب</button>
-        </div>
-
-        <!-- 🛡️ وضع القسوة — بوني الشرس -->
-        <div class="card" style="border-top: 2px solid #00D9FF;">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">👹</span> وضع القسوة — "بوني الشرس"</span>
-            <button class="btn btn-secondary btn-sm" onclick="app.toggleStrictMode()" id="strictToggleBtn">تفعيل 😈</button>
-          </div>
-          <p class="card-desc" style="margin-bottom:8px;">
-            أدوات تجبرك على التحويش من غير ما تحس: تقريب كل قبض، سقف صرف يومي، خزنة مقفولة، وغرامة على أي سحب.
-          </p>
-          <div id="strictVaultInfo" style="font-size:0.85rem; font-weight:700; color:#00D9FF; background:rgba(0,217,255,0.07); border:1px solid rgba(0,217,255,0.25); padding:9px 10px; border-radius:10px; margin-bottom:8px;"></div>
-          <div id="strictDailyInfo" style="font-size:0.85rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:9px 10px; border-radius:10px; margin-bottom:12px;"></div>
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-            <div class="form-group">
-              <label class="form-label" for="strictRoundUp">🪙 تقريب القبض لأقرب (ج.م)</label>
-              <input type="number" id="strictRoundUp" class="form-control" value="50" min="0">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="strictDailyCap">💳 سقف الصرف اليومي (ج.م)</label>
-              <input type="number" id="strictDailyCap" class="form-control" value="300" min="0">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="strictLockDays">🔒 قفل الخزنة (يوم)</label>
-              <select id="strictLockDays" class="form-control">
-                <option value="0">بدون قفل</option>
-                <option value="7">7 أيام</option>
-                <option value="15">15 يوم</option>
-                <option value="30">30 يوم</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="strictPenalty">👹 غرامة السحب %</label>
-              <input type="number" id="strictPenalty" class="form-control" value="10" min="0" max="50">
-            </div>
-          </div>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="app.saveStrictSettings()">حفظ إعدادات القسوة</button>
-        </div>
-
-        <!-- Appearance Settings Card -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">🎨</span> مظهر التطبيق</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
-            <div>
-              <strong style="font-size: 0.95rem; color: #fff;">👁️ وضع الأرقام المكبرة</strong>
-              <div style="font-size: 0.78rem; color: var(--text-muted);">تكبير المبالغ والأرقام لقراءتها فوراً أثناء القيادة</div>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="app.toggleBigNumbers()" id="bigNumbersToggleBtn">تفعيل 👁️</button>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px;">
-            <div>
-              <strong style="font-size: 0.95rem; color: #fff;">✨ شاشة البداية</strong>
-              <div style="font-size: 0.78rem; color: var(--text-muted);">أنيميشن الدخول — يظهر تلقائياً كل ما تفتح التطبيق</div>
-            </div>
-            <div style="display: flex; gap: 6px;">
-              <button class="btn btn-secondary btn-sm" onclick="app.previewSplash()">معاينة ▶</button>
-              <button class="btn btn-secondary btn-sm" onclick="app.toggleSplash()" id="splashToggleBtn">إيقاف</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- "مستقبلي المالي" Simulator Card -->
-        <div class="card">
+<div class="card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">📈</span> مستقبلي المالي (محاكي التوقعات)</span>
           </div>
           <p class="card-desc">
             توقع رصيدك المستقبلي بناءً على معدل تحويشك دون التعديل على رصيدك الحقيقي.
           </p>
-          
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label" for="simWeeklySavings">التحويش الأسبوعي (ج.م)</label>
@@ -799,8 +690,133 @@
           </div>
         </div>
 
-        <!-- GitHub Update Card -->
-        <div class="card" id="updateCard">
+<div class="section-heading"><h2>إدارة الفلوس</h2><p>اضبط التقسيم والرصيد وحدود الصرف.</p></div>
+
+<div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">⚙️</span> نسب تقسيم القبض الافتراضية</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+            <div class="form-group">
+              <label class="form-label" for="ratioSavings">🔒 التحويش %</label>
+              <input type="number" id="ratioSavings" class="form-control" value="50">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ratioEssentials">🏠 مصاريف %</label>
+              <input type="number" id="ratioEssentials" class="form-control" value="30">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ratioOutings">❤️ خروجات %</label>
+              <input type="number" id="ratioOutings" class="form-control" value="20">
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.saveRatios()">تحديث النسب</button>
+        </div>
+
+<div class="card" style="border-top: 2px solid #00D9FF;">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">👹</span> وضع القسوة — "بوني الشرس"</span>
+            <button class="btn btn-secondary btn-sm" onclick="app.toggleStrictMode()" id="strictToggleBtn">تفعيل 😈</button>
+          </div>
+          <p class="card-desc" style="margin-bottom:8px;">
+            أدوات تجبرك على التحويش من غير ما تحس: تقريب كل قبض، سقف صرف يومي، خزنة مقفولة، وغرامة على أي سحب.
+          </p>
+          <div id="strictVaultInfo" style="font-size:0.85rem; font-weight:700; color:#00D9FF; background:rgba(0,217,255,0.07); border:1px solid rgba(0,217,255,0.25); padding:9px 10px; border-radius:10px; margin-bottom:8px;"></div>
+          <div id="strictDailyInfo" style="font-size:0.85rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:9px 10px; border-radius:10px; margin-bottom:12px;"></div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            <div class="form-group">
+              <label class="form-label" for="strictRoundUp">🪙 تقريب القبض لأقرب (ج.م)</label>
+              <input type="number" id="strictRoundUp" class="form-control" value="50" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="strictDailyCap">💳 سقف الصرف اليومي (ج.م)</label>
+              <input type="number" id="strictDailyCap" class="form-control" value="300" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="strictLockDays">🔒 قفل الخزنة (يوم)</label>
+              <select id="strictLockDays" class="form-control">
+                <option value="0">بدون قفل</option>
+                <option value="7">7 أيام</option>
+                <option value="15">15 يوم</option>
+                <option value="30">30 يوم</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="strictPenalty">👹 غرامة السحب %</label>
+              <input type="number" id="strictPenalty" class="form-control" value="10" min="0" max="50">
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="app.saveStrictSettings()">حفظ إعدادات القسوة</button>
+        </div>
+
+<div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">✎</span> ضبط الرصيد الحقيقي</span>
+          </div>
+          <p class="card-desc">
+            حط الفلوس اللي معاك فعلاً — من غير ما تتحسب قبض ولا مصروف.
+          </p>
+          <button class="btn btn-primary btn-full btn-sm" onclick="app.openBalanceAdjust()">
+            💰 أنا معايا كام دلوقتي؟
+          </button>
+          <div id="adjustHistoryBox" class="adjust-history"></div>
+        </div>
+
+<div class="section-heading"><h2>تفضيلاتك</h2><p>المظهر والتنبيهات على راحتك.</p></div>
+
+<div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🎨</span> مظهر التطبيق</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
+            <div>
+              <strong style="font-size: 0.95rem; color: #fff;">👁️ وضع الأرقام المكبرة</strong>
+              <div style="font-size: 0.78rem; color: var(--text-muted);">تكبير المبالغ والأرقام لقراءتها فوراً أثناء القيادة</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="app.toggleBigNumbers()" id="bigNumbersToggleBtn">تفعيل 👁️</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px;">
+            <div>
+              <strong style="font-size: 0.95rem; color: #fff;">✨ شاشة البداية</strong>
+              <div style="font-size: 0.78rem; color: var(--text-muted);">أنيميشن الدخول — يظهر تلقائياً كل ما تفتح التطبيق</div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-secondary btn-sm" onclick="app.previewSplash()">معاينة ▶</button>
+              <button class="btn btn-secondary btn-sm" onclick="app.toggleSplash()" id="splashToggleBtn">إيقاف</button>
+            </div>
+          </div>
+        </div>
+
+<div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🔔</span> التنبيهات الذكية</span>
+          </div>
+          <p class="card-desc">
+            ينبهك قبل ما تحصل مشكلة: رصيدك قارب يعمل، نسيت تسجّل وردية، أو هدفك قارب يتحقق.
+          </p>
+          <div id="smartAlertSettings"></div>
+        </div>
+
+<div class="section-heading"><h2>البيانات والتحديثات</h2><p>النسخ الاحتياطية والتحديث والفحص في مكان واحد.</p></div>
+
+<div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">💾</span> نسخ واستعادة البيانات</span>
+          </div>
+          <p class="card-desc">
+            نسخة احتياطية كل 3 أيام بتتحمل لوحدها. نزّل نسخة كمان وابعتها لنفسك على واتساب.
+          </p>
+          <div class="action-grid" style="margin-bottom: 10px;">
+            <button class="btn btn-secondary btn-sm" onclick="app.downloadBackup()">📦 نسخة الآن</button>
+            <label class="btn btn-secondary btn-sm" style="margin:0; text-align:center;">
+              📥 استعادة (Import)
+              <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="app.importData(event)">
+            </label>
+          </div>
+          <button class="btn btn-danger btn-full btn-sm" onclick="app.confirmResetData()">⚠️ صفر البيانات بالكامل (Reset)</button>
+        </div>
+
+<div class="card" id="updateCard">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">🔄</span> تحديث التطبيق</span>
             <span class="eyebrow" id="currentVersionLabel" style="font-size: 0.62rem;">—</span>
@@ -821,50 +837,15 @@
           </div>
         </div>
 
-        <!-- 🔔 Smart Alerts Settings Card -->
-        <div class="card">
+<div class="card audit-card">
           <div class="card-header">
-            <span class="card-title"><span class="card-icon">🔔</span> التنبيهات الذكية</span>
+            <span class="card-title"><span class="card-icon">🧪</span> فحص شامل للموقع</span>
+            <span class="sub-balance-label">سلامة + حماية</span>
           </div>
-          <p class="card-desc">
-            ينبهك قبل ما تحصل مشكلة: رصيدك قارب يعمل، نسيت تسجّل وردية، أو هدفك قارب يتحقق.
-          </p>
-          <div id="smartAlertSettings"></div>
+          <button class="btn btn-primary audit-run-btn" id="runAuditBtn" onclick="app.runFullAudit()">🚀 ابدأ الفحص — تقرير كامل</button>
+          <div id="fullAuditReport"></div>
         </div>
-
-        <!-- Balance Adjustment Card -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">✎</span> ضبط الرصيد الحقيقي</span>
-          </div>
-          <p class="card-desc">
-            حط الفلوس اللي معاك فعلاً — من غير ما تتحسب قبض ولا مصروف.
-          </p>
-          <button class="btn btn-primary btn-full btn-sm" onclick="app.openBalanceAdjust()">
-            💰 أنا معايا كام دلوقتي؟
-          </button>
-          <div id="adjustHistoryBox" class="adjust-history"></div>
-        </div>
-
-        <!-- Data Backup & Management -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">💾</span> نسخ واستعادة البيانات</span>
-          </div>
-          <p class="card-desc">
-            نسخة احتياطية كل 3 أيام بتتحمل لوحدها. نزّل نسخة كمان وابعتها لنفسك على واتساب.
-          </p>
-          <div class="action-grid" style="margin-bottom: 10px;">
-            <button class="btn btn-secondary btn-sm" onclick="app.downloadBackup()">📦 نسخة الآن</button>
-            <label class="btn btn-secondary btn-sm" style="margin:0; text-align:center;">
-              📥 استعادة (Import)
-              <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="app.importData(event)">
-            </label>
-          </div>
-          <button class="btn btn-danger btn-full btn-sm" onclick="app.confirmResetData()">⚠️ صفر البيانات بالكامل (Reset)</button>
-        </div>
-
-      </section>
+</section>
 
       <div class="desktop-only desktop-endmark" aria-hidden="true">BONY</div>
     </main>
@@ -985,7 +966,7 @@
         <div class="celebration-badge">🎉</div>
         <h2 style="color: #fff; font-size: 1.4rem;">قبضك وصل!</h2>
         <p style="color: var(--text-muted); font-size: 0.9rem;">تم تقسيم المبلغ تلقائياً وفقاً لخطتك المالية:</p>
-        
+
         <div class="celebration-split-list">
           <div class="split-card-item">
             <span>🔒 التحويش/الديون (<span id="celebSavingsRatio">50</span>%)</span>
@@ -1145,7 +1126,7 @@
         <div style="font-size: 1.1rem;" id="expensiveOutingWarnTitle">🚨 تنبيه خروجة مكلفة</div>
         <div style="font-size: 0.88rem; font-weight: 600;" id="expensiveOutingWarnDesc">الخروجة دي هتستهلك 300% من ميزانية خروجاتك المتبقية.</div>
       </div>
-      
+
       <div class="celebration-split-list" style="margin-bottom: 16px;">
         <div class="split-card-item">
           <span>💵 مبلغ المصروف:</span>

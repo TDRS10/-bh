@@ -1,0 +1,126 @@
+/* Shared card rhythm and responsive page layout; theme colours stay unchanged. */
+:root { --card-gap:18px; --card-padding:20px; }
+.view-page > *, .card > *, .wallet-card > *, .stats-grid > *, .balance-grid > *, .work-stats-grid > * { min-width:0; }
+.view-page.active { gap:var(--card-gap); }
+.card { padding:var(--card-padding); }
+.card-header { gap:12px; align-items:flex-start; flex-wrap:wrap; margin-bottom:18px; }
+.card-title { font-size:.9rem; letter-spacing:0; line-height:1.65; text-transform:none; overflow-wrap:anywhere; }
+.card-header > .card-title { flex:1 1 150px; }
+.card-header > .btn { flex:0 1 auto; }
+.card-header .sub-balance-label { line-height:1.7; }
+.card-desc { line-height:1.9; margin-bottom:18px; }
+.section-heading { padding:12px 2px 0; }
+.section-heading h2 { font-size:1.12rem; line-height:1.6; font-weight:700; color:var(--text-primary); }
+.section-heading p { font-size:.76rem; line-height:1.8; color:var(--text-secondary); margin-top:3px; }
+.card .btn { min-height:42px; white-space:normal; line-height:1.65; }
+.btn-full { max-width:100%; }
+.form-control { min-width:0; max-width:100%; }
+.form-group { min-width:0; }
+.form-label { line-height:1.7; letter-spacing:0; }
+.stats-grid { gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.stat-box { justify-content:space-between; gap:10px; }
+.stat-box .title { letter-spacing:0; font-size:.73rem; line-height:1.7; }
+.stat-box .value,.work-stat-val,.sub-balance-val,.wallet-card-foot strong { font-variant-numeric:tabular-nums; overflow-wrap:anywhere; line-height:1.5; }
+.stat-box .value { font-size:clamp(1rem,1.5vw,1.55rem); }
+.total-amount { overflow-wrap:anywhere; line-height:1.3; }
+.balance-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.sub-balance-label,.work-stat-label { line-height:1.75; }
+.quick-actions-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.quick-actions-grid > .btn { width:100%; margin:0; min-height:52px; justify-content:center; }
+.quick-actions-grid .wallet-entry { display:flex; }
+.quick-actions-grid .wallet-entry span { display:none; }
+.history-list { gap:8px; }
+.list-item { gap:14px; flex-wrap:wrap; }
+.item-main { flex:1 1 170px; min-width:0; }
+.item-details { min-width:0; gap:5px; }
+.item-title,.item-sub { overflow-wrap:anywhere; line-height:1.7; }
+.item-amount { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.list-item > div:last-child { min-width:0; gap:10px; max-width:100%; }
+.delete-btn { flex-shrink:0; min-width:40px; min-height:40px; }
+.empty-state { padding:28px 16px; line-height:1.9; }
+.empty-state-icon { margin-bottom:10px; }
+.progress-bar-container { margin-block:14px; }
+.work-stats-grid { gap:12px; }
+.work-stat { min-width:0; }
+#workTrackerCard > .btn { margin-top:16px; }
+.wallet-heading { flex-wrap:wrap; }
+.wallet-card { min-width:0; }
+.wallet-card-top,.wallet-card-foot { flex-wrap:wrap; gap:14px; }
+.wallet-card-foot > div { flex:1 1 140px; min-width:0; }
+.wallet-card-foot strong { font-size:clamp(1.15rem,2vw,1.55rem); }
+.wallet-card-foot .btn { flex-shrink:0; }
+.wallet-history-item { flex-wrap:wrap; align-items:flex-start; }
+.wallet-history-item > div { flex:1 1 180px; }
+.wallet-history-item b { white-space:normal; overflow-wrap:anywhere; }
+.wallet-summary > strong { overflow-wrap:anywhere; }
+.wallet-summary p { max-width:72ch; }
+.wallet-form-row { align-items:start; }
+#heatmapWrap { overflow-x:auto; }
+#monthComparisonCard { overflow-x:auto; }
+.chart-container { max-width:100%; }
+.modal-container { overflow-y:auto; overscroll-behavior:contain; }
+.modal-header { gap:12px; align-items:flex-start; }
+.modal-title { line-height:1.6; }
+.close-btn { flex-shrink:0; min-width:40px; min-height:40px; }
+
+@media (min-width:980px) {
+  :root { --card-gap:22px; --card-padding:24px; }
+  .desktop-heading { gap:16px; padding:22px 16px 28px; }
+  .desktop-heading h1 { font-size:clamp(2.3rem,3.6vw,3.5rem); }
+  .desktop-heading > div:first-child > p { margin-bottom:14px; }
+  .desktop-heading .desktop-description { margin-top:10px; font-size:.92rem; }
+  #dashboardView.active { gap:var(--card-gap); align-items:stretch; }
+  #dashboardView > * { grid-row:auto; }
+  #dashboardView > .balance-card { grid-column:span 7; grid-row:auto; }
+  #dashboardView > .today-hub-card { grid-column:span 5; grid-row:auto; }
+  #dashboardView > .stats-grid { grid-column:1 / -1; grid-row:auto; grid-template-columns:repeat(4,minmax(0,1fr)); }
+  #dashboardView > .section-heading,#dashboardView > #quickActionsCard,#dashboardView > #recentActivityCard { grid-column:1 / -1; }
+  #quickActionsCard .quick-actions-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  #dashboardView > .card { margin:0; }
+  .today-hub-card .today-hub-body { min-height:170px; flex:1; justify-content:center; }
+  #todayHubCard { display:flex; flex-direction:column; }
+  .work-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .history-list .list-item { padding:18px 12px; }
+  #moreView.active { gap:var(--card-gap); align-items:start; }
+  #moreView > .section-heading,#moreView > .audit-card { grid-column:1 / -1; }
+  #goalsView.active,#challengesView.active { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:var(--card-gap); }
+  #goalsView > .card:has(#debtPlannerWrap) { grid-column:1 / -1; }
+  #incomesView.active { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); align-items:start; }
+  #incomesView > * { grid-column:1 / -1; }
+  #incomesView > .card:has(#riderShiftForm) { grid-column:span 7; }
+  #incomesView > .card:has(#heatmapWrap) { grid-column:span 5; }
+  #incomesView > .btn-full,#expensesView > .btn-full { width:fit-content; min-width:200px; }
+  #walletView.active { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); align-items:start; gap:var(--card-gap); }
+  #walletView > * { grid-column:1 / -1; min-width:0; margin-block:0; }
+  #walletView > #walletAddDetails { grid-column:span 5; }
+  #walletView > #walletMovement { grid-column:span 7; }
+  #walletView .wallet-grid { gap:20px; }
+  #walletView .wallet-status:not(:empty) { padding:12px 16px; border:1px solid var(--border); border-radius:10px; }
+  .desktop-endmark { margin-top:24px; font-size:5rem; }
+}
+@media (min-width:1300px) {
+  #walletView .wallet-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (min-width:980px) and (max-width:1140px) {
+  #dashboardView > .balance-card,#dashboardView > .today-hub-card { grid-column:span 6; }
+  #incomesView > .card:has(#riderShiftForm),#incomesView > .card:has(#heatmapWrap) { grid-column:1 / -1; }
+  .today-hub-card .today-hub-body { flex-direction:column; }
+}
+@media (max-width:979px) {
+  .work-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .section-heading { padding-top:14px; }
+  .quick-actions-grid { gap:10px; }
+  .quick-actions-grid > .btn { font-size:.78rem; padding:12px 8px; }
+  .wallet-summary { padding:20px; }
+}
+@media (max-width:380px) {
+  :root { --card-padding:15px; --card-gap:14px; }
+  .card-header { gap:8px; }
+  .card-header > .btn { width:100%; }
+  .card-title { font-size:.83rem; }
+  .stat-box { padding:11px; }
+  .item-main { flex-basis:100%; }
+  .list-item > .item-amount { margin-inline-start:auto; }
+  .wallet-form-row { grid-template-columns:1fr; }
+  .sub-balance-val { font-size:1.15rem; }
+}
