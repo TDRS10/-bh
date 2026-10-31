@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v45';
+const CACHE_NAME = 'bh-finance-v46';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './js/wallet.js',
   './js/cards.js',
   './css/wallet.css',
+  './css/desktop.css',
   './manifest.json',
   './assets/icon-192.png',
   './assets/icon-512.png',
