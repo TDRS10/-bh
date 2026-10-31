@@ -1,28 +1,49 @@
-/* ============================================================
-   BH — Firebase Realtime Database Rules
-   ============================================================
-   📋 انسخ الـ JSON اللي تحت → Realtime Database → Rules
-      → استبدل كل المحتوى القديم → Publish
-
-   الصفحة الجاهزة:
-   https://console.firebase.google.com/project/bhxx-2a3be/database/bhxx-2a3be-default-rtdb/rules
-
-   ⚠️ لازم تستبدل القديم كله — لا تسيب أي ".read": false فوق.
-
-   📖 الشرح:
-   • كل مستخدم عنده مساحة خاصة: users/{uid}
-   • يقدر يقرا ويكتب في مساحته هو بس
-   • محدش يقدر يقرا أو يعدّل بيانات حد تاني
-   • أي حاجة بره users/ مقفولة تماماً
-   ============================================================ */
-
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "users": {
       "$uid": {
-        ".read":  "$uid === auth.uid",
-        ".write": "$uid === auth.uid"
+        ".read": "auth != null && $uid === auth.uid",
+        ".write": "auth != null && $uid === auth.uid"
       }
+    },
+    "publicChat": {
+      "messages": {
+        ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !root.child('chatBans').child(auth.uid).exists() && query.orderByChild === 'createdAt' && query.limitToLast != null && query.limitToLast <= 100",
+        ".indexOn": ["createdAt"],
+        "$message": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !root.child('chatBans').child(auth.uid).exists() && ((!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid && !newData.hasChild('reactions')) || (!newData.exists() && (data.child('uid').val() === auth.uid || auth.token.chatAdmin === true)))",
+          ".validate": "newData.hasChildren(['uid', 'name', 'text', 'createdAt'])",
+          "uid": { ".validate": "newData.isString() && ((!data.exists() && newData.val() === auth.uid) || newData.val() === data.val())" },
+          "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60 && (!data.exists() || newData.val() === data.val())" },
+          "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000 && (!data.exists() || newData.val() === data.val())" },
+          "createdAt": { ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || newData.val() === data.val())" },
+          "reactions": {
+            "$uid": {
+              ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !root.child('chatBans').child(auth.uid).exists() && $uid === auth.uid && root.child('publicChat/messages').child($message).exists()",
+              ".validate": "newData.val() === true"
+            }
+          },
+          "$other": { ".validate": false }
+        }
+      },
+      "reports": {
+        ".read": "auth != null && auth.token.chatAdmin === true",
+        "$message": {
+          "$uid": {
+            ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !root.child('chatBans').child(auth.uid).exists() && $uid === auth.uid && !data.exists() && newData.exists() && root.child('publicChat/messages').child($message).exists()",
+            ".validate": "newData.hasChildren(['createdAt'])",
+            "createdAt": { ".validate": "newData.isNumber() && newData.val() === now" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    },
+    "chatBans": {
+      ".read": "auth != null && auth.token.chatAdmin === true",
+      ".write": "auth != null && auth.token.chatAdmin === true",
+      "$uid": { ".validate": "newData.val() === true" }
     }
   }
 }

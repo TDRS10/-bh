@@ -14,20 +14,9 @@
         tdrs10.github.io
         localhost
 
-   3) Realtime Database → Rules → الصق:
-
-      {
-        "rules": {
-          "users": {
-            "$uid": {
-              ".read":  "$uid === auth.uid",
-              ".write": "$uid === auth.uid"
-            }
-          }
-        }
-      }
-
-   ملحوظة: القواعد دي بتخلي كل مستخدم يقرا ويكتب بياناته هو بس.
+   3) Realtime Database → Rules → انشر محتوى dev/firebase-rules.json.
+      الملف يضم حماية البيانات الخاصة وقواعد الشات العام للمسجّلين.
+      لا تستخدم قواعد users وحدها؛ الشات يحتاج قواعد publicChat أيضًا.
    ============================================================ */
 
 window.BH_FIREBASE_CONFIG = {

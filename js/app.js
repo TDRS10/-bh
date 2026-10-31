@@ -1401,10 +1401,12 @@ class BHApp {
     this._dustTimer = setTimeout(() => { try { this.dustPuff(); } catch (e) { /* ignore */ } }, 520);
 
     this.currentTab = viewId;
+    if (window.BHChat) window.BHChat.setVisible(viewId === 'chatView');
     const scooterScene = document.getElementById('boniScooterScene');
     if (scooterScene) scooterScene.hidden = viewId !== 'dashboardView';
     const desktopTitle = document.getElementById('desktopPageTitle');
     if (desktopTitle) desktopTitle.textContent = ({ dashboardView: 'فلوسك تحت سيطرتك.', incomesView: 'القبض والدخل', expensesView: 'المصاريف', goalsView: 'الأهداف والديون', challengesView: 'التحديات والإنجازات', moreView: 'الأدوات والإعدادات', walletView: 'حساباتي وكروتي', workView: 'جدول الشغل' })[viewId] || 'بوني';
+    if (viewId === 'chatView' && desktopTitle) desktopTitle.textContent = 'لمة بوني';
     if (viewId === 'moreView') {
       this.renderReportChart();
     }

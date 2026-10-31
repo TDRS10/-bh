@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/desktop.css">
   <link rel="stylesheet" href="css/boni-scooter.css">
   <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/chat.css">
   <!-- Paint the dark background immediately — prevents any white flash -->
   <style>
     html, body { background: #04060A; }
@@ -603,7 +604,23 @@
       </section>
 
       <!-- ================= 6. MORE / TOOLS VIEW ================= -->
+      <section id="chatView" class="view-page" aria-labelledby="chatTitle">
+        <div class="card chat-shell">
+          <div class="chat-heading"><div><span class="chat-eyebrow">BONY COMMUNITY</span><h2 id="chatTitle">لمة بوني <span>💬</span></h2><p>غرفة عامة للمسجّلين · آخر 100 رسالة</p></div><span class="chat-badge">للأعضاء</span></div>
+          <p class="chat-notice">الرسائل ظاهرة لكل أعضاء الموقع. خليك لطيف، ومتشاركش بياناتك الخاصة أو المالية.</p>
+          <div id="chatGate" class="chat-gate"><p>سجّل بحساب Google علشان تدخل الشات.</p><button id="chatLogin" class="btn btn-primary" type="button">الدخول بحساب Google</button></div>
+          <p id="chatStatus" class="chat-status" role="status" aria-live="polite"></p>
+          <div id="chatMessages" class="chat-messages" role="region" aria-label="رسائل الشات العام" tabindex="0" hidden></div>
+          <button id="chatLatest" class="btn btn-secondary chat-latest" type="button" hidden>رسائل جديدة ↓</button>
+          <form id="chatForm" class="chat-composer" hidden>
+            <label for="chatText">رسالتك للأعضاء</label>
+            <textarea id="chatText" rows="2" maxlength="1000" placeholder="شاركنا حاجة حلوة…" required></textarea>
+            <div><small id="chatCount">0 / 1000 · Enter للإرسال، Shift + Enter لسطر جديد</small><button id="chatSend" class="btn btn-primary" type="submit">إرسال ↗</button></div>
+          </form>
+        </div>
+      </section>
       <section id="moreView" class="view-page">
+        <button class="btn btn-secondary btn-full" onclick="app.switchTab('chatView')">💬 الشات العام — لمة بوني</button>
 <button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>إدارة الكروت والأرصدة ←</span></button>
 
 <div class="section-heading"><h2>التخطيط والتقارير</h2><p>راجع أداءك وخطط للخطوة الجاية.</p></div>
@@ -851,6 +868,7 @@
     </main>
 
     <!-- Bottom Navigation Bar -->
+    <button class="icon-btn chat-open" onclick="app.switchTab('chatView')" title="الشات العام" aria-label="فتح الشات العام">💬</button>
     <nav class="bottom-nav" aria-label="التنقل الرئيسي">
       <!-- 🖥️ براند الشريط الجانبي — بيظهر بس على نسخة الكمبيوتر -->
       <div class="rail-brand">
@@ -1280,6 +1298,7 @@
     })();
   </script>
   <script src="js/firebase-service.js"></script>
+  <script src="js/chat.js"></script>
 
   <script>
     // Register Service Worker for Offline PWA
