@@ -1,26 +1,41 @@
 .boni-scene { display:none; }
 @media (min-width:980px) {
-  .boni-scene { display:block; position:relative; width:min(100%,560px); height:265px; margin:-12px auto -12px; isolation:isolate; }
+  .boni-scene { --ride-span:clamp(150px,24vw,300px); display:block; position:relative; width:min(100%,900px); height:160px; margin:-20px auto -10px; isolation:isolate; }
   .boni-scene[hidden] { display:none !important; }
   .boni-viewport { position:absolute; inset:0; perspective:850px; perspective-origin:50% 35%; overflow:hidden; pointer-events:none; }
-  .boni-orbit { position:absolute; left:50%; top:48%; transform-style:preserve-3d; animation:boni-cruise 14s ease-in-out infinite !important; }
-  .boni-model { position:absolute; width:0; height:0; transform-style:preserve-3d; transform:rotateX(-12deg) rotateY(-32deg); animation:boni-turn 14s ease-in-out infinite !important; }
+  .boni-orbit { position:absolute; left:50%; top:35%; transform-style:preserve-3d; animation:boni-cruise 12s linear infinite !important; }
+  .boni-model { position:absolute; width:0; height:0; transform-style:preserve-3d; transform:scale(.5) rotateX(-12deg) rotateY(-25deg); animation:boni-turn 12s linear infinite !important; }
   .boni-solid,.boni-wheel,.boni-wheel-rotor { position:absolute; width:0; height:0; transform-style:preserve-3d; }
   .boni-face { position:absolute; top:0; left:0; border:1px solid #ffffff15; border-radius:5px; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font:bold 12px Arial,sans-serif; color:#fff; box-shadow:inset 0 2px 4px #ffffff20; }
   .boni-wheel-rotor { animation:boni-roll 1.1s linear infinite !important; }
   .boni-wheel-face { position:absolute; width:62px; height:62px; top:-31px; left:-31px; border:8px solid #11121a; border-radius:50%; background:radial-gradient(circle,#ff596c 0 4px,#20222f 5px 9px,transparent 10px),repeating-conic-gradient(#9397a8 0 12deg,#242735 12deg 60deg); box-shadow:inset 0 0 0 3px #474958,0 0 0 1px #3b303b; }
   .boni-tread { position:absolute; top:-13px; left:-6.3px; width:12.6px; height:26px; background:#14151d; border:1px solid #252631; backface-visibility:visible; }
-  .boni-platform { position:absolute; width:350px; height:116px; left:50%; bottom:32px; transform:translateX(-50%); border-radius:50%; border:1px solid #ef233c45; background:radial-gradient(ellipse,#ef233c18,transparent 66%); box-shadow:0 0 35px #ef233c0c,inset 0 0 30px #ef233c0c; }
-  .boni-platform::after { content:''; position:absolute; inset:15px 30px; border:1px dashed #ef233c40; border-radius:50%; }
-  .boni-shadow { position:absolute; width:210px; height:24px; left:50%; bottom:68px; transform:translateX(-50%); border-radius:50%; background:#000; filter:blur(9px); opacity:.85; }
+  .boni-platform { position:absolute; width:calc(var(--ride-span) * 2 + 30px); height:40px; left:50%; top:82px; transform:translateX(-50%); border-radius:50%; border:1px dashed #ef233c30; background:radial-gradient(ellipse,#ef233c05,transparent 70%); }
+  .boni-platform::after { content:''; position:absolute; width:5px; height:5px; left:50%; top:-3px; border-radius:50%; background:#ef233c; box-shadow:0 0 10px #ef233c88; }
+  .boni-shadow { position:absolute; width:110px; height:12px; left:-55px; top:43px; border-radius:50%; background:#000; filter:blur(5px); opacity:.75; }
   .boni-scene-caption { position:absolute; bottom:3px; left:0; right:0; display:flex; align-items:center; justify-content:center; gap:18px; color:#a1a1aa; font-size:.68rem; }
   .boni-scene-caption span { letter-spacing:.4px; }
   .boni-motion-toggle { background:#ffffff05; color:#d4d4d8; border:1px solid #ffffff18; padding:6px 12px; border-radius:999px; font:inherit; cursor:pointer; }
   .boni-motion-toggle:hover { border-color:#ef233c80; color:white; }
   .boni-motion-toggle:disabled { cursor:default; opacity:.65; }
   .boni-paused .boni-orbit,.boni-paused .boni-model,.boni-paused .boni-wheel-rotor { animation-play-state:paused !important; }
-  @keyframes boni-cruise { 0%,100% { transform:translateX(-35px); } 45%,55% { transform:translateX(35px); } }
-  @keyframes boni-turn { 0%,22% { transform:rotateX(-12deg) rotateY(-32deg) rotateZ(-2deg); } 48%,68% { transform:rotateX(-12deg) rotateY(148deg) rotateZ(2deg); } 100% { transform:rotateX(-12deg) rotateY(328deg) rotateZ(-2deg); } }
+  @keyframes boni-cruise {
+    0%,100% { transform:translate3d(calc(var(--ride-span) * -1),0,0); }
+    12.5% { transform:translate3d(calc(var(--ride-span) * -.7),-14px,0); }
+    25% { transform:translate3d(0,-20px,0); }
+    37.5% { transform:translate3d(calc(var(--ride-span) * .7),-14px,0); }
+    50% { transform:translate3d(var(--ride-span),0,0); }
+    62.5% { transform:translate3d(calc(var(--ride-span) * .7),14px,0); }
+    75% { transform:translate3d(0,20px,0); }
+    87.5% { transform:translate3d(calc(var(--ride-span) * -.7),14px,0); }
+  }
+  @keyframes boni-turn {
+    0% { transform:scale(.5) rotateX(-12deg) rotateY(65deg) rotateZ(-5deg); }
+    8%,42% { transform:scale(.5) rotateX(-12deg) rotateY(-25deg) rotateZ(-2deg); }
+    50% { transform:scale(.5) rotateX(-12deg) rotateY(-115deg) rotateZ(5deg); }
+    58%,92% { transform:scale(.5) rotateX(-12deg) rotateY(-205deg) rotateZ(2deg); }
+    100% { transform:scale(.5) rotateX(-12deg) rotateY(-295deg) rotateZ(-5deg); }
+  }
   @keyframes boni-roll { to { transform:rotateZ(360deg); } }
 }
 @media (min-width:980px) and (prefers-reduced-motion:reduce) {
