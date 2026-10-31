@@ -120,7 +120,7 @@
     <!-- Main Content Pages Container -->
     <main class="app-content">
 
-      <div class="desktop-only desktop-heading"><div><p>مساحتك المالية / بوني</p><h1 id="desktopPageTitle">نظرة عامة</h1></div><div class="desktop-actions"><button class="btn btn-secondary" onclick="app.openModal('newExpenseModal')">− تسجيل مصروف</button><button class="btn btn-primary" onclick="app.openModal('newIncomeModal')">＋ إضافة قبض</button></div></div>
+      <div class="desktop-only desktop-heading"><div><p>مساحتك المالية / بوني</p><h1 id="desktopPageTitle">فلوسك تحت سيطرتك.</h1><div class="desktop-description">حساباتك، قبضك ومصاريفك. صورة واضحة لكل جنيه، وخطوة أقرب لهدفك.</div></div><div class="desktop-actions"><button class="btn btn-secondary" onclick="app.openModal('newExpenseModal')">− تسجيل مصروف</button><button class="btn btn-primary" onclick="app.openModal('newIncomeModal')">＋ إضافة قبض</button></div></div>
       <!-- 🔔 Smart Alerts Card -->
       <div class="card" id="smartAlertsCard" style="display:none; border-top: 2px solid var(--warning);">
         <!-- populated by renderSmartAlerts() -->
@@ -865,6 +865,7 @@
 
       </section>
 
+      <div class="desktop-only desktop-endmark" aria-hidden="true">BONY</div>
     </main>
 
     <!-- Bottom Navigation Bar -->

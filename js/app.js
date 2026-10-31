@@ -1402,7 +1402,7 @@ class BHApp {
 
     this.currentTab = viewId;
     const desktopTitle = document.getElementById('desktopPageTitle');
-    if (desktopTitle) desktopTitle.textContent = ({ dashboardView: 'نظرة عامة', incomesView: 'القبض والدخل', expensesView: 'المصاريف', goalsView: 'الأهداف والديون', challengesView: 'التحديات والإنجازات', moreView: 'الأدوات والإعدادات', walletView: 'حساباتي وكروتي', workView: 'جدول الشغل' })[viewId] || 'بوني';
+    if (desktopTitle) desktopTitle.textContent = ({ dashboardView: 'فلوسك تحت سيطرتك.', incomesView: 'القبض والدخل', expensesView: 'المصاريف', goalsView: 'الأهداف والديون', challengesView: 'التحديات والإنجازات', moreView: 'الأدوات والإعدادات', walletView: 'حساباتي وكروتي', workView: 'جدول الشغل' })[viewId] || 'بوني';
     if (viewId === 'moreView') {
       this.renderReportChart();
     }
