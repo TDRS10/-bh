@@ -18,6 +18,7 @@
     let visible = false, uid = null, generation = 0, query = null, callback = null;
     let connectedRef = null, connectedCallback = null, connected = false, loaded = false, sending = false;
     let admin = false, rows = [], lastSent = 0, failed = false;
+    let renderQueued = false;
     const state = () => root.BHFirebase.getState();
     function status(text) { $('chatStatus').textContent = text; }
     function controls() { send.disabled = !loaded || !connected || sending || failed; }
@@ -41,6 +42,14 @@
       return el;
     }
     function bottom() { list.scrollTop = list.scrollHeight; $('chatLatest').hidden = true; }
+    function scheduleRender() {
+      if (renderQueued) return;
+      renderQueued = true;
+      const flush = () => { renderQueued = false; if (visible && uid) render(); };
+      if (typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(flush);
+      else if (typeof root.setTimeout === 'function') root.setTimeout(flush, 0);
+      else flush();
+    }
     function render() {
       const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 100;
       const scroll = list.scrollTop;
@@ -109,7 +118,7 @@
       s.user.getIdTokenResult().then(result => {
         if (version !== generation) return;
         admin = result.claims.chatAdmin === true;
-        if (loaded) render();
+        if (loaded) scheduleRender();
       }).catch(() => {});
       connectedRef = s.db.ref('.info/connected');
       connectedCallback = snap => {
@@ -122,7 +131,7 @@
       callback = snap => {
         if (version !== generation) return;
         rows = []; snap.forEach(child => { rows.push({ key:child.key, value:child.val() }); });
-        render(); loaded = true; failed = false; controls();
+        loaded = true; failed = false; scheduleRender(); controls();
         status(connected ? 'متصل · الرسائل بتتحدث تلقائيًا' : 'الاتصال مقطوع؛ الإرسال متوقف.');
       };
       query.on('value', callback, err => {

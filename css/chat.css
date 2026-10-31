@@ -10,7 +10,7 @@
 .chat-status { min-height:28px; padding-block:6px; font-size:.8rem; line-height:1.8; color:#fda4af; }
 .chat-gate { text-align:center; padding:40px 12px; line-height:2; }
 .chat-gate .btn { margin-top:18px; }
-.chat-messages { height:clamp(280px,48vh,540px); overflow-y:auto; overscroll-behavior:contain; padding:12px 6px; display:flex; flex-direction:column; gap:16px; scrollbar-width:thin; }
+.chat-messages { height:clamp(280px,48vh,540px); min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; contain:content; padding:12px 6px; display:flex; flex-direction:column; gap:16px; scrollbar-width:thin; }
 .chat-message { flex-shrink:0; width:85%; align-self:flex-end; border:1px solid var(--border); border-radius:16px 16px 16px 4px; background:#ffffff05; padding:14px; overflow-wrap:anywhere; }
 .chat-message.is-own { align-self:flex-start; border-radius:16px 16px 4px 16px; background:#fb71850b; border-color:#fb718533; }
 .chat-message header { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; }
@@ -29,7 +29,17 @@
 .chat-composer .btn { flex-shrink:0; }
 .chat-latest { margin:10px auto; }
 .chat-empty { text-align:center; margin:auto; color:var(--text-secondary); line-height:2; }
-@media(max-width:600px) { .chat-message { width:94%; } .chat-composer small { font-size:.63rem; } .chat-shell { padding:16px; } }
+@media(max-width:600px) {
+  .chat-message { width:94%; }
+  .chat-composer small { font-size:.63rem; }
+  .chat-shell { width:100%; padding:16px; overflow:hidden; }
+  .chat-heading { align-items:flex-start; }
+  .chat-heading h2 { font-size:1.35rem; }
+  .chat-heading p { font-size:.68rem; }
+  .chat-messages { height:min(46dvh,420px); max-height:420px; }
+  .chat-composer > div { align-items:flex-end; }
+  .chat-composer small { max-width:62%; }
+}
 @media(max-width:979px) {
   .chat-open { position:fixed; bottom:calc(88px + env(safe-area-inset-bottom)); left:16px; width:44px; height:44px; z-index:70; background:#241019; border:1px solid #fb718577; box-shadow:0 4px 20px #0006; }
 }
