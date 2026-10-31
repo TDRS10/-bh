@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/wallet.css">
   <link rel="stylesheet" href="css/desktop.css">
+  <link rel="stylesheet" href="css/boni-scooter.css">
   <!-- Paint the dark background immediately — prevents any white flash -->
   <style>
     html, body { background: #04060A; }
@@ -120,7 +121,7 @@
     <!-- Main Content Pages Container -->
     <main class="app-content">
 
-      <div class="desktop-only desktop-heading"><div><p>مساحتك المالية / بوني</p><h1 id="desktopPageTitle">فلوسك تحت سيطرتك.</h1><div class="desktop-description">حساباتك، قبضك ومصاريفك. صورة واضحة لكل جنيه، وخطوة أقرب لهدفك.</div></div><div class="desktop-actions"><button class="btn btn-secondary" onclick="app.openModal('newExpenseModal')">− تسجيل مصروف</button><button class="btn btn-primary" onclick="app.openModal('newIncomeModal')">＋ إضافة قبض</button></div></div>
+      <div class="desktop-only desktop-heading"><div><p>مساحتك المالية / بوني</p><h1 id="desktopPageTitle">فلوسك تحت سيطرتك.</h1><div class="desktop-description">حساباتك، قبضك ومصاريفك. صورة واضحة لكل جنيه، وخطوة أقرب لهدفك.</div></div><div id="boniScooterScene" class="boni-scene" role="group" aria-label="بوني بسكوتره ثلاثي الأبعاد"><div class="boni-platform" aria-hidden="true"></div><div class="boni-shadow" aria-hidden="true"></div><div class="boni-viewport" aria-hidden="true"><div class="boni-orbit"><div id="boniScooterModel" class="boni-model"></div></div></div><div class="boni-scene-caption"><span>بوني • جاهز للمشوار</span><button id="boniMotionToggle" type="button" class="boni-motion-toggle" aria-pressed="false">إيقاف الحركة Ⅱ</button></div></div><div class="desktop-actions"><button class="btn btn-secondary" onclick="app.openModal('newExpenseModal')">− تسجيل مصروف</button><button class="btn btn-primary" onclick="app.openModal('newIncomeModal')">＋ إضافة قبض</button></div></div>
       <!-- 🔔 Smart Alerts Card -->
       <div class="card" id="smartAlertsCard" style="display:none; border-top: 2px solid var(--warning);">
         <!-- populated by renderSmartAlerts() -->
@@ -1256,6 +1257,7 @@
   <script src="js/wallet.js"></script>
   <script src="js/app.js"></script>
   <script src="js/cards.js"></script>
+  <script src="js/boni-scooter.js"></script>
   <script>
     // ── Firebase (optional — app works without it) ──
     // Loaded after app.js so BHFirebase is defined before init runs
