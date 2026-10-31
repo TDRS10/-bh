@@ -17,6 +17,7 @@
           ".validate": "newData.hasChildren(['uid', 'name', 'text', 'createdAt'])",
           "uid": { ".validate": "newData.isString() && ((!data.exists() && newData.val() === auth.uid) || newData.val() === data.val())" },
           "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60 && (!data.exists() || newData.val() === data.val())" },
+          "photoURL": { ".validate": "newData.isString() && newData.val().length <= 500 && newData.val().indexOf('https://') === 0 && (!data.exists() || newData.val() === data.val())" },
           "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000 && (!data.exists() || newData.val() === data.val())" },
           "createdAt": { ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || newData.val() === data.val())" },
           "reactions": {

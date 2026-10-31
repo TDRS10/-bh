@@ -7,7 +7,9 @@
     if (!member(user)) throw new Error('سجّل بحساب Google الأول.');
     text = String(text || '').trim();
     if (!text || text.length > 1000) throw new Error('اكتب رسالة من 1 إلى 1000 حرف.');
-    return { uid: user.uid, name: String(user.displayName || 'عضو بوني').slice(0, 60), text, createdAt: timestamp };
+    const output = { uid: user.uid, name: String(user.displayName || 'عضو بوني').slice(0, 60), text, createdAt: timestamp };
+    if (typeof user.photoURL === 'string' && /^https:\/\//i.test(user.photoURL)) output.photoURL = user.photoURL.slice(0, 500);
+    return output;
   }
   // Exposed pure validation is also used by the regression suite.
   root.BHChatData = { member, message };
@@ -61,7 +63,14 @@
         const own = m.uid === uid;
         const article = node('article', 'chat-message' + (own ? ' is-own' : ''));
         const header = node('header');
-        header.append(node('span', 'chat-avatar', String(m.name || 'ب').slice(0, 1)), node('strong', '', String(m.name || 'عضو بوني') + (own ? ' · أنت' : '')));
+        const avatar = node('span', 'chat-avatar', String(m.name || 'ب').slice(0, 1));
+        if (typeof m.photoURL === 'string' && /^https:\/\//i.test(m.photoURL)) {
+          const image = document.createElement('img');
+          image.className = 'chat-avatar-image'; image.alt = ''; image.loading = 'lazy'; image.src = m.photoURL;
+          image.addEventListener('error', () => { image.remove(); avatar.textContent = String(m.name || 'ب').slice(0, 1); });
+          avatar.textContent = ''; avatar.append(image);
+        }
+        header.append(avatar, node('strong', '', String(m.name || 'عضو بوني') + (own ? ' · أنت' : '')));
         const time = node('time');
         if (typeof m.createdAt === 'number' && Number.isFinite(m.createdAt)) {
           const date = new Date(m.createdAt);
