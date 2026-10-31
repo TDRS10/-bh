@@ -11,6 +11,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/wallet.css">
   <!-- Paint the dark background immediately — prevents any white flash -->
   <style>
     html, body { background: #04060A; }
@@ -125,6 +126,7 @@
 
       <!-- ================= 1. DASHBOARD VIEW ================= -->
       <section id="dashboardView" class="view-page active">
+        <button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>الأرصدة والتحويلات ←</span></button>
 
         <!-- Main Balance Card — أول حاجة في الصفحة -->
         <div class="card balance-card">
@@ -358,37 +360,37 @@
           <form id="riderShiftForm" onsubmit="app.handleRiderShiftSubmit(event)">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div class="form-group">
-                <label class="form-label">عدد الأوردرات</label>
+                <label class="form-label" for="shiftOrders">عدد الأوردرات</label>
                 <input type="number" id="shiftOrders" class="form-control" value="20" required oninput="app.calculateShiftNet()">
               </div>
               <div class="form-group">
-                <label class="form-label">قيمة الأوردر (ج.م)</label>
+                <label class="form-label" for="shiftRate">قيمة الأوردر (ج.م)</label>
                 <input type="number" id="shiftRate" class="form-control" value="22" required oninput="app.calculateShiftNet()">
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
               <div class="form-group">
-                <label class="form-label">البونص</label>
+                <label class="form-label" for="shiftBonus">البونص</label>
                 <input type="number" id="shiftBonus" class="form-control" value="0" oninput="app.calculateShiftNet()">
               </div>
               <div class="form-group">
-                <label class="form-label">Tips (إكرامية)</label>
+                <label class="form-label" for="shiftTips">Tips (إكرامية)</label>
                 <input type="number" id="shiftTips" class="form-control" value="0" oninput="app.calculateShiftNet()">
               </div>
               <div class="form-group">
-                <label class="form-label">بنزين ومصاريف</label>
+                <label class="form-label" for="shiftExpenses">بنزين ومصاريف</label>
                 <input type="number" id="shiftExpenses" class="form-control" value="0" oninput="app.calculateShiftNet()">
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
               <div class="form-group">
-                <label class="form-label">ساعات الشفت (ساعة)</label>
+                <label class="form-label" for="shiftHours">ساعات الشفت (ساعة)</label>
                 <input type="number" id="shiftHours" class="form-control" value="8" step="0.5" oninput="app.calculateShiftNet()">
               </div>
               <div class="form-group">
-                <label class="form-label">المسافة المقطوعة (كم)</label>
+                <label class="form-label" for="shiftKm">المسافة المقطوعة (كم)</label>
                 <input type="number" id="shiftKm" class="form-control" value="100" oninput="app.calculateShiftNet()">
               </div>
             </div>
@@ -396,7 +398,7 @@
             <!-- Shift start time & date (for the work heat map) -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
               <div class="form-group">
-                <label class="form-label">🕐 بداية الشفت (الساعة)</label>
+                <label class="form-label" for="shiftStartHour">🕐 بداية الشفت (الساعة)</label>
                 <select id="shiftStartHour" class="form-control">
                   <option value="6">6 الصبح</option>
                   <option value="7">7 الصبح</option>
@@ -424,7 +426,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">📅 تاريخ الوردية</label>
+                <label class="form-label" for="shiftDate">📅 تاريخ الوردية</label>
                 <input type="date" id="shiftDate" class="form-control">
               </div>
             </div>
@@ -580,8 +582,41 @@
 
       </section>
 
+      <section id="walletView" class="view-page" aria-labelledby="walletTitle">
+        <div class="wallet-heading"><div><p class="wallet-eyebrow">فلوسك في مكانها</p><h2 id="walletTitle">حساباتي وكروتي</h2></div><button class="btn btn-secondary btn-sm" onclick="app.switchTab('dashboardView')">الرئيسية</button></div>
+        <div class="wallet-summary"><span>إجمالي أرصدة الحسابات</span><strong id="walletTotal">٠٫٠٠ ج.م</strong><small id="walletCount">0 حساب</small><p>سجل يدوي مستقل عن ميزانية بوني. الرصيد هنا لا يُضاف مرة أخرى لإجمالي الرئيسية، والعمليات هنا لا تُسجّل تلقائيًا في القبض والمصاريف.</p></div>
+        <p id="walletNegative" class="wallet-warning" hidden>في حساب رصيده سالب بعد الدمج. راجع العمليات من أجهزتك قبل تسجيل سحب جديد.</p>
+        <div id="walletCards" class="wallet-grid"></div>
+        <p id="walletStatus" class="wallet-status" role="status" aria-live="polite"></p>
+        <details class="card wallet-add" id="walletAddDetails"><summary>＋ إضافة كارت أو حساب</summary>
+          <form onsubmit="app.walletAdd(event)" class="wallet-form">
+            <div class="form-group"><label class="form-label" for="walletName">اسم الكارت أو الحساب</label><input id="walletName" class="form-control" maxlength="60" placeholder="مثال: فيزا المرتب" required></div>
+            <div class="wallet-form-row">
+              <div class="form-group"><label class="form-label" for="walletBank">البنك أو المحفظة</label><input id="walletBank" class="form-control" maxlength="60" list="walletBanks" placeholder="مثال: البنك الأهلي"><datalist id="walletBanks"><option value="البنك الأهلي المصري"><option value="بنك مصر"><option value="CIB"><option value="QNB"><option value="بنك القاهرة"><option value="فودافون كاش"><option value="أورنج كاش"><option value="اتصالات كاش"></datalist></div>
+              <div class="form-group"><label class="form-label" for="walletBrand">نوع الكارت</label><select id="walletBrand" class="form-control"><option value="visa">Visa</option><option value="mastercard">Mastercard</option><option value="meeza">ميزة</option><option value="wallet">محفظة إلكترونية</option><option value="cash">كاش</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label" for="walletLast4">آخر 4 أرقام فقط (اختياري)</label><input id="walletLast4" class="form-control" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="1234" dir="ltr"><small>لا تدخل رقم الكارت كاملًا أو الرقم السري أو CVV.</small></div>
+            <div class="form-group"><label class="form-label" for="walletLogoFile">لوجو البنك (اختياري)</label><input id="walletLogoFile" class="form-control" type="file" accept="image/png,image/jpeg,image/webp"><small>صورة لوجو فقط، حتى 2 ميجا. شعار نوع الكارت بيظهر تلقائيًا.</small></div>
+            <div class="form-group"><label class="form-label" for="walletLink">الكارت مربوط بأي حساب؟</label><select id="walletLink" class="form-control" onchange="app.walletLinkChanged()"><option value="">حساب جديد برصيد مستقل</option></select><small>لو كارت تاني لنفس الحساب، اختار الحساب الموجود عشان الرصيد ما يتكررش.</small></div>
+            <div class="form-group" id="walletOpeningGroup"><label class="form-label" for="walletOpening">الرصيد الموجود دلوقتي (ج.م)</label><input id="walletOpening" class="form-control" type="number" min="0" max="1000000000" step="0.01" value="0" required></div>
+            <button id="walletAddButton" type="submit" class="btn btn-primary btn-full">حفظ الكارت</button>
+          </form>
+        </details>
+        <div class="card" id="walletMovement"><h3>تسجيل حركة</h3><p class="wallet-help">نقل فلوس بين حسابين؟ اختار «تحويل» عشان الإجمالي يفضل زي ما هو.</p>
+          <form onsubmit="app.walletMove(event)" class="wallet-form"><fieldset id="walletMovementFieldset">
+            <div class="form-group"><label class="form-label" for="walletKind">نوع العملية</label><select id="walletKind" class="form-control" onchange="app.walletKindChanged()"><option value="deposit">إيداع من خارج الحسابات</option><option value="withdrawal">سحب / مصروف خارج الحسابات</option><option value="transfer">تحويل بين حسابين</option></select></div>
+            <div id="walletFromGroup" class="form-group" hidden><label class="form-label" for="walletFrom">من حساب</label><select id="walletFrom" class="form-control"></select></div>
+            <div id="walletToGroup" class="form-group"><label class="form-label" for="walletTo">إلى حساب</label><select id="walletTo" class="form-control" required></select></div>
+            <div class="wallet-form-row"><div class="form-group"><label class="form-label" for="walletAmount">المبلغ (ج.م)</label><input id="walletAmount" class="form-control" type="number" min="0.01" max="1000000000" step="0.01" required></div><div class="form-group"><label class="form-label" for="walletNote">ملاحظة (اختياري)</label><input id="walletNote" class="form-control" maxlength="160" placeholder="سبب العملية"></div></div>
+            <button class="btn btn-primary btn-full" type="submit">تسجيل العملية</button>
+          </fieldset></form><p id="walletMoveStatus" class="wallet-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="card"><div class="wallet-heading"><h3>سجل العمليات</h3><small id="walletHistoryCount"></small></div><label class="form-label" for="walletFilter">عرض حساب</label><select id="walletFilter" class="form-control" onchange="app.renderWalletHistory()"></select><div id="walletHistory"></div></div>
+      </section>
+
       <!-- ================= 6. MORE / TOOLS VIEW ================= -->
       <section id="moreView" class="view-page">
+        <button class="wallet-entry btn btn-secondary btn-full" onclick="app.switchTab('walletView')">💳 حساباتي وكروتي <span>إدارة الكروت والأرصدة ←</span></button>
 
         <!-- 🧪 فحص شامل — سلامة + حماية + تقرير -->
         <div class="card audit-card">
@@ -599,7 +634,7 @@
             <span class="card-title"><span class="card-icon">🤔</span> ميزة "هل أقدر أصرف؟"</span>
           </div>
           <div class="form-group">
-            <label class="form-label">أدخل المبلغ المزمع صرفه (ج.م)</label>
+            <label class="form-label" for="spendCheckAmount">أدخل المبلغ المزمع صرفه (ج.م)</label>
             <input type="number" id="spendCheckAmount" class="form-control" placeholder="مثال: 500" oninput="app.evaluateCanISpend()">
           </div>
           <div id="spendDecisionResult" class="decision-card decision-green" style="display: none;">
@@ -625,15 +660,15 @@
           </div>
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
             <div class="form-group">
-              <label class="form-label">🔒 التحويش %</label>
+              <label class="form-label" for="ratioSavings">🔒 التحويش %</label>
               <input type="number" id="ratioSavings" class="form-control" value="50">
             </div>
             <div class="form-group">
-              <label class="form-label">🏠 مصاريف %</label>
+              <label class="form-label" for="ratioEssentials">🏠 مصاريف %</label>
               <input type="number" id="ratioEssentials" class="form-control" value="30">
             </div>
             <div class="form-group">
-              <label class="form-label">❤️ خروجات %</label>
+              <label class="form-label" for="ratioOutings">❤️ خروجات %</label>
               <input type="number" id="ratioOutings" class="form-control" value="20">
             </div>
           </div>
@@ -653,15 +688,15 @@
           <div id="strictDailyInfo" style="font-size:0.85rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:9px 10px; border-radius:10px; margin-bottom:12px;"></div>
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
             <div class="form-group">
-              <label class="form-label">🪙 تقريب القبض لأقرب (ج.م)</label>
+              <label class="form-label" for="strictRoundUp">🪙 تقريب القبض لأقرب (ج.م)</label>
               <input type="number" id="strictRoundUp" class="form-control" value="50" min="0">
             </div>
             <div class="form-group">
-              <label class="form-label">💳 سقف الصرف اليومي (ج.م)</label>
+              <label class="form-label" for="strictDailyCap">💳 سقف الصرف اليومي (ج.م)</label>
               <input type="number" id="strictDailyCap" class="form-control" value="300" min="0">
             </div>
             <div class="form-group">
-              <label class="form-label">🔒 قفل الخزنة (يوم)</label>
+              <label class="form-label" for="strictLockDays">🔒 قفل الخزنة (يوم)</label>
               <select id="strictLockDays" class="form-control">
                 <option value="0">بدون قفل</option>
                 <option value="7">7 أيام</option>
@@ -670,7 +705,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">👹 غرامة السحب %</label>
+              <label class="form-label" for="strictPenalty">👹 غرامة السحب %</label>
               <input type="number" id="strictPenalty" class="form-control" value="10" min="0" max="50">
             </div>
           </div>
@@ -712,11 +747,11 @@
           
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
-              <label class="form-label">التحويش الأسبوعي (ج.م)</label>
+              <label class="form-label" for="simWeeklySavings">التحويش الأسبوعي (ج.م)</label>
               <input type="number" id="simWeeklySavings" class="form-control" value="1000" oninput="app.calculateFutureSimulation()">
             </div>
             <div class="form-group">
-              <label class="form-label">الرصيد الحالي (ج.م)</label>
+              <label class="form-label" for="simCurrentBalance">الرصيد الحالي (ج.م)</label>
               <input type="number" id="simCurrentBalance" class="form-control" value="3000" oninput="app.calculateFutureSimulation()">
             </div>
           </div>
@@ -904,15 +939,15 @@
       </div>
       <form id="newIncomeForm" onsubmit="app.handleNewIncome(event)">
         <div class="form-group">
-          <label class="form-label">مبلغ القبض (ج.م)</label>
+          <label class="form-label" for="incomeAmount">مبلغ القبض (ج.م)</label>
           <input type="number" id="incomeAmount" class="form-control" placeholder="مثال: 4000" required>
         </div>
         <div class="form-group">
-          <label class="form-label">تاريخ القبض</label>
+          <label class="form-label" for="incomeDate">تاريخ القبض</label>
           <input type="date" id="incomeDate" class="form-control" required>
         </div>
         <div class="form-group">
-          <label class="form-label">مصدر الدخل</label>
+          <label class="form-label" for="incomeSource">مصدر الدخل</label>
           <select id="incomeSource" class="form-control">
             <option value="طلبات">طلبات (شغل الدليفري)</option>
             <option value="شغل آخر">شغل آخر</option>
@@ -921,14 +956,14 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">حالة الاستلام والقبض</label>
+          <label class="form-label" for="incomeStatus">حالة الاستلام والقبض</label>
           <select id="incomeStatus" class="form-control">
             <option value="received">✅ تم الاستلام فعلياً (تقسيم فوري للرصيد)</option>
             <option value="pending">⏳ قيد الانتظار (تحويل متوقع - لم يُستلم بعد)</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">ملاحظة (اختياري)</label>
+          <label class="form-label" for="incomeNote">ملاحظة (اختياري)</label>
           <input type="text" id="incomeNote" class="form-control" placeholder="مثال: قبض أسبوع طلبات المتوقع">
         </div>
         <button type="submit" class="btn btn-primary btn-full">حفظ عملية القبض</button>
@@ -978,11 +1013,11 @@
       </div>
       <form id="newExpenseForm" onsubmit="app.handleNewExpense(event)">
         <div class="form-group">
-          <label class="form-label">المبلغ (ج.م)</label>
+          <label class="form-label" for="expenseAmount">المبلغ (ج.م)</label>
           <input type="number" id="expenseAmount" class="form-control" placeholder="مثال: 100" required>
         </div>
         <div class="form-group">
-          <label class="form-label">نوع المصروف</label>
+          <label class="form-label" for="expenseCategory">نوع المصروف</label>
           <select id="expenseCategory" class="form-control">
             <option value="أكل">أكل وطعام</option>
             <option value="مواصلات">مواصلات وبنزين</option>
@@ -995,11 +1030,11 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">ملاحظة</label>
+          <label class="form-label" for="expenseNote">ملاحظة</label>
           <input type="text" id="expenseNote" class="form-control" placeholder="مثال: قعدة قهوة مع الأصحاب">
         </div>
         <div class="form-group">
-          <label class="form-label">التاريخ</label>
+          <label class="form-label" for="expenseDate">التاريخ</label>
           <input type="date" id="expenseDate" class="form-control" required>
         </div>
         <button type="submit" class="btn btn-danger btn-full">خصم المصروف</button>
@@ -1022,11 +1057,11 @@
       <div id="withdrawStrictInfo" style="display:none; background: rgba(0, 217, 255, 0.07); border: 1px solid rgba(0, 217, 255, 0.3); padding: 11px 12px; border-radius: var(--radius-md); color: #00D9FF; font-size: 0.85rem; font-weight: 700; margin-bottom: 14px; line-height: 1.6;"></div>
       <form id="withdrawSavingsForm" onsubmit="app.handleWithdrawSavings(event)">
         <div class="form-group">
-          <label class="form-label">المبلغ السحوب من التحويش (ج.م)</label>
+          <label class="form-label" for="withdrawAmount">المبلغ السحوب من التحويش (ج.م)</label>
           <input type="number" id="withdrawAmount" class="form-control" placeholder="أدخل المبلغ" required>
         </div>
         <div class="form-group">
-          <label class="form-label">سبب السحب الاضطراري</label>
+          <label class="form-label" for="withdrawReason">سبب السحب الاضطراري</label>
           <input type="text" id="withdrawReason" class="form-control" placeholder="مثال: طوارئ أو سداد دين عاجل" required>
         </div>
         <button type="submit" class="btn btn-danger btn-full">تأكيد السحب وتحويل للمتاح للصرف</button>
@@ -1043,15 +1078,15 @@
       </div>
       <form id="newGoalForm" onsubmit="app.handleNewGoal(event)">
         <div class="form-group">
-          <label class="form-label">اسم الهدف</label>
+          <label class="form-label" for="goalTitle">اسم الهدف</label>
           <input type="text" id="goalTitle" class="form-control" placeholder="مثال: شراء سكوتر جديد" required>
         </div>
         <div class="form-group">
-          <label class="form-label">المبلغ المطلوب (ج.م)</label>
+          <label class="form-label" for="goalTargetAmount">المبلغ المطلوب (ج.م)</label>
           <input type="number" id="goalTargetAmount" class="form-control" placeholder="11000" required>
         </div>
         <div class="form-group">
-          <label class="form-label">المبلغ المحجوز حالياً (ج.م)</label>
+          <label class="form-label" for="goalCurrentAmount">المبلغ المحجوز حالياً (ج.م)</label>
           <input type="number" id="goalCurrentAmount" class="form-control" value="0">
         </div>
         <button type="submit" class="btn btn-primary btn-full">حفظ الهدف</button>
@@ -1068,23 +1103,23 @@
       </div>
       <form id="newDebtForm" onsubmit="app.handleNewDebt(event)">
         <div class="form-group">
-          <label class="form-label">اسم صاحب الدين</label>
+          <label class="form-label" for="debtTitle">اسم صاحب الدين</label>
           <input type="text" id="debtTitle" class="form-control" placeholder="مثال: أستاذ أحمد" required>
         </div>
         <div class="form-group">
-          <label class="form-label">المبلغ الأصلي (ج.م)</label>
+          <label class="form-label" for="debtTotalAmount">المبلغ الأصلي (ج.م)</label>
           <input type="number" id="debtTotalAmount" class="form-control" placeholder="2000" required>
         </div>
         <div class="form-group">
-          <label class="form-label">المبلغ المسدد حتى الآن (ج.م)</label>
+          <label class="form-label" for="debtPaidAmount">المبلغ المسدد حتى الآن (ج.م)</label>
           <input type="number" id="debtPaidAmount" class="form-control" value="0">
         </div>
         <div class="form-group">
-          <label class="form-label">موعد الاستحقاق</label>
+          <label class="form-label" for="debtDueDate">موعد الاستحقاق</label>
           <input type="date" id="debtDueDate" class="form-control">
         </div>
         <div class="form-group">
-          <label class="form-label">نسبة الفايدة سنوياً % (اختياري)</label>
+          <label class="form-label" for="debtInterest">نسبة الفايدة سنوياً % (اختياري)</label>
           <input type="number" id="debtInterest" class="form-control" placeholder="مثال: 5" step="0.1" min="0">
         </div>
         <button type="submit" class="btn btn-danger btn-full">حفظ الدين</button>
@@ -1158,7 +1193,7 @@
         <!-- Mode: single total -->
         <div id="modeTotalFields">
           <div class="form-group">
-            <label class="form-label">💵 الرصيد المتاح للصرف الآن (ج.م)</label>
+            <label class="form-label" for="adjustSpendable">💵 الرصيد المتاح للصرف الآن (ج.م)</label>
             <input type="number" id="adjustSpendable" class="form-control" value="0" step="0.01" oninput="app.updateAdjustPreview()">
           </div>
           <label class="adjust-check">
@@ -1177,11 +1212,11 @@
         <!-- Mode: detailed -->
         <div id="modeDetailFields" style="display:none;">
           <div class="form-group">
-            <label class="form-label">🔒 المحجوز للتحويش (ج.م)</label>
+            <label class="form-label" for="adjustReserved">🔒 المحجوز للتحويش (ج.م)</label>
             <input type="number" id="adjustReserved" class="form-control" value="0" step="0.01" oninput="app.updateAdjustPreview()">
           </div>
           <div class="form-group">
-            <label class="form-label">💳 المتاح للصرف (ج.م)</label>
+            <label class="form-label" for="adjustSpendable2">💳 المتاح للصرف (ج.م)</label>
             <input type="number" id="adjustSpendable2" class="form-control" value="0" step="0.01" oninput="app.updateAdjustPreview()">
           </div>
         </div>
@@ -1190,7 +1225,7 @@
         <div class="adjust-preview" id="adjustPreview"></div>
 
         <div class="form-group">
-          <label class="form-label">سبب التسوية (اختياري)</label>
+          <label class="form-label" for="adjustNote">سبب التسوية (اختياري)</label>
           <input type="text" id="adjustNote" class="form-control" placeholder="مثال: عدّيت فلوسي ولا حاططها" maxlength="60">
         </div>
 
@@ -1212,7 +1247,9 @@
     <div class="splash-subtitle">إدارة أموالك</div>
   </div>
 
+  <script src="js/wallet.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/cards.js"></script>
   <script>
     // ── Firebase (optional — app works without it) ──
     // Loaded after app.js so BHFirebase is defined before init runs
@@ -1231,7 +1268,6 @@
 
       function loadNext(cdnIdx) {
         if (loaded >= FILES.length) {
-          console.warn('[بوني] Firebase SDK unavailable — cloud sync disabled, app works normally');
           return;
         }
         var s = document.createElement('script');

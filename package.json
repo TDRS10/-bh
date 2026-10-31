@@ -4,6 +4,7 @@
   "description": "بوني — إدارة الفلوس والقبض لفرسان الدليفري (PWA)",
   "private": true,
   "scripts": {
-    "start": "python -m http.server 8899"
+    "start": "node dev/server.cjs",
+    "test": "node --test tests/*.test.cjs"
   }
 }

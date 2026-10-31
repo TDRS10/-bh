@@ -198,7 +198,8 @@ window.BHFirebase = (function () {
       })
       .catch(function (e) {
         setStatus(state.status === 'syncing' ? 'offline' : 'error', e.message);
-        return null;
+        // A failed read is NOT an empty account: callers must not overwrite it.
+        throw e;
       });
   }
 

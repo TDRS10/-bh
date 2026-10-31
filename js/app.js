@@ -9,6 +9,16 @@ const BACKUP_TIME_KEY = 'BH_LAST_BACKUP_TIME';
 const SYNC_TIME_KEY = 'BH_LAST_SYNC_TIME';
 const LOCAL_TIME_KEY = 'BH_LOCAL_UPDATED_AT';
 
+// Calendar days must follow the device's timezone, not UTC.
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+// Attribute escaping alone does not escape a JavaScript string in onclick.
+function jsArg(value) {
+  return esc(JSON.stringify(String(value)));
+}
+
 // Escape user-entered text before injecting it into innerHTML
 function esc(str) {
   if (str === null || str === undefined) return '';
@@ -31,7 +41,7 @@ class BHApp {
 
   // Initial State Factory
   getDefaultData() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     return {
       settings: {
         savingsRatio: 50,
@@ -60,6 +70,9 @@ class BHApp {
       },
       balancesAt: 0,
       workDaysAt: {},
+      walletAccounts: [],
+      walletCards: [],
+      walletEntries: [],
       incomes: [],
       expenses: [],
       goals: [
@@ -81,11 +94,64 @@ class BHApp {
   }
 
   // Load from LocalStorage with fallback
+  validateData(data) {
+    if (typeof BHWallet !== 'undefined') BHWallet.validate(data);
+    const object = value => value && typeof value === 'object' && !Array.isArray(value);
+    if (!object(data)) throw new Error('Invalid data object');
+    for (const key of ['settings', 'balances', 'workDays', 'workDaysAt', '_tombstones']) {
+      if (data[key] !== undefined && !object(data[key])) throw new Error('Invalid ' + key);
+    }
+    const required = {
+      incomes: ['amount'], expenses: ['amount'], pendingIncomes: ['amount'],
+      goals: ['targetAmount', 'currentAmount'], debts: ['totalAmount', 'paidAmount'],
+      workSessions: [], adjustments: [], walletAccounts: [], walletCards: [], walletEntries: []
+    };
+    for (const [key, fields] of Object.entries(required)) {
+      if (data[key] === undefined) continue;
+      if (!Array.isArray(data[key])) throw new Error('Invalid ' + key);
+      for (const entry of data[key]) {
+        if (!object(entry)) throw new Error('Invalid entry');
+        for (const field of fields) {
+          if (!Number.isFinite(entry[field]) || entry[field] < 0) throw new Error('Invalid ' + field);
+        }
+        if (entry.id !== undefined && typeof entry.id !== 'string') throw new Error('Invalid id');
+      }
+    }
+    const numeric = new Set(['reservedSavings', 'spendableBalance', 'amount', 'savingsAmt',
+      'essentialsAmt', 'outingsAmt', 'savingsReleased', 'targetAmount', 'currentAmount',
+      'totalAmount', 'paidAmount', 'balancesAt', 'savingsRatio', 'essentialsRatio',
+      'outingsRatio', 'weeklyOutingsBudget', 'dailyWorkTarget']);
+    const visit = value => {
+      if (!value || typeof value !== 'object') return;
+      for (const [key, child] of Object.entries(value)) {
+        if (['__proto__', 'prototype', 'constructor'].includes(key)) throw new Error('Unsafe key');
+        if (numeric.has(key) && !Number.isFinite(child)) throw new Error('Invalid number');
+        visit(child);
+      }
+    };
+    visit(data);
+    return data;
+  }
+
+  normalizeData(data) {
+    this.validateData(data);
+    const defaults = this.getDefaultData();
+    return {
+      ...defaults, ...data,
+      balances: { ...defaults.balances, ...data.balances },
+      settings: {
+        ...defaults.settings, ...data.settings,
+        strict: { ...defaults.settings.strict, ...data.settings?.strict },
+        challenges: data.settings?.challenges || {}, badges: data.settings?.badges || {}
+      }
+    };
+  }
+
   loadData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return this.getDefaultData();
-      const parsed = JSON.parse(raw);
+      const parsed = this.normalizeData(JSON.parse(raw));
       // Merge with defaults in case of missing keys
       const merged = { ...this.getDefaultData(), ...parsed, pendingIncomes: parsed.pendingIncomes || [] };
       merged.workSessions = parsed.workSessions || [];
@@ -116,7 +182,7 @@ class BHApp {
         const parsed = JSON.parse(s.payload);
         if (parsed && parsed.balances && Array.isArray(parsed.incomes)) {
           console.log('Recovered data from snapshot');
-          return parsed;
+          return this.normalizeData(parsed);
         }
       } catch (e) { /* try the next one */ }
     }
@@ -224,6 +290,8 @@ class BHApp {
           this.pullFromCloud();   // اسحب مرة واحدة بعد التأكد من الجلسة
         }
       } else if (!st.user && this._cloudSubUid) {
+        this._cloudReady = false;
+        clearTimeout(this._cloudPushTimer);
         // خرج من الحساب → افصل الاستماع
         this._cloudSubUid = null;
         try { window.BHFirebase.unsubscribeRealtime(); } catch (e) { /* ignore */ }
@@ -312,7 +380,10 @@ class BHApp {
     // The REAL age of our local data (not the sign-in time!)
     const localUpdatedAt = parseInt(localStorage.getItem(LOCAL_TIME_KEY) || '0', 10);
 
-    window.BHFirebase.pull().then((envelope) => {
+    const uid = window.BHFirebase.getUser()?.uid;
+    if (!uid) return Promise.resolve();
+    return window.BHFirebase.pull().then((envelope) => {
+      if (window.BHFirebase.getUser()?.uid !== uid) return;
       if (!envelope) {
         // Nothing in the cloud yet → upload ours
         this._lastPushAt = Date.now();   // عشان صدى رفعتنا إحنا مايتبلعش غلط
@@ -347,17 +418,32 @@ class BHApp {
         if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
       });
       this.renderAll();
+    }).catch((error) => {
+      console.warn('Cloud read failed; local and remote data retained', error);
+      this.showToast('⚠️ تعذرت قراءة السحابة — لم يتم رفع أو استبدال البيانات');
     });
   }
 
   // Merge cloud data with local data — union of all entries,
   // إلا الحاجة اللي اتمسحت (متسجلة في _tombstones) — دي عمرها ما بترجع.
   mergeCloudData(local, remote, remoteUpdatedAt, localUpdatedAt) {
+    this.validateData(local);
+    this.validateData(remote);
     const out = JSON.parse(JSON.stringify(local || {}));
     let changed = false;
 
     // 🔐 Tombstones (شنط الجثث): كل آي دي اتمسح من أي جهاز — ما يرجّعوش مرة تانية
-    const tom = Object.assign({}, (local && local._tombstones) || {}, (remote && remote._tombstones) || {});
+    const tom = {};
+    for (const source of [local._tombstones || {}, remote._tombstones || {}]) {
+      for (const [collection, entries] of Object.entries(source)) {
+        if (!['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments', 'workDays', 'walletAccounts', 'walletCards', 'walletEntries'].includes(collection)) continue;
+        if (!tom[collection]) tom[collection] = {};
+        for (const [id, timestamp] of Object.entries(entries)) {
+          if (['__proto__', 'constructor', 'prototype'].includes(id)) continue;
+          tom[collection][id] = Math.max(tom[collection][id] || 0, timestamp);
+        }
+      }
+    }
     if (JSON.stringify((local && local._tombstones) || {}) !== JSON.stringify(tom)) changed = true;
     out._tombstones = tom;
     const isDead = (coll, id) => !!(id && tom[coll] && tom[coll][id]);
@@ -390,6 +476,8 @@ class BHApp {
       return res;
     };
 
+    for (const key of ['walletAccounts', 'walletCards', 'walletEntries']) out[key] = union(local[key], remote[key], key);
+
     out.incomes = union(local.incomes, remote.incomes, 'incomes');
     out.expenses = union(local.expenses, remote.expenses, 'expenses');
     out.goals = union(local.goals, remote.goals, 'goals');
@@ -405,6 +493,12 @@ class BHApp {
     const wdBefore = JSON.stringify(out.workDays || {});
     out.workDays = Object.assign({}, remoteWd, localWd);
     out.workDaysAt = Object.assign({}, remoteWdAt, localWdAt);
+    Object.keys(remoteWd).forEach(k => {
+      if ((remoteWdAt[k] || 0) > (localWdAt[k] || 0)) {
+        out.workDays[k] = remoteWd[k];
+        out.workDaysAt[k] = remoteWdAt[k];
+      }
+    });
     let tombKilled = false;
     Object.keys(tom.workDays || {}).forEach(k => {
       const tTs = tom.workDays[k] || 0;
@@ -736,7 +830,7 @@ class BHApp {
 
       // جودة السجلات: آي ديز ممكررة/تايهة
       let noId = 0, dupes = 0;
-      ['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments'].forEach(c0 => {
+      ['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments', 'walletAccounts', 'walletCards', 'walletEntries'].forEach(c0 => {
         if (!Array.isArray(this.data[c0])) return;
         const seen = new Set();
         this.data[c0].forEach(x => {
@@ -1031,7 +1125,8 @@ class BHApp {
   getSnapshots() {
     try {
       const raw = localStorage.getItem(SNAPSHOT_KEY);
-      return raw ? JSON.parse(raw) : [];
+      const snapshots = raw ? JSON.parse(raw) : [];
+      return Array.isArray(snapshots) ? snapshots.filter(s => s && typeof s.payload === 'string') : [];
     } catch (e) {
       return [];
     }
@@ -1268,7 +1363,7 @@ class BHApp {
 
   // Set default dates to today
   initDateInputs() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     ['incomeDate', 'expenseDate', 'shiftDate'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = today;
@@ -1309,6 +1404,7 @@ class BHApp {
     if (viewId === 'moreView') {
       this.renderReportChart();
     }
+    if (viewId === 'walletView') this.renderWallet();
     if (viewId === 'workView') {
       this.renderWorkCalendar();
     }
@@ -1496,7 +1592,7 @@ class BHApp {
 
     const toast = document.createElement('div');
     toast.className = 'toast';
-    toast.innerHTML = `<span>${message}</span>`;
+    toast.textContent = message;
 
     container.appendChild(toast);
     setTimeout(() => {
@@ -1548,12 +1644,12 @@ class BHApp {
   handleNewIncome(e) {
     e.preventDefault();
     const amount = parseFloat(document.getElementById('incomeAmount').value);
-    const date = document.getElementById('incomeDate').value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('incomeDate').value || localDateKey();
     const source = document.getElementById('incomeSource').value;
     const notes = document.getElementById('incomeNote').value || '';
     const status = (document.getElementById('incomeStatus') && document.getElementById('incomeStatus').value) || 'received';
 
-    if (isNaN(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       this.showToast('⚠️ يرجى إدخال مبلغ قبض صحيح');
       return;
     }
@@ -1671,7 +1767,7 @@ class BHApp {
       ...(stStrict.enabled && stStrict.lockDays > 0
         ? { lockedUntil: Date.now() + stStrict.lockDays * 86400000 }
         : {}),
-      date: new Date().toISOString().split('T')[0],
+      date: localDateKey(),
       source: item.source,
       notes: item.notes ? `استلام قبض منتظر: ${item.notes}` : 'استلام قبض كان قيد الانتظار'
     });
@@ -1716,9 +1812,9 @@ class BHApp {
     const amount = parseFloat(document.getElementById('expenseAmount').value);
     const category = document.getElementById('expenseCategory').value;
     const note = document.getElementById('expenseNote').value || '';
-    const date = document.getElementById('expenseDate').value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('expenseDate').value || localDateKey();
 
-    if (isNaN(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       this.showToast('⚠️ يرجى إدخال مبلغ مصروف صحيح');
       return;
     }
@@ -1832,7 +1928,7 @@ class BHApp {
     const amount = parseFloat(document.getElementById('withdrawAmount').value);
     const reason = document.getElementById('withdrawReason').value;
 
-    if (isNaN(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       this.showToast('⚠️ يرجى إدخال مبلغ صحيح');
       return;
     }
@@ -1877,7 +1973,7 @@ class BHApp {
     }
 
     // Reset Streak!
-    this.data.settings.lastSavingsWithdrawalDate = new Date().toISOString().split('T')[0];
+    this.data.settings.lastSavingsWithdrawalDate = localDateKey();
 
     // Log as a special expense note
     this.data.expenses.unshift({
@@ -1885,7 +1981,7 @@ class BHApp {
       amount: 0,
       category: 'سحب تحويش',
       note: `سحب ${amount} ج.م من التحويش${penalty ? ` + غرامة ${penalty} ج.م (${stStrict.penaltyPct}%) بتتحرق` : ''} (سبب: ${reason})`,
-      date: new Date().toISOString().split('T')[0]
+      date: localDateKey()
     });
 
     this.saveData();
@@ -1958,7 +2054,7 @@ class BHApp {
     const hours = parseFloat(document.getElementById('shiftHours').value) || 0;
     const km = parseFloat(document.getElementById('shiftKm').value) || 0;
     const hour = parseInt(document.getElementById('shiftStartHour').value, 10);
-    const shiftDate = document.getElementById('shiftDate').value || new Date().toISOString().split('T')[0];
+    const shiftDate = document.getElementById('shiftDate').value || localDateKey();
 
     if (!this.data.workSessions) this.data.workSessions = [];
     this.data.workSessions.unshift({
@@ -2022,7 +2118,7 @@ class BHApp {
     // 🛡️ وضع القسوة: السقف اليومي بيغلب أي حاجة
     const stStrict = this.getStrict();
     if (stStrict.enabled && stStrict.dailyCap > 0) {
-      const spent = this.getSpentOn(new Date().toISOString().split('T')[0]);
+      const spent = this.getSpentOn(localDateKey());
       const rem = Math.max(0, stStrict.dailyCap - spent);
       if (amt > rem) {
         box.className = 'decision-card decision-red';
@@ -2064,7 +2160,7 @@ class BHApp {
       title,
       targetAmount,
       currentAmount,
-      date: new Date().toISOString().split('T')[0]
+      date: localDateKey()
     });
 
     this.saveData();
@@ -2084,7 +2180,9 @@ class BHApp {
     const interestEl = document.getElementById('debtInterest');
     const interest = interestEl ? (parseFloat(interestEl.value) || 0) : 0;
 
-    if (!creditor || isNaN(totalAmount) || totalAmount <= 0) {
+    if (!creditor || !Number.isFinite(totalAmount) || totalAmount <= 0 ||
+        !Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > totalAmount ||
+        !Number.isFinite(interest) || interest < 0) {
       this.showToast('⚠️ يرجى إدخال اسم صاحب الدين والمبلغ الأصلي');
       return;
     }
@@ -2115,7 +2213,11 @@ class BHApp {
     const amtStr = prompt(`أدخل مبلغ السداد للدين (${esc(debt.creditor)}) - المتبقي: ${remaining} ج.م:`, remaining);
     const payAmt = parseFloat(amtStr);
 
-    if (!isNaN(payAmt) && payAmt > 0) {
+    if (Number.isFinite(payAmt) && payAmt > 0) {
+      if (payAmt > remaining) {
+        this.showToast('⚠️ مبلغ السداد أكبر من المتبقي من الدين');
+        return;
+      }
       if (payAmt > this.data.balances.spendableBalance) {
         this.showToast('⚠️ المبلغ المتاح للصرف غير كافٍ لسداد هذا الدين!');
         return;
@@ -2131,7 +2233,7 @@ class BHApp {
         amount: payAmt,
         category: 'ديون',
         note: `سداد جزء من دين ${esc(debt.creditor)}`,
-        date: new Date().toISOString().split('T')[0]
+        date: localDateKey()
       });
 
       this.saveData();
@@ -2317,7 +2419,7 @@ class BHApp {
     const dInfo = document.getElementById('strictDailyInfo');
     if (dInfo) {
       if (st.enabled && st.dailyCap > 0) {
-        const spent = this.getSpentOn(new Date().toISOString().split('T')[0]);
+        const spent = this.getSpentOn(localDateKey());
         const rem = Math.max(0, st.dailyCap - spent);
         dInfo.innerHTML = `💳 صرفت النهارده <strong>${spent.toLocaleString()} ج.م</strong> من سقف ${st.dailyCap.toLocaleString()} — فاضل ${rem.toLocaleString()} ج.م بس`;
       } else {
@@ -2351,11 +2453,12 @@ class BHApp {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const imported = JSON.parse(e.target.result);
-        if (!imported.balances || !imported.incomes) {
+        const raw = JSON.parse(e.target.result);
+        if (!raw || !raw.balances || !Array.isArray(raw.incomes)) {
           this.showToast('⚠️ ملف البيانات غير صالح');
           return;
         }
+        const imported = this.normalizeData(raw);
 
         // Offer merge vs replace — never silently wipe existing data
         const curIncomes = (this.data.incomes || []).length;
@@ -2371,6 +2474,8 @@ class BHApp {
           this.mergeImported(imported);
           this.showToast('🎉 تم دمج البيانات بنجاح!', 'success');
         } else {
+          if (!confirm('تأكيد استبدال كل بيانات الجهاز بالملف؟ إلغاء يحافظ على بياناتك الحالية.')) return;
+          this._saveSnapshot();
           this.data = imported;
           this.saveData();
           this.showToast('🎉 تم استعادة البيانات بنجاح!', 'success');
@@ -2388,9 +2493,14 @@ class BHApp {
 
   // Merge imported data into the current data (keeps everything, dedupes by id)
   mergeImported(imported) {
+    this.validateData(imported);
     const mergeList = (cur, inc, key) => {
       const seen = new Set((cur || []).map(x => x.id));
-      const add = (inc || []).filter(x => !x.id || !seen.has(x.id));
+      const add = (inc || []).filter(x => {
+        if (x.id && seen.has(x.id)) return false;
+        if (x.id) seen.add(x.id);
+        return true;
+      });
       return [...add, ...(cur || [])];
     };
 
@@ -2401,13 +2511,12 @@ class BHApp {
     this.data.pendingIncomes = mergeList(this.data.pendingIncomes, imported.pendingIncomes);
     this.data.workSessions = mergeList(this.data.workSessions, imported.workSessions);
     this.data.adjustments = mergeList(this.data.adjustments, imported.adjustments);
+    for (const key of ['walletAccounts', 'walletCards', 'walletEntries']) this.data[key] = mergeList(this.data[key], imported[key]);
 
-    // Balances: take the newer/highest sensible values
-    this.data.balances = {
-      reservedSavings: Math.max(this.data.balances.reservedSavings || 0, imported.balances?.reservedSavings || 0),
-      spendableBalance: Math.max(this.data.balances.spendableBalance || 0, imported.balances?.spendableBalance || 0)
-    };
-    this.touchBalances();
+    // An older backup must not resurrect money already spent.
+    // Keep current balances during merge; restore mode replaces the full state.
+    this.data.workDays = { ...imported.workDays, ...this.data.workDays };
+    this.data.workDaysAt = { ...imported.workDaysAt, ...this.data.workDaysAt };
 
     this.saveData();
   }
@@ -2418,8 +2527,8 @@ class BHApp {
       this._saveSnapshot();
       // 🔐 شنطة جماعية: سجّل كل الآي هات القديم — عشان المزامنة ما ترجّعهمش من السحابة
       const old = this.data;
-      const tom = { incomes: {}, expenses: {}, goals: {}, debts: {}, pendingIncomes: {}, workSessions: {}, adjustments: {}, workDays: {} };
-      ['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments'].forEach(c => {
+      const tom = { incomes: {}, expenses: {}, goals: {}, debts: {}, pendingIncomes: {}, workSessions: {}, adjustments: {}, workDays: {}, walletAccounts: {}, walletCards: {}, walletEntries: {} };
+      ['incomes', 'expenses', 'goals', 'debts', 'pendingIncomes', 'workSessions', 'adjustments', 'walletAccounts', 'walletCards', 'walletEntries'].forEach(c => {
         (old[c] || []).forEach(x => { if (x && x.id) tom[c][x.id] = Date.now(); });
       });
       Object.keys(old.workDays || {}).forEach(k => { tom.workDays[k] = Date.now(); });
@@ -2437,7 +2546,7 @@ class BHApp {
     if (!this.data.workSessions) return;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffKey = cutoff.toISOString().split('T')[0];
+    const cutoffKey = localDateKey(cutoff);
     const before = this.data.workSessions.length;
     this.data.workSessions = this.data.workSessions.filter(w => w.date >= cutoffKey);
     if (this.data.workSessions.length !== before) this.saveData();
@@ -2983,6 +3092,7 @@ class BHApp {
 
   // Render Master Logic
   renderAll() {
+    if (this.renderWallet) this.renderWallet();
     this.renderHeaderWorkChip();
     this.renderMascot();
     this.renderPeakStrip();
@@ -3118,12 +3228,12 @@ class BHApp {
           <div class="item-icon outing">⏳</div>
           <div class="item-details">
             <span class="item-title">${esc(item.source)} — ${item.amount.toLocaleString()} ج.م</span>
-            <span class="item-sub">${esc(item.notes || 'قبض منتظر')} • ${item.date}</span>
+            <span class="item-sub">${esc(item.notes || 'قبض منتظر')} • ${esc(item.date)}</span>
           </div>
         </div>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button class="btn btn-savings btn-sm" onclick="app.confirmPendingIncome('${item.id}')">✅ تم الاستلام</button>
-          <button class="delete-btn" onclick="app.deletePendingIncome('${item.id}')" title="حذف">🗑️</button>
+          <button class="btn btn-savings btn-sm" onclick="app.confirmPendingIncome(${jsArg(item.id)})">✅ تم الاستلام</button>
+          <button class="delete-btn" onclick="app.deletePendingIncome(${jsArg(item.id)})" title="حذف">🗑️</button>
         </div>
       </div>
     `).join('');
@@ -3316,7 +3426,7 @@ class BHApp {
             <div class="item-icon ${iconClass}">${iconSymbol}</div>
             <div class="item-details">
               <span class="item-title">${isInc ? 'قبض: ' + esc(item.source) : esc(item.category)}</span>
-              <span class="item-sub">${item.date} ${(item.notes || item.note) ? '• ' + esc(item.notes || item.note) : ''}</span>
+              <span class="item-sub">${esc(item.date)} ${(item.notes || item.note) ? '• ' + esc(item.notes || item.note) : ''}</span>
             </div>
           </div>
           <div class="item-amount ${colorClass}">${amountSign}${item.amount.toLocaleString()} ج.م</div>
@@ -3340,13 +3450,13 @@ class BHApp {
           <div class="item-icon income">💵</div>
           <div class="item-details">
             <span class="item-title">قبض (${esc(inc.source)})</span>
-            <span class="item-sub">${inc.date} ${inc.notes ? '• ' + inc.notes : ''}</span>
+            <span class="item-sub">${esc(inc.date)} ${inc.notes ? '• ' + esc(inc.notes) : ''}</span>
             <small style="color: var(--text-muted); font-size: 0.72rem;">🔒تحويش: ${inc.savingsAmt} | 💳متاح: ${inc.essentialsAmt + inc.outingsAmt}</small>
           </div>
         </div>
         <div style="display:flex; align-items:center;">
           <span class="item-amount positive">+${inc.amount.toLocaleString()} ج.م</span>
-          <button class="delete-btn" onclick="app.deleteItem('income', '${inc.id}')" title="حذف">🗑️</button>
+          <button class="delete-btn" onclick="app.deleteItem('income', ${jsArg(inc.id)})" title="حذف">🗑️</button>
         </div>
       </div>
     `).join('');
@@ -3367,12 +3477,12 @@ class BHApp {
           <div class="item-icon ${exp.category === 'خروجة' ? 'outing' : 'expense'}">${exp.category === 'خروجة' ? '❤️' : '💸'}</div>
           <div class="item-details">
             <span class="item-title">${esc(exp.category)}</span>
-            <span class="item-sub">${exp.date} ${exp.note ? '• ' + exp.note : ''}</span>
+            <span class="item-sub">${esc(exp.date)} ${exp.note ? '• ' + esc(exp.note) : ''}</span>
           </div>
         </div>
         <div style="display:flex; align-items:center;">
           <span class="item-amount negative">-${exp.amount.toLocaleString()} ج.م</span>
-          <button class="delete-btn" onclick="app.deleteItem('expense', '${exp.id}')" title="حذف">🗑️</button>
+          <button class="delete-btn" onclick="app.deleteItem('expense', ${jsArg(exp.id)})" title="حذف">🗑️</button>
         </div>
       </div>
     `).join('');
@@ -3395,7 +3505,7 @@ class BHApp {
         <div class="list-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <strong style="color: #fff;">🎯 ${esc(goal.title)}</strong>
-            <button class="delete-btn" onclick="app.deleteItem('goal', '${goal.id}')">🗑️</button>
+            <button class="delete-btn" onclick="app.deleteItem('goal', ${jsArg(goal.id)})">🗑️</button>
           </div>
           <div class="progress-bar-container" style="margin: 2px 0;">
             <div class="progress-fill fill-savings" style="width: ${percent}%;"></div>
@@ -3449,11 +3559,11 @@ class BHApp {
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <strong style="color: #fff;">📌 ${esc(debt.creditor)}</strong>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">استحقاق: ${debt.dueDate || 'غير محدد'}${urgencyHtml}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">استحقاق: ${esc(debt.dueDate || 'غير محدد')}${urgencyHtml}</div>
             </div>
             <div style="display: flex; gap: 6px;">
-              ${remaining > 0 ? `<button class="btn btn-primary btn-sm" onclick="app.payDebt('${debt.id}')">سداد جزء</button>` : `<span class="streak-badge">تم السداد بالكامل ✅</span>`}
-              <button class="delete-btn" onclick="app.deleteItem('debt', '${debt.id}')">🗑️</button>
+              ${remaining > 0 ? `<button class="btn btn-primary btn-sm" onclick="app.payDebt(${jsArg(debt.id)})">سداد جزء</button>` : `<span class="streak-badge">تم السداد بالكامل ✅</span>`}
+              <button class="delete-btn" onclick="app.deleteItem('debt', ${jsArg(debt.id)})">🗑️</button>
             </div>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
@@ -3532,7 +3642,7 @@ class BHApp {
             </div>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-primary btn-sm" onclick="app.payDebt('${debt.id}')">سداد</button>
+            <button class="btn btn-primary btn-sm" onclick="app.payDebt(${jsArg(debt.id)})">سداد</button>
           </div>
         </div>
       `;
@@ -3554,7 +3664,7 @@ class BHApp {
     const critical = this.getUrgentDebts().filter(x => x.urgency.level !== 'week');
     if (critical.length === 0) return;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     if (this.data.settings.lastDebtNotifyDate === today) return;
 
     this.data.settings.lastDebtNotifyDate = today;
@@ -3804,7 +3914,7 @@ class BHApp {
     let streak = 0;
     const d = new Date();
     for (let i = 0; i < 400; i++) {
-      const key = d.toISOString().split('T')[0];
+      const key = localDateKey(d);
       if (dates.has(key)) {
         streak++;
         d.setDate(d.getDate() - 1);
@@ -3827,7 +3937,7 @@ class BHApp {
     let streak = 0;
     const d = new Date();
     for (let i = 0; i < 400; i++) {
-      const key = d.toISOString().split('T')[0];
+      const key = localDateKey(d);
       if (dates.has(key)) break;
       streak++;
       d.setDate(d.getDate() - 1);
@@ -4561,7 +4671,7 @@ class BHApp {
 
           <div class="form-group">
             <label class="form-label">التاريخ</label>
-            <input type="date" id="shareDate" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+            <input type="date" id="shareDate" class="form-control" value="${localDateKey()}">
           </div>
 
           <button type="submit" class="btn ${isIncome ? 'btn-savings' : 'btn-danger'} btn-full">
@@ -4579,12 +4689,12 @@ class BHApp {
   confirmSharedEntry(e) {
     e.preventDefault();
     const amount = parseFloat(document.getElementById('shareAmount').value);
-    const date = document.getElementById('shareDate').value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('shareDate').value || localDateKey();
     const note = document.getElementById('shareNote').value || '';
     const catEl = document.getElementById('shareCategory');
     const category = catEl ? catEl.value : 'طلبات';
 
-    if (isNaN(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       this.showToast('⚠️ مبلغ غير صحيح');
       return;
     }
@@ -4777,7 +4887,7 @@ class BHApp {
     const noteEl = document.getElementById('adjustNote');
     this.data.adjustments.unshift({
       id: 'adj_' + Date.now(),
-      date: new Date().toISOString().split('T')[0],
+      date: localDateKey(),
       oldTotal, newTotal, diff,
       oldReserved, oldSpendable,
       newReserved, newSpendable,
@@ -5038,9 +5148,9 @@ class BHApp {
       const sessions = this.data.workSessions || [];
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yKey = yesterday.toISOString().split('T')[0];
+      const yKey = localDateKey(yesterday);
       const loggedYesterday = sessions.some(w => w.date === yKey);
-      const loggedToday = sessions.some(w => w.date === new Date().toISOString().split('T')[0]);
+      const loggedToday = sessions.some(w => w.date === localDateKey());
       // Only nag if the user normally works (logged at least once in the last 7 days)
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
@@ -5121,7 +5231,7 @@ class BHApp {
   // Mark an alert as seen (don't show it again today)
   dismissAlert(alertId) {
     const cfg = this.getSmartAlertSettings();
-    cfg.lastShown[alertId] = new Date().toISOString().split('T')[0];
+    cfg.lastShown[alertId] = localDateKey();
     this.data.settings.smartAlerts = Object.assign({}, this.data.settings.smartAlerts, cfg);
     this.saveData();
     this.renderSmartAlerts();
@@ -5134,7 +5244,7 @@ class BHApp {
 
     const all = this.getSmartAlerts();
     const cfg = this.getSmartAlertSettings();
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     // Hide alerts already dismissed today
     const alerts = all.filter(a => cfg.lastShown[a.id] !== today);
 
@@ -5469,7 +5579,7 @@ class BHApp {
         if (statusBox) {
           statusBox.className = 'decision-card decision-yellow';
           statusIcon.textContent = '🆕';
-          statusText.innerHTML = 'تحديث جديد متاح!<br><span style="font-size:.72rem;opacity:.7;">' + commitMsg.substring(0, 60) + '</span><br><span style="font-size:.68rem;opacity:.6;">' + commitDate + '</span>';
+          statusText.innerHTML = 'تحديث جديد متاح!<br><span style="font-size:.72rem;opacity:.7;">' + esc(commitMsg.substring(0, 60)) + '</span><br><span style="font-size:.68rem;opacity:.6;">' + commitDate + '</span>';
         }
         if (applyBtn) applyBtn.style.display = 'flex';
         this._pendingUpdateSHA = latestSHA;
@@ -5533,7 +5643,7 @@ class BHApp {
       if ('caches' in window) {
         var cacheNames = await caches.keys();
         for (var i = 0; i < cacheNames.length; i++) {
-          await caches.delete(cacheNames[i]);
+          if (cacheNames[i].startsWith('bh-finance-')) await caches.delete(cacheNames[i]);
         }
       }
 
@@ -5541,7 +5651,7 @@ class BHApp {
       if ('serviceWorker' in navigator) {
         var registrations = await navigator.serviceWorker.getRegistrations();
         for (var j = 0; j < registrations.length; j++) {
-          await registrations[j].unregister();
+          if (registrations[j].scope === new URL('./', location.href).href) await registrations[j].unregister();
         }
       }
 

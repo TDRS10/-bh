@@ -1,9 +1,12 @@
-const CACHE_NAME = 'bh-finance-v43';
+const CACHE_NAME = 'bh-finance-v45';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/app.js',
+  './js/wallet.js',
+  './js/cards.js',
+  './css/wallet.css',
   './manifest.json',
   './assets/icon-192.png',
   './assets/icon-512.png',
@@ -27,6 +30,7 @@ self.addEventListener('install', (event) => {
           // `cache: 'reload'` forces a fresh network fetch, ignoring the HTTP cache
           cache.add(new Request(url, { cache: 'reload' })).catch((err) => {
             console.warn('[ServiceWorker] Failed to cache:', url, err);
+            if (!url.startsWith('https://')) throw err;
           })
         )
       );
@@ -41,7 +45,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keyList) => {
       return Promise.all(
         keyList.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key.startsWith('bh-finance-') && key !== CACHE_NAME) {
             console.log('[ServiceWorker] Removing old cache', key);
             return caches.delete(key);
           }
@@ -56,6 +60,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  // Never cache API/auth responses or unrelated sites sharing this origin.
+  const allowed = ASSETS.some(asset => {
+    const assetUrl = new URL(asset, self.registration.scope);
+    return url.origin === assetUrl.origin && url.pathname === assetUrl.pathname;
+  });
+  if (!allowed) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
@@ -63,13 +74,13 @@ self.addEventListener('fetch', (event) => {
         // Revalidate in background ONLY for page navigations (HTML).
         // Static assets (css/js/icons) stay cache-first — no wasted network calls on every launch.
         if (event.request.mode === 'navigate') {
-          fetch(event.request)
+          event.waitUntil(fetch(event.request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+                return caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
               }
             })
-            .catch(() => {/* Offline mode */});
+            .catch(() => {/* Offline mode */}));
         }
         return cachedResponse;
       }
@@ -80,15 +91,16 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         }
         const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
+        event.waitUntil(caches.open(CACHE_NAME).then((cache) => {
+          return cache.put(event.request, responseToCache);
+        }));
         return networkResponse;
       }).catch(() => {
         // Return fallback html if offline navigation
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
+        return Response.error();
       });
     })
   );
@@ -114,7 +126,7 @@ self.addEventListener('message', (event) => {
 
   if (event.data.action === 'SCHEDULE_SMART_ALERT') {
     const { timestamp, title, body, tag } = event.data;
-    scheduleSmartAlert(timestamp, title, body, tag);
+    event.waitUntil(scheduleSmartAlert(timestamp, title, body, tag));
   }
 });
 
@@ -131,8 +143,8 @@ async function scheduleSmartAlert(timestamp, title, body, tag) {
 
   const options = {
     body: body,
-    icon: './icon-192.png',
-    badge: './icon-192.png',
+    icon: './assets/icon-192.png',
+    badge: './assets/icon-192.png',
     tag: tag || 'bh-smart-alert',
     requireInteraction: false,
     data: { url: './' }
@@ -143,8 +155,8 @@ async function scheduleSmartAlert(timestamp, title, body, tag) {
       options.showTrigger = new TimestampTrigger(timestamp);
       await self.registration.showNotification(title || 'بوني', options);
     } else {
-      // Fallback: show it now if we can't schedule (still useful info)
-      await self.registration.showNotification(title || 'بوني', options);
+      // A future alert must not be shown immediately on unsupported browsers.
+      return;
     }
   } catch (err) {
     console.warn('[SW] Could not schedule smart alert:', err);
@@ -176,8 +188,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'بوني';
   const options = {
     body: payload.body || '',
-    icon: payload.icon || './icon-192.png',
-    badge: './icon-192.png',
+    icon: payload.icon || './assets/icon-192.png',
+    badge: './assets/icon-192.png',
     tag: payload.tag || 'bh-push',
     data: { url: payload.url || './' },
     requireInteraction: !!payload.requireInteraction
