@@ -3811,3 +3811,44 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
   color: var(--accent);
 }
 .audit-stamp { font-size: .6rem; color: var(--text-muted, var(--text-secondary)); }
+
+/* ═══════ وضع المشوار — لمسة إبداعية للموبايل: طريق بوني + عداد الرصيد ═══════ */
+.bh-road { display: none; }
+@media (max-width: 979px) {
+  .bh-road {
+    display: block; position: relative; height: 30px; margin: 12px 14px 0;
+    border-radius: 999px; overflow: hidden;
+    background: linear-gradient(#0b1218, #070b0f);
+    border: 1px solid rgba(0, 217, 255, 0.28);
+    box-shadow: inset 0 0 14px rgba(0, 217, 255, 0.12), 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  .bh-road::before {
+    content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 3px;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(90deg, rgba(0, 217, 255, 0.85) 0 22px, transparent 22px 44px);
+    animation: bhRoadMove 1.1s linear infinite;
+    filter: drop-shadow(0 0 6px rgba(0, 217, 255, 0.7));
+  }
+  .bh-road::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(55% 130% at 50% 50%, transparent 35%, rgba(3, 6, 10, 0.8) 100%);
+  }
+  .bh-scooter {
+    position: absolute; right: 16px; top: 50%; transform: translateY(-64%);
+    font-size: 16px; z-index: 1;
+    filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.6));
+    animation: bhScooterBob 0.45s ease-in-out infinite alternate;
+  }
+  .balance-card::before {
+    content: ''; position: absolute; top: -140px; left: 50%; width: 420px; height: 420px;
+    transform: translateX(-50%); border-radius: 50%; z-index: -1; pointer-events: none; opacity: 0.5;
+    background: repeating-conic-gradient(from 0deg, rgba(0, 217, 255, 0.55) 0 1.1deg, transparent 1.1deg 8deg);
+    -webkit-mask: radial-gradient(circle, transparent 0 62%, #000 63% 71%, transparent 72%);
+            mask: radial-gradient(circle, transparent 0 62%, #000 63% 71%, transparent 72%);
+  }
+  @keyframes bhRoadMove { to { background-position: -44px 0; } }
+  @keyframes bhScooterBob { from { transform: translateY(-72%); } to { transform: translateY(-56%); } }
+}
+@media (max-width: 979px) and (prefers-reduced-motion: reduce) {
+  .bh-road::before, .bh-scooter { animation: none; }
+}
