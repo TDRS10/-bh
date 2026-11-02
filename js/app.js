@@ -3,11 +3,23 @@
  * Tailored for Delivery Riders with Variable Income
  */
 
-const STORAGE_KEY = 'BH_APP_DATA_V1';
-const SNAPSHOT_KEY = 'BH_APP_SNAPSHOTS';
-const BACKUP_TIME_KEY = 'BH_LAST_BACKUP_TIME';
-const SYNC_TIME_KEY = 'BH_LAST_SYNC_TIME';
-const LOCAL_TIME_KEY = 'BH_LOCAL_UPDATED_AT';
+// -- Storage key helpers (UID-scoped for multi-account safety) ---------------
+// Each Google account gets its own isolated localStorage namespace.
+// Guests (not signed in) use the 'guest' slot; data migrates on first sign-in.
+function _storageUid() {
+  try { return (window.BHFirebase && window.BHFirebase.getUser() && window.BHFirebase.getUser().uid) || 'guest'; } catch (e) { return 'guest'; }
+}
+function getStorageKey(uid)    { return 'BH_APP_DATA_V1_'    + (uid || _storageUid()); }
+function getSnapshotKey(uid)   { return 'BH_APP_SNAPSHOTS_'   + (uid || _storageUid()); }
+function getBackupTimeKey(uid) { return 'BH_LAST_BACKUP_TIME_'+ (uid || _storageUid()); }
+function getSyncTimeKey(uid)   { return 'BH_LAST_SYNC_TIME_'  + (uid || _storageUid()); }
+function getLocalTimeKey(uid)  { return 'BH_LOCAL_UPDATED_AT_'+ (uid || _storageUid()); }
+
+// Legacy fixed keys (kept for one-time migration only)
+const _LEGACY_STORAGE_KEY    = 'BH_APP_DATA_V1';
+const _LEGACY_SNAPSHOT_KEY   = 'BH_APP_SNAPSHOTS';
+const _LEGACY_SYNC_TIME_KEY  = 'BH_LAST_SYNC_TIME';
+const _LEGACY_LOCAL_TIME_KEY = 'BH_LOCAL_UPDATED_AT';
 
 // Calendar days must follow the device's timezone, not UTC.
 function localDateKey(date = new Date()) {
@@ -147,9 +159,74 @@ class BHApp {
     };
   }
 
+
+  // ── Accessibility: Focus Trap for Modals ──────────────────────
+  // Keeps keyboard focus inside an open modal overlay.
+  _trapFocus(el) {
+    if (!el) return;
+    const focusable = el.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last  = focusable[focusable.length - 1];
+    this._focusTrapHandler = (e) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+      }
+    };
+    el.addEventListener('keydown', this._focusTrapHandler);
+    // Move focus inside modal on open
+    setTimeout(() => { if (first) first.focus(); }, 50);
+    this._focusTrapEl = el;
+  }
+
+  _releaseFocus() {
+    if (this._focusTrapEl && this._focusTrapHandler) {
+      this._focusTrapEl.removeEventListener('keydown', this._focusTrapHandler);
+    }
+    this._focusTrapEl = null;
+    this._focusTrapHandler = null;
+  }
+
+  // ── UI: Animate number from old value to new value ───────────
+  animateNumber(el, from, to, duration = 400) {
+    if (!el || from === to) { if (el) el.classList.add('bh-num-anim'); return; }
+    const start = performance.now();
+    const diff  = to - from;
+    const tick  = (now) => {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = p < .5 ? 2*p*p : -1+(4-2*p)*p; // ease-in-out
+      el.textContent = Math.round(from + diff * ease).toLocaleString('ar-EG');
+      if (p < 1) requestAnimationFrame(tick);
+      else { el.textContent = to.toLocaleString('ar-EG'); el.classList.add('bh-num-anim'); }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // ── UI: Ripple effect on any button click ────────────────────
+  addRipple(btn) {
+    if (!btn) return;
+    btn.classList.add('bh-ripple-host');
+    btn.addEventListener('pointerdown', (e) => {
+      const wave = document.createElement('span');
+      wave.className = 'bh-ripple-wave';
+      const rect = btn.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      wave.style.cssText = 'width:' + size + 'px;height:' + size + 'px;top:' + (e.clientY - rect.top - size/2) + 'px;left:' + (e.clientX - rect.left - size/2) + 'px';
+      btn.appendChild(wave);
+      setTimeout(() => wave.remove(), 700);
+    });
+  }
+
   loadData() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      // Try UID-scoped key first; fall back to legacy key for one-time migration
+      let raw = localStorage.getItem(getStorageKey());
+      if (!raw) raw = localStorage.getItem(_LEGACY_STORAGE_KEY);
       if (!raw) return this.getDefaultData();
       const parsed = this.normalizeData(JSON.parse(raw));
       // Merge with defaults in case of missing keys
@@ -189,12 +266,46 @@ class BHApp {
     return null;
   }
 
+
+  // Called once when user signs in — move guest/legacy data to UID-scoped key
+  migrateGuestData(uid) {
+    if (!uid) return;
+    const uidKey = getStorageKey(uid);
+    // Already have data for this UID — don't overwrite
+    if (localStorage.getItem(uidKey)) return;
+    // Try guest slot first
+    const guestData = localStorage.getItem(getStorageKey('guest'));
+    if (guestData) {
+      try {
+        localStorage.setItem(uidKey, guestData);
+        var guestSnap = localStorage.getItem(getSnapshotKey('guest'));
+        if (guestSnap) localStorage.setItem(getSnapshotKey(uid), guestSnap);
+        var guestLocal = localStorage.getItem(getLocalTimeKey('guest'));
+        if (guestLocal) localStorage.setItem(getLocalTimeKey(uid), guestLocal);
+        console.log('[BH] Guest data migrated to UID slot:', uid);
+      } catch (e) { console.warn('[BH] Migration failed:', e); }
+      return;
+    }
+    // Fall back: migrate from the old fixed legacy key
+    var legacyData = localStorage.getItem(_LEGACY_STORAGE_KEY);
+    if (legacyData) {
+      try {
+        localStorage.setItem(uidKey, legacyData);
+        var legacySnap = localStorage.getItem(_LEGACY_SNAPSHOT_KEY);
+        if (legacySnap) localStorage.setItem(getSnapshotKey(uid), legacySnap);
+        var legacyLocal = localStorage.getItem(_LEGACY_LOCAL_TIME_KEY);
+        if (legacyLocal) localStorage.setItem(getLocalTimeKey(uid), legacyLocal);
+        console.log('[BH] Legacy data migrated to UID slot:', uid);
+      } catch (e) { console.warn('[BH] Legacy migration failed:', e); }
+    }
+  }
+
   // Save State to LocalStorage (+ rolling auto-snapshots for safety)
   saveData() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+      localStorage.setItem(getStorageKey(), JSON.stringify(this.data));
       // Track WHEN the local data actually changed (used for conflict resolution)
-      localStorage.setItem(LOCAL_TIME_KEY, String(Date.now()));
+      localStorage.setItem(getLocalTimeKey(), String(Date.now()));
       this._saveSnapshot();
       this._scheduleCloudPush();
     } catch (e) {
@@ -285,6 +396,9 @@ class BHApp {
 
         const uid = st.user.uid;
         if (this._cloudSubUid !== uid) {
+          // 🔒 Migrate any guest/legacy data to the UID-scoped slot on first sign-in
+          this.migrateGuestData(uid);
+          this.data = this.loadData();
           this._cloudSubUid = uid;
           this.startCloudListener();
           this.pullFromCloud();   // اسحب مرة واحدة بعد التأكد من الجلسة
@@ -292,8 +406,9 @@ class BHApp {
       } else if (!st.user && this._cloudSubUid) {
         this._cloudReady = false;
         clearTimeout(this._cloudPushTimer);
-        // خرج من الحساب → افصل الاستماع
+        // خرج من الحساب → افصل الاستماع، وارجع لـ guest slot
         this._cloudSubUid = null;
+        this.data = this.loadData();
         try { window.BHFirebase.unsubscribeRealtime(); } catch (e) { /* ignore */ }
       }
     } catch (e) { /* ignore */ }
@@ -315,9 +430,9 @@ class BHApp {
 
     // تجاهل صدى رفّعنا الايح احنا نفسنا — التوقيض بيبقى مطابقة
     // (أي تحديث من جهاز تاني بيبقى بتوقيض مختلف فبيعدّي عادي)
-    if (this._lastPushAt && Math.abs(envelope.updatedAt - this._lastPushAt) <= 100) return;
+    if (this._lastPushAt && Math.abs(envelope.updatedAt - this._lastPushAt) <= 500) return;
 
-    const localUpdatedAt = parseInt(localStorage.getItem(LOCAL_TIME_KEY) || '0', 10);
+    const localUpdatedAt = parseInt(localStorage.getItem(getLocalTimeKey()) || '0', 10);
     const merged = this.mergeCloudData(this.data, envelope.data, envelope.updatedAt, localUpdatedAt);
     const changed = merged.__changed;
 
@@ -332,7 +447,7 @@ class BHApp {
       // ارفع الدمج نفسه عشان باقي الأجهزة تتقارب على نفس البيانات
       this._lastPushAt = Date.now();
       window.BHFirebase.push(this.data).then((ok) => {
-        if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+        if (ok) localStorage.setItem(getSyncTimeKey(), String(Date.now()));
       });
     }
   }
@@ -345,7 +460,7 @@ class BHApp {
     this._cloudPushTimer = setTimeout(() => {
       this._lastPushAt = Date.now();
       window.BHFirebase.push(this.data).then((ok) => {
-        if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+        if (ok) localStorage.setItem(getSyncTimeKey(), String(Date.now()));
       });
     }, 2500);
   }
@@ -378,7 +493,7 @@ class BHApp {
   pullFromCloud() {
     if (typeof window.BHFirebase === 'undefined') return;
     // The REAL age of our local data (not the sign-in time!)
-    const localUpdatedAt = parseInt(localStorage.getItem(LOCAL_TIME_KEY) || '0', 10);
+    const localUpdatedAt = parseInt(localStorage.getItem(getLocalTimeKey()) || '0', 10);
 
     const uid = window.BHFirebase.getUser()?.uid;
     if (!uid) return Promise.resolve();
@@ -388,7 +503,7 @@ class BHApp {
         // Nothing in the cloud yet → upload ours
         this._lastPushAt = Date.now();   // عشان صدى رفعتنا إحنا مايتبلعش غلط
         window.BHFirebase.push(this.data).then((ok) => {
-          if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+          if (ok) localStorage.setItem(getSyncTimeKey(), String(Date.now()));
         });
         return;
       }
@@ -415,7 +530,7 @@ class BHApp {
       // Push the merged result back so every device converges
       this._lastPushAt = Date.now();
       window.BHFirebase.push(this.data).then((ok) => {
-        if (ok) localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+        if (ok) localStorage.setItem(getSyncTimeKey(), String(Date.now()));
       });
       this.renderAll();
     }).catch((error) => {
@@ -460,14 +575,28 @@ class BHApp {
         fixId(res[i]);
         if (isDead(collName, res[i].id)) { res.splice(i, 1); pruned++; }
       }
+      // Field-level LWW: same ID on both sides — newer _updatedAt wins
+      const idxMap = new Map(res.map((x, i) => [x.id, i]));
       const seen = new Set(res.map(x => x.id));
       let added = 0;
       (b || []).forEach(x => {
         if (!x || typeof x !== 'object') return;
         fixId(x);
-        if (seen.has(x.id) || isDead(collName, x.id)) return;
+        if (isDead(collName, x.id)) return;
+        if (seen.has(x.id)) {
+          var localIdx = idxMap.get(x.id);
+          if (localIdx !== undefined) {
+            var localRec = res[localIdx];
+            if ((x._updatedAt || 0) > (localRec._updatedAt || 0)) {
+              Object.assign(localRec, x);
+              changed = true;
+            }
+          }
+          return;
+        }
         res.push(x);
         seen.add(x.id);
+        idxMap.set(x.id, res.length - 1);
         added++;
       });
       // Newest entries first
@@ -1124,7 +1253,7 @@ class BHApp {
   // Read the rolling snapshots
   getSnapshots() {
     try {
-      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      const raw = localStorage.getItem(getSnapshotKey());
       const snapshots = raw ? JSON.parse(raw) : [];
       return Array.isArray(snapshots) ? snapshots.filter(s => s && typeof s.payload === 'string') : [];
     } catch (e) {
@@ -1141,7 +1270,7 @@ class BHApp {
 
       snaps.unshift({ ts: Date.now(), payload });
       while (snaps.length > 6) snaps.pop();
-      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snaps));
+      localStorage.setItem(getSnapshotKey(), JSON.stringify(snaps));
     } catch (e) {
       console.warn('Snapshot failed:', e);
     }
@@ -1162,7 +1291,7 @@ class BHApp {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1500);
 
-      localStorage.setItem(BACKUP_TIME_KEY, String(Date.now()));
+      localStorage.setItem(getBackupTimeKey(), String(Date.now()));
       if (!silent) this.showToast('📦 تم تحميل النسخة الاحتياطية — هتلاقيها في فولدر Downloads', 'success');
       return true;
     } catch (e) {
@@ -1174,7 +1303,7 @@ class BHApp {
 
   // Auto-backup: download a copy every 3 days
   autoBackupCheck() {
-    const last = parseInt(localStorage.getItem(BACKUP_TIME_KEY) || '0', 10);
+    const last = parseInt(localStorage.getItem(getBackupTimeKey()) || '0', 10);
     const days = last ? Math.floor((Date.now() - last) / 86400000) : 999;
     if (days >= 3) this.downloadBackup(true);
   }
@@ -1235,6 +1364,29 @@ class BHApp {
     this.handleLaunchIntent();
     this.autoBackupCheck();
     this.installUnloadGuard();
+
+    // Auto-apply ripple to all primary buttons + focus trap to modals
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button, [role="button"]');
+      if (btn && !btn.classList.contains('bh-ripple-host')) this.addRipple(btn);
+    });
+    // Watch for modals opening via display:flex/block
+    const modalObs = new MutationObserver((muts) => {
+      muts.forEach((m) => {
+        if (m.type === 'attributes' && m.attributeName === 'style') {
+          const el = m.target;
+          const isModal = el.classList.contains('modal-overlay') || el.classList.contains('bottom-sheet') || el.id && el.id.includes('modal');
+          if (!isModal) return;
+          const visible = el.style.display !== 'none' && el.style.display !== '';
+          if (visible) this._trapFocus(el);
+          else this._releaseFocus();
+        }
+      });
+    });
+    document.querySelectorAll('.modal-overlay, .bottom-sheet, [id*="modal"]').forEach(el => {
+      modalObs.observe(el, { attributes: true, attributeFilter: ['style'] });
+    });
+
     this.initCloudSync();
     this.updateUserAvatar();
     this.initCardTilt();
@@ -1596,15 +1748,25 @@ class BHApp {
     const container = document.getElementById('toastContainer');
     if (!container) return;
 
+    // Make container accessible once
+    if (!container.hasAttribute('aria-live')) {
+      container.setAttribute('role', 'status');
+      container.setAttribute('aria-live', 'polite');
+      container.setAttribute('aria-atomic', 'true');
+    }
+
     const toast = document.createElement('div');
-    toast.className = 'toast';
+    toast.className = 'toast toast-enter';
+    toast.setAttribute('role', 'alert');
     toast.textContent = message;
+    if (type === 'error')   toast.classList.add('toast-error');
+    if (type === 'success') toast.classList.add('toast-success');
 
     container.appendChild(toast);
     setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateY(-10px)';
-      setTimeout(() => toast.remove(), 300);
+      toast.classList.remove('toast-enter');
+      toast.classList.add('toast-leave');
+      setTimeout(() => toast.remove(), 280);
     }, 3200);
   }
 
@@ -2540,7 +2702,8 @@ class BHApp {
       Object.keys(old.workDays || {}).forEach(k => { tom.workDays[k] = Date.now(); });
       this.data = this.getDefaultData();
       this.data._tombstones = tom;
-      localStorage.removeItem(STORAGE_KEY);
+      // Clear every slot (signed-in, guest, legacy) so old data can't resurrect on sign-out
+      [getStorageKey(), getStorageKey('guest'), _LEGACY_STORAGE_KEY].forEach(k => localStorage.removeItem(k));
       this.saveData();
       this.renderAll();
       this.showToast('🧹 تم تصفير البيانات بنجاح');
@@ -3052,7 +3215,7 @@ class BHApp {
     } else if (status === 'synced') {
       chip.classList.add('is-ok');
       label = 'متزامن';
-      const t = (st && st.lastSync) || parseInt(localStorage.getItem(SYNC_TIME_KEY) || '0', 10);
+      const t = (st && st.lastSync) || parseInt(localStorage.getItem(getSyncTimeKey()) || '0', 10);
       if (t) {
         const hhmm = new Date(t).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
         const mins = Math.round((Date.now() - t) / 60000);
@@ -4618,7 +4781,7 @@ class BHApp {
 
       if (user) {
         this._cloudReady = true;
-        localStorage.setItem(SYNC_TIME_KEY, String(Date.now()));
+        localStorage.setItem(getSyncTimeKey(), String(Date.now()));
         this.updateUserAvatar();
         this.showToast('☁️ تم تسجيل الدخول بـ Google بنجاح!', 'success');
         this.pullFromCloud();

@@ -12,7 +12,12 @@
   }
   html,body { background:#030303 !important; color:var(--text-primary); }
   body::before,body::after,.bottom-nav::before,.bottom-nav::after { display:none; }
-  *,*::before,*::after { animation:none !important; text-shadow:none !important; }
+  /* Selective animation disable: kill heavy mobile-only effects, keep UI transitions */
+  .bottom-nav::before,.bottom-nav::after,
+  body::before, body::after,
+  .halftone-layer, .glow-orb { animation:none !important; }
+  /* text-shadow: remove on most elements to keep Red Noir clean */
+  *:not(.boni-mascot):not(#navMascot):not(.mascot-strip) { text-shadow:none !important; }
   .desktop-only { display:flex; }
   .app-container { max-width:none; width:auto; margin:0 auto; padding:0 0 40px; min-height:100vh; border:0; box-shadow:none; background:none; }
   .app-header { position:relative; top:auto; margin:106px auto 0; padding:12px 40px; height:58px; width:100%; border:0; border-bottom:0; border-radius:0; background:transparent; box-shadow:none; backdrop-filter:none; justify-content:flex-end; }
@@ -33,7 +38,26 @@
   .rail-logo { width:42px; height:42px; border-radius:10px; object-fit:cover; filter:none; }
   .rail-brand-text b { display:block; font-size:1.25rem; letter-spacing:2px; color:#ffffff; }
   .rail-brand-text small { display:block; font-size:.63rem; color:var(--text-secondary); margin-top:6px; }
-  #navMascot { display:none; }
+  /* Mascot: show on desktop as a fixed floating badge bottom-left */
+  #navMascot {
+    display:flex !important;
+    position:fixed;
+    bottom:28px;
+    left:24px;
+    z-index:200;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    background:#13040a;
+    border:1px solid #ef233c44;
+    border-radius:16px;
+    padding:10px 12px;
+    box-shadow:0 0 24px #ef233c1a;
+    min-width:64px;
+    cursor:pointer;
+    transition:box-shadow .25s, border-color .25s;
+  }
+  #navMascot:hover { border-color:#ef233c99; box-shadow:0 0 40px #ef233c33; }
   .bottom-nav .nav-item { flex:0 1 auto; width:auto; min-height:40px; padding:10px 12px; display:flex; flex-direction:row; justify-content:flex-start; align-items:center; gap:13px; border:1px solid transparent; border-radius:8px; color:#a1a1aa; background:none; box-shadow:none; text-align:right; font:inherit; cursor:pointer; }
   .bottom-nav .nav-item > span:last-child { font-size:.76rem; font-weight:400; letter-spacing:0; opacity:1; transform:none; }
   .bottom-nav .nav-icon { width:22px; height:22px; margin:0; border:0; border-radius:0; padding:0; color:inherit; background:none !important; box-shadow:none !important; display:grid; place-items:center; }

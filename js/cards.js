@@ -85,9 +85,9 @@ Object.assign(BHApp.prototype, {
   },
   persistWallet(next) {
     // Commit locally before updating UI; never show success when storage fails.
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(getStorageKey(), JSON.stringify(next));
     this.data = next;
-    try { localStorage.setItem(LOCAL_TIME_KEY, String(Date.now())); } catch (error) { console.warn(error); }
+    try { localStorage.setItem(getLocalTimeKey(), String(Date.now())); } catch (error) { console.warn(error); }
     this._saveSnapshot();
     this._scheduleCloudPush();
     this.renderWallet();

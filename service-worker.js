@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bh-finance-v53';
+const CACHE_NAME = 'bh-finance-v54';
 const ASSETS = [
   './',
   './index.html',
@@ -22,8 +22,8 @@ const ASSETS = [
   // Firebase SDK (cached for offline use — app degrades gracefully if missing)
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js',
-  'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
-  'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap'
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js'
+  // Note: Fonts loaded via <link preload> in index.html — not cached here
 ];
 
 // Install event - Cache static assets (bypass HTTP cache to always get fresh files)
