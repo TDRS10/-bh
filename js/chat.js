@@ -21,6 +21,7 @@
     let connectedRef = null, connectedCallback = null, connected = false, loaded = false, sending = false;
     let admin = false, rows = [], lastSent = 0, failed = false;
     let renderQueued = false;
+    let lastSig = '', lastLen = 0, lastDay = null, lastUid = null;
     const state = () => root.BHFirebase.getState();
     function status(text) { $('chatStatus').textContent = text; }
     function controls() { send.disabled = !loaded || !connected || sending || failed; }
@@ -34,7 +35,8 @@
       if (connectedRef && connectedCallback) connectedRef.off('value', connectedCallback);
       query = callback = connectedRef = connectedCallback = null;
       uid = null; rows = []; connected = loaded = sending = admin = failed = false;
-      list.replaceChildren(); input.value = ''; $('chatCount').textContent = '0 / 1000';
+      lastSig = ''; lastLen = 0; lastDay = null; lastUid = null;
+      list.replaceChildren(); input.value = ''; input.style.height = ''; $('chatCount').textContent = '0 / 1000';
       $('chatLatest').hidden = true; controls();
     }
     function node(tag, cls, text) {
@@ -42,6 +44,17 @@
       if (cls) el.className = cls;
       if (text !== undefined) el.textContent = text;
       return el;
+    }
+    function dayKey(ts) {
+      const d = (typeof ts === 'number' && Number.isFinite(ts)) ? new Date(ts) : null;
+      return d ? d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() : '';
+    }
+    function dayLabel(ts) {
+      const d = new Date(ts), now = new Date();
+      const diff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+      if (diff === 0) return 'النهاردة';
+      if (diff === 1) return 'إمبارح';
+      return d.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
     }
     function bottom() { list.scrollTop = list.scrollHeight; $('chatLatest').hidden = true; }
     function scheduleRender() {
@@ -53,15 +66,43 @@
       else flush();
     }
     function render() {
+      // sig = كل المدخلات اللي بتأثر على الشكل — لو مفيش تغيير: ماتعيدش بناء الدومين (نصفي اللمس على الموبايل)
+      // (الأرقام أطوال مش نصوص لأن الرسايل مالهاش تعديل — بس تتحذف وتتزايد)
+      const rowsSig = rows.map(r => {
+        const v = r.value || {};
+        return r.key + '~' + String(v.text || '').length + '~' + String(v.name || '').length + '~' +
+          (typeof v.createdAt === 'number' ? v.createdAt : 0) + '~' +
+          Object.keys(v.reactions || {}).length;
+      }).join('|');
+      const adminPart = admin ? 'a' : '';
+      const sig = rowsSig + '~' + adminPart;
+      if (sig === lastSig && list.children.length) return;
+      // رسايل جديدة اتضافت بس؟ نلحقها بس بـappend من غير ما نمسح القديم (اللمس مايتقطّعش)
+      const t = lastSig.lastIndexOf('~');
+      const appendOnly = t > 0 && lastSig.slice(t + 1) === adminPart &&
+        rowsSig.startsWith(lastSig.slice(0, t) + '|') && list.children.length > 0;
       const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 100;
       const scroll = list.scrollTop;
       const focused = document.activeElement;
       const focusKey = focused && focused.dataset.chatKey;
       const frag = document.createDocumentFragment();
-      rows.forEach(({ key, value: m }) => {
-        if (!m || typeof m.text !== 'string' || typeof m.uid !== 'string') return;
+      let prevDay = appendOnly ? lastDay : null, prevUid = appendOnly ? lastUid : null;
+      for (let i = appendOnly ? lastLen : 0; i < rows.length; i++) {
+        const { key, value: m } = rows[i];
+        if (!m || typeof m.text !== 'string' || typeof m.uid !== 'string') continue;
         const own = m.uid === uid;
-        const article = node('article', 'chat-message' + (own ? ' is-own' : ''));
+        const day = dayKey(m.createdAt);
+        if (day && day !== prevDay) {
+          const divider = node('div', 'chat-day');
+          divider.append(node('span', '', dayLabel(m.createdAt)));
+          frag.append(divider);
+        }
+        const cont = day === prevDay && m.uid === prevUid;
+        prevDay = day; prevUid = m.uid;
+        const article = node('article', 'chat-message' + (own ? ' is-own' : '') + (cont ? ' is-cont' : ''));
+        const body = node('p', '', m.text);
+        if (cont) { article.append(body); }
+        else {
         const header = node('header');
         const avatar = node('span', 'chat-avatar', String(m.name || 'ب').slice(0, 1));
         if (typeof m.photoURL === 'string' && /^https:\/\//i.test(m.photoURL)) {
@@ -77,7 +118,8 @@
           time.dateTime = date.toISOString();
           time.textContent = date.toLocaleString('ar-EG', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
         }
-        header.append(time); article.append(header, node('p', '', m.text));
+        header.append(time); article.append(header, body);
+        }
         const footer = node('footer');
         function action(label, kind, fn) {
           const button = node('button', '', label); button.type = 'button';
@@ -105,12 +147,16 @@
           if (version === generation) status('وصل البلاغ للمراجعة.');
         });
         article.append(footer); frag.append(article);
-      });
-      if (!frag.childNodes.length) frag.append(node('p', 'chat-empty', 'لسه مفيش رسائل. ابدأ اللمة بأول رسالة 👋'));
-      list.replaceChildren(frag);
+      }
+      if (appendOnly) { if (frag.childNodes.length) list.append(frag); }
+      else {
+        if (!frag.childNodes.length) frag.append(node('p', 'chat-empty', 'لسه مفيش رسائل. ابدأ اللمة بأول رسالة 👋'));
+        list.replaceChildren(frag);
+      }
       if (focusKey) Array.from(list.querySelectorAll('button')).find(b => b.dataset.chatKey === focusKey)?.focus({ preventScroll:true });
       if (nearBottom || !loaded) bottom();
       else { list.scrollTop = scroll; $('chatLatest').hidden = false; }
+      lastSig = sig; lastLen = rows.length; lastDay = prevDay; lastUid = prevUid;
     }
     function sync() {
       const s = state(), allowed = member(s.user);
@@ -145,7 +191,9 @@
       };
       query.on('value', callback, err => {
         if (version !== generation) return;
-        failed = true; loaded = false; list.replaceChildren(); rows = []; controls(); error(err);
+        failed = true; loaded = false; list.replaceChildren(); rows = [];
+        lastSig = ''; lastLen = 0; lastDay = null; lastUid = null;
+        controls(); error(err);
       });
     }
     form.addEventListener('submit', async event => {
@@ -168,7 +216,11 @@
         }
       } finally { if (version === generation) { sending = false; controls(); } }
     });
-    input.addEventListener('input', () => { $('chatCount').textContent = input.value.length + ' / 1000 · Enter للإرسال، Shift + Enter لسطر جديد'; });
+    input.addEventListener('input', () => {
+      $('chatCount').textContent = input.value.length + ' / 1000 · Enter للإرسال، Shift + Enter لسطر جديد';
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+    });
     input.addEventListener('keydown', event => {
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });

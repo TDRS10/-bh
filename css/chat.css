@@ -1,42 +1,59 @@
+/* لمة بوني — شات خفيف: فقاعات زجاجية، فاصل أيام على شكل طريق، وتفاعلات مخفية لحد الـhover */
 .chat-open { position:fixed; bottom:28px; left:24px; width:48px; height:48px; z-index:70; background:#241019; border:1px solid #fb718577; box-shadow:0 4px 20px #0006; }
-.chat-shell { width:100%; max-width:960px; margin-inline:auto; }
+.chat-shell { width:100%; max-width:760px; margin-inline:auto; }
 .chat-shell [hidden] { display:none !important; }
-.chat-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.chat-eyebrow { color:#fb7185; font:700 .65rem/2 Arial,sans-serif; letter-spacing:3px; }
-.chat-heading h2 { font-size:1.65rem; line-height:1.8; }
-.chat-heading p,.chat-notice,.chat-composer small { font-size:.75rem; line-height:1.9; color:var(--text-secondary); }
-.chat-badge { padding:7px 13px; border:1px solid #fb718544; background:#fb718510; color:#fda4af; border-radius:20px; white-space:nowrap; font-size:.7rem; }
-.chat-notice { padding:12px 0; border-bottom:1px solid var(--border); }
-.chat-status { min-height:28px; padding-block:6px; font-size:.8rem; line-height:1.8; color:#fda4af; }
-.chat-gate { text-align:center; padding:40px 12px; line-height:2; }
-.chat-gate .btn { margin-top:18px; }
-.chat-messages { height:clamp(280px,48vh,540px); min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; contain:content; padding:12px 6px; display:flex; flex-direction:column; gap:16px; scrollbar-width:thin; }
-.chat-message { flex-shrink:0; width:85%; align-self:flex-end; border:1px solid var(--border); border-radius:13px 13px 13px 4px; background:#ffffff05; padding:9px 11px; overflow-wrap:anywhere; }
-.chat-message.is-own { align-self:flex-start; border-radius:16px 16px 4px 16px; background:#fb71850b; border-color:#fb718533; }
-.chat-message header { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; }
+.chat-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.chat-eyebrow { display:inline-flex; align-items:center; gap:6px; color:#00D9FF; font:700 .6rem/1 Arial,sans-serif; letter-spacing:3px; }
+.chat-eyebrow::before { content:''; width:6px; height:6px; border-radius:50%; background:#00D9FF; box-shadow:0 0 8px #00D9FF; }
+.chat-heading h2 { font-size:1.2rem; line-height:1.5; }
+.chat-heading p,.chat-notice,.chat-composer small { font-size:.7rem; line-height:1.9; color:var(--text-secondary); }
+.chat-badge { padding:5px 11px; border:1px solid rgba(0,217,255,.35); background:rgba(0,217,255,.08); color:#7defff; border-radius:20px; white-space:nowrap; font-size:.66rem; }
+.chat-notice { padding:8px 0; border-bottom:1px dashed var(--border); }
+.chat-status { min-height:26px; padding-block:4px; font-size:.76rem; line-height:1.7; color:#7defff; }
+.chat-gate { text-align:center; padding:36px 12px; line-height:2; }
+.chat-gate .btn { margin-top:16px; }
+.chat-messages { height:clamp(280px,48vh,540px); min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; contain:content; padding:10px 4px; display:flex; flex-direction:column; gap:9px; scrollbar-width:thin; }
+
+/* فاصل الأيام — خط طريق بوني المتقطع */
+.chat-day { display:flex; align-items:center; gap:10px; margin:8px 0 2px; }
+.chat-day::before,.chat-day::after { content:''; flex:1; border-top:1px dashed rgba(0,217,255,.3); }
+.chat-day span { font-size:.6rem; color:var(--text-secondary); background:var(--surface); border:1px solid var(--border); padding:3px 10px; border-radius:999px; white-space:nowrap; }
+
+.chat-message { flex-shrink:0; width:min(88%,420px); align-self:flex-end; border:1px solid transparent; border-radius:16px 16px 16px 4px; background:rgba(255,255,255,.045); padding:8px 11px; overflow-wrap:anywhere; }
+.chat-message.is-own { align-self:flex-start; border-radius:16px 16px 4px 16px; background:linear-gradient(135deg,rgba(0,217,255,.14),rgba(0,217,255,.05)); border-color:rgba(0,217,255,.3); box-shadow:0 4px 18px rgba(0,217,255,.10); }
+.chat-message.is-cont { margin-top:-5px; padding-top:4px; }
+.chat-message.is-cont header { display:none; }
+.chat-message header { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:7px; }
 .chat-message header strong { font-size:.68rem; font-weight:600; }
-.chat-avatar { display:grid; place-items:center; flex-shrink:0; width:28px; height:28px; border-radius:9px; background:#fb71851c; color:#fda4af; }
+.chat-avatar { display:grid; place-items:center; flex-shrink:0; width:26px; height:26px; border-radius:50%; background:rgba(0,217,255,.14); color:#7defff; font-size:.75rem; }
 .chat-avatar-image { display:block; width:100%; height:100%; border-radius:inherit; object-fit:cover; }
-.chat-message time { font-size:.65rem; color:var(--text-secondary); margin-inline-start:auto; }
+.chat-message time { font-size:.62rem; color:var(--text-secondary); margin-inline-start:auto; }
 .chat-message p { white-space:pre-wrap; font-size:.82rem; line-height:1.7; unicode-bidi:plaintext; }
-.chat-message footer { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
+.chat-message footer { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; opacity:0; transition:opacity .18s ease; }
+.chat-message:hover footer,.chat-message:focus-within footer { opacity:1; }
+@media (hover:none) { .chat-message footer { opacity:1; } }
 .chat-message footer button { border:1px solid var(--border); border-radius:7px; background:transparent; color:var(--text-secondary); padding:5px 8px; min-height:32px; cursor:pointer; font:inherit; font-size:.64rem; }
-.chat-message footer button[aria-pressed="true"] { border-color:#fb7185; color:#fda4af; background:#fb71851c; }
-.chat-message button:focus-visible,.chat-composer textarea:focus-visible { outline:2px solid #fb7185; outline-offset:3px; }
-.chat-composer { margin-top:16px; border-top:1px solid var(--border); padding-top:16px; }
-.chat-composer label { display:block; font-size:.8rem; margin-bottom:8px; }
-.chat-composer textarea { width:100%; resize:vertical; min-height:80px; max-height:240px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text-primary); padding:12px; font:inherit; }
+.chat-message footer button:hover { border-color:rgba(0,217,255,.45); color:#7defff; }
+.chat-message footer button[aria-pressed="true"] { border-color:#00D9FF; color:#7defff; background:rgba(0,217,255,.14); }
+.chat-message button:focus-visible,.chat-composer textarea:focus-visible { outline:2px solid #00D9FF; outline-offset:3px; }
+.chat-composer { margin-top:14px; border-top:1px dashed var(--border); padding-top:12px; }
+.chat-composer label { display:block; font-size:.74rem; margin-bottom:6px; color:var(--text-secondary); }
+.chat-composer textarea { width:100%; resize:none; overflow-y:auto; min-height:46px; max-height:200px; border:1px solid var(--border); border-radius:14px; background:var(--surface); color:var(--text-primary); padding:11px 12px; font:inherit; line-height:1.6; }
+.chat-composer textarea:focus { border-color:rgba(0,217,255,.5); box-shadow:0 0 0 3px rgba(0,217,255,.12); outline:none; }
 .chat-composer > div { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; }
 .chat-composer .btn { flex-shrink:0; }
 .chat-latest { margin:10px auto; }
 .chat-empty { text-align:center; margin:auto; color:var(--text-secondary); line-height:2; }
+/* لمس سلس على الموبايل: وقّف تنفّس الإضاءة الخلفية وإخفِ الزر العائم وأنت جوه الشات */
+body:has(#chatView.active)::after { animation: none; }
+body:has(#chatView.active) .chat-open { display: none; }
 @media(max-width:600px) {
   .chat-message { width:94%; }
   .chat-composer small { font-size:.63rem; }
   .chat-shell { width:100%; padding:16px; overflow:hidden; }
   .chat-heading { align-items:flex-start; }
-  .chat-heading h2 { font-size:1.35rem; }
-  .chat-heading p { font-size:.68rem; }
+  .chat-heading h2 { font-size:1.1rem; }
+  .chat-heading p { font-size:.66rem; }
   .chat-messages { height:min(46dvh,420px); max-height:420px; }
   .chat-composer > div { align-items:flex-end; }
   .chat-composer small { max-width:62%; }
