@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const host = process.env.FIREBASE_DATABASE_EMULATOR_HOST;
 const namespace = 'demo-bony-chat';
+// القواعد على الإموليتر بتتحمّل على namespace القاعدة الافتراضية <project>-default-rtdb
+const dbNamespace = namespace + '-default-rtdb';
 function token(uid, provider = 'google.com', admin = false) {
   const encode = v => Buffer.from(JSON.stringify(v)).toString('base64url');
   return encode({ alg:'none', typ:'JWT' }) + '.' + encode({
@@ -13,7 +15,7 @@ function token(uid, provider = 'google.com', admin = false) {
 test('Realtime Database enforces chat membership, ownership, validation and moderation', { skip:!host }, async () => {
   async function request(path, auth, method = 'GET', body, query = {}) {
     const url = new URL('http://' + host + '/' + path + '.json');
-    url.searchParams.set('ns', namespace);
+    url.searchParams.set('ns', dbNamespace);
     if (auth) url.searchParams.set('auth', auth);
     for (const [key, value] of Object.entries(query)) url.searchParams.set(key, JSON.stringify(value));
     return fetch(url, { method, headers:{ 'Content-Type':'application/json' }, body:body === undefined ? undefined : JSON.stringify(body) });

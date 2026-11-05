@@ -24,7 +24,7 @@ test('chat validates text and publishes no private account information', () => {
 
 function ui() {
   class Element {
-    constructor(tag = '') { this.tag = tag; this.childNodes = []; this.dataset = {}; this.events = {}; this.value = ''; this.scrollHeight = 0; this.scrollTop = 0; this.clientHeight = 500; }
+    constructor(tag = '') { this.tag = tag; this.childNodes = []; this.dataset = {}; this.events = {}; this.value = ''; this.style = {}; this.scrollHeight = 0; this.scrollTop = 0; this.clientHeight = 500; }
     append(...nodes) { this.childNodes.push(...nodes.flatMap(n => n.tag === 'fragment' ? n.childNodes : [n])); }
     replaceChildren(...nodes) { this.childNodes = []; this.append(...nodes); }
     addEventListener(name, fn) { this.events[name] = fn; }
@@ -79,7 +79,7 @@ test('chat renders untrusted names and messages as text and disables offline sen
   app.window.BHChat.setVisible(true);
   const room = app.subscriptions.find(s => s.path === 'publicChat/messages');
   room.callback({ forEach(fn) { fn({ key:'one', val:() => ({ uid:'bob', name:'<script>bad()</script>', text:'<img onerror=bad()>', createdAt:1000 }) }); } });
-  const article = app.nodes.chatMessages.childNodes[0];
+  const article = app.nodes.chatMessages.childNodes.find(n => n.tag === 'article');
   assert.equal(article.childNodes[1].textContent, '<img onerror=bad()>');
   assert.equal(article.childNodes[0].childNodes[1].textContent, '<script>bad()</script>');
   assert.equal(app.nodes.chatSend.disabled, true);

@@ -108,10 +108,12 @@ test('calendar key uses local calendar components', () => {
 
 test('worker activation removes only older BH caches', async () => {
   const handlers = {}, removed = [];
-  const context = vm.createContext({ console, self: { addEventListener: (name, fn) => handlers[name] = fn, clients: { claim() {} } }, caches: { keys: async () => ['other-app', 'bh-finance-v43', 'bh-finance-v53'], delete: async key => removed.push(key) } });
+  const current = /CACHE_NAME = '([^']+)'/.exec(fs.readFileSync('service-worker.js', 'utf8'))[1];
+  const older = current.replace(/v(\d+)$/, (m, n) => 'v' + (Number(n) - 1));
+  const context = vm.createContext({ console, self: { addEventListener: (name, fn) => handlers[name] = fn, clients: { claim() {} } }, caches: { keys: async () => ['other-app', older, current], delete: async key => removed.push(key) } });
   vm.runInContext(fs.readFileSync('service-worker.js', 'utf8'), context);
   let done; handlers.activate({ waitUntil: p => done = p }); await done;
-  assert.deepEqual(removed, ['bh-finance-v43']);
+  assert.deepEqual(removed, [older]);
 });
 
 test('service layer distinguishes failed reads from an empty database', async () => {
