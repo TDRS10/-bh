@@ -5636,6 +5636,183 @@ class BHApp {
   // ═══════════════════════════════════════════════════════════
 
   // Share the app (Web Share API, with a copy-link fallback)
+  // ═══════════════════════════════════════════════════════════
+  //  MONTHLY SHARE CARD  (كارت مشاركة ملخص الشهر)
+  // ═══════════════════════════════════════════════════════════
+
+  // ملخص الشهر — أرقام + أعلى 3 مصاريف + أيام الشغل
+  getMonthSummary(now) {
+    const d = now || new Date();
+    const y = d.getFullYear(), m = d.getMonth();
+    const inMonth = (s) => { const x = new Date(s); return x.getFullYear() === y && x.getMonth() === m; };
+
+    const incomes = (this.data.incomes || []).filter(i => inMonth(i.date));
+    const expenses = (this.data.expenses || []).filter(e => inMonth(e.date));
+
+    const income = incomes.reduce((n, i) => n + (Number(i.amount) || 0), 0);
+    const spent = expenses.reduce((n, e) => n + (Number(e.amount) || 0), 0);
+    const saved = incomes.reduce((n, i) => n + (Number(i.savingsAmt) || 0), 0);
+
+    const byCat = {};
+    expenses.forEach(e => {
+      const k = e.category || 'تاني';
+      byCat[k] = (byCat[k] || 0) + (Number(e.amount) || 0);
+    });
+    const top = Object.keys(byCat)
+      .sort((a, b) => byCat[b] - byCat[a])
+      .slice(0, 3)
+      .map(category => ({
+        category,
+        amount: byCat[category],
+        pct: spent ? Math.round((byCat[category] / spent) * 100) : 0
+      }));
+
+    const prefix = y + '-' + String(m + 1).padStart(2, '0');
+    const days = Object.keys(this.data.workDays || {}).filter(k => k.indexOf(prefix) === 0 && this.data.workDays[k]).length;
+
+    return { year: y, month: m, monthKey: prefix, income, spent, saved, top, days };
+  }
+
+  async shareMonthlyCard() {
+    const s = this.getMonthSummary();
+    if (!s.income && !s.spent) {
+      this.showToast('📭 مفيش بيانات الشهر ده — سجّل قبض أو مصروف الأول', 'info');
+      return;
+    }
+
+    const blob = await new Promise(res => this.drawMonthCard(s).toBlob(res, 'image/png'));
+    if (!blob) { this.showToast('⚠️ معرفتش أجهّز الصورة', 'error'); return; }
+
+    const file = new File([blob], 'bony-' + s.monthKey + '.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'ملخص شهر ' + this.WORK_MONTH_NAMES[s.month] + ' من بوني' });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    this.showToast('🖼️ صورة الملخص اتحملت — شاركها زي ما تحب', 'success');
+  }
+
+  drawMonthCard(s) {
+    const W = 900, H = 1200, pad = 64, right = W - pad;
+    const FONT = '"Segoe UI", Tahoma, "Noto Naskh Arabic", Arial, sans-serif';
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.direction = 'rtl';
+
+    // خلفية + توهج
+    const bg = x.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#07131c'); bg.addColorStop(1, '#03060a');
+    x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    const glow = x.createRadialGradient(W * 0.8, 130, 0, W * 0.8, 130, 560);
+    glow.addColorStop(0, 'rgba(0,217,255,.2)'); glow.addColorStop(1, 'rgba(0,217,255,0)');
+    x.fillStyle = glow; x.fillRect(0, 0, W, H);
+
+    x.strokeStyle = 'rgba(0,217,255,.26)'; x.lineWidth = 2;
+    x.beginPath(); x.roundRect(28, 28, W - 56, H - 56, 34); x.stroke();
+
+    // البراند + سكوتر متجه (مش إيموجي عشان يظهر على كل الأجهزة)
+    x.strokeStyle = '#00D9FF'; x.lineWidth = 4; x.lineCap = 'round'; x.lineJoin = 'round';
+    x.beginPath();
+    x.arc(pad + 26, 118, 13, 0, Math.PI * 2);
+    x.moveTo(pad + 39, 118); x.lineTo(pad + 74, 118);
+    x.moveTo(pad + 74, 118); x.lineTo(pad + 92, 84);
+    x.moveTo(pad + 92, 84); x.lineTo(pad + 112, 84);
+    x.moveTo(pad + 56, 96); x.lineTo(pad + 74, 118);
+    x.stroke();
+    x.beginPath(); x.arc(pad + 112, 118, 13, 0, Math.PI * 2); x.stroke();
+
+    x.textAlign = 'right';
+    x.fillStyle = '#00D9FF'; x.font = '700 58px ' + FONT;
+    x.shadowColor = 'rgba(0,217,255,.5)'; x.shadowBlur = 24;
+    x.fillText('بوني', right, 130);
+    x.shadowBlur = 0;
+    x.fillStyle = '#7fa3b3'; x.font = '500 23px ' + FONT;
+    x.fillText('إدارة الفلوس والقبض', right, 172);
+
+    x.fillStyle = '#e9fbff'; x.font = '600 30px ' + FONT;
+    x.fillText(this.WORK_MONTH_NAMES[s.month] + ' ' + s.year, right, 250);
+    x.fillStyle = 'rgba(0,217,255,.45)'; x.fillRect(pad, 274, W - pad * 2, 2);
+
+    // الأرقام الأساسية
+    const rows = [
+      { label: 'القبض', value: s.income, color: '#00D9FF', note: s.days ? 'أيام شغل: ' + s.days : '' },
+      { label: 'المصاريف', value: s.spent, color: '#ff6b6b', note: s.income ? Math.round((s.spent / s.income) * 100) + '% من القبض' : '' },
+      { label: 'التحويش', value: s.saved, color: '#00c87a', note: s.income ? Math.round((s.saved / s.income) * 100) + '% من القبض' : '' }
+    ];
+    let y = 318;
+    rows.forEach(r => {
+      x.fillStyle = 'rgba(255,255,255,.045)';
+      x.beginPath(); x.roundRect(pad, y, W - pad * 2, 130, 22); x.fill();
+      x.strokeStyle = 'rgba(255,255,255,.07)'; x.lineWidth = 1.5; x.stroke();
+
+      x.textAlign = 'right';
+      x.fillStyle = r.color; x.font = '600 26px ' + FONT;
+      x.fillText(r.label, right - 30, y + 46);
+
+      const num = r.value.toLocaleString('en-US');
+      x.fillStyle = '#ffffff'; x.font = '700 48px ' + FONT;
+      const nw = x.measureText(num).width;
+      x.fillText(num, right - 30, y + 104);
+      x.fillStyle = 'rgba(233,251,255,.5)'; x.font = '600 22px ' + FONT;
+      x.fillText('ج.م', right - 40 - nw, y + 104);
+
+      if (r.note) {
+        x.textAlign = 'left';
+        x.fillStyle = 'rgba(233,251,255,.42)'; x.font = '500 22px ' + FONT;
+        x.fillText(r.note, pad + 30, y + 104);
+      }
+      y += 152;
+    });
+
+    // أعلى المصاريف
+    y += 26;
+    x.textAlign = 'right';
+    x.fillStyle = '#e9fbff'; x.font = '700 30px ' + FONT;
+    x.fillText('أعلى المصاريف', right, y);
+
+    if (!s.top.length) {
+      x.fillStyle = 'rgba(233,251,255,.4)'; x.font = '500 24px ' + FONT;
+      x.fillText('مفيش مصاريف مسجلة الشهر ده', right, y + 46);
+    }
+
+    y += 34;
+    s.top.forEach(t => {
+      x.textAlign = 'right';
+      x.fillStyle = 'rgba(233,251,255,.92)'; x.font = '600 26px ' + FONT;
+      x.fillText(t.category, right, y + 30);
+
+      x.textAlign = 'left';
+      x.fillStyle = '#7fa3b3'; x.font = '500 21px ' + FONT;
+      x.fillText(t.amount.toLocaleString('en-US') + ' ج.م · ' + t.pct + '%', pad, y + 30);
+
+      x.fillStyle = 'rgba(255,255,255,.08)';
+      x.beginPath(); x.roundRect(pad, y + 46, W - pad * 2, 8, 4); x.fill();
+      const bw = Math.max(6, (W - pad * 2) * Math.min(1, t.pct / 100));
+      const g = x.createLinearGradient(right - bw, 0, right, 0);
+      g.addColorStop(0, 'rgba(0,217,255,.3)'); g.addColorStop(1, '#00D9FF');
+      x.fillStyle = g;
+      x.beginPath(); x.roundRect(right - bw, y + 46, bw, 8, 4); x.fill();
+      y += 92;
+    });
+
+    // الفوتر
+    x.textAlign = 'center';
+    x.fillStyle = 'rgba(233,251,255,.32)'; x.font = '500 21px ' + FONT;
+    x.fillText('tdrs10.github.io/-bh', W / 2, H - 62);
+
+    return c;
+  }
+
   async shareApp() {
     const url = window.location.origin + window.location.pathname;
     const text = 'بوني — تطبيق إدارة القبض والمصاريف لفرسان الدليفري. جرّبه من هنا:';
