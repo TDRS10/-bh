@@ -5356,6 +5356,24 @@ class BHApp {
       });
     }
 
+    // 5) قسط/دين مستحق قرب — فات أو النهاردة أو بكرة أو خلال 3 أيام
+    if (cfg.enabled) {
+      (typeof this.getUrgentDebts === 'function' ? this.getUrgentDebts() : [])
+        .filter(x => x.urgency.level !== 'week')
+        .slice(0, 3)
+        .forEach(({ debt, urgency }) => {
+          const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
+          alerts.push({
+            id: 'debt_due_' + (debt.id || (debt.creditor || 'debt') + '_' + (debt.dueDate || '')),
+            icon: '📌',
+            level: urgency.level === 'soon' ? 'yellow' : 'red',
+            title: `📌 قسط قرب: ${debt.creditor} — ${urgency.label}`,
+            body: `المتبقي ${remaining.toLocaleString()} ج.م`,
+            action: 'الأهداف'
+          });
+        });
+    }
+
     // 4) Weekly outings budget nearly gone
     if (cfg.outingsBudgetEnabled) {
       const budget = this.data.settings.weeklyOutingsBudget || 0;
@@ -5389,6 +5407,8 @@ class BHApp {
         const el = document.getElementById('shiftOrders');
         if (el) el.scrollIntoView({ block: 'center' });
       }, 300);
+    } else if (a.id && a.id.startsWith('debt_due_')) {
+      this.switchTab('goalsView');
     } else if (a.id === 'goal_close_' + a.id.split('goal_close_')[1]) {
       this.switchTab('goalsView');
     } else if (a.id === 'outings_close') {

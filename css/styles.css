@@ -3834,9 +3834,9 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
     background: radial-gradient(55% 130% at 50% 50%, transparent 35%, rgba(3, 6, 10, 0.8) 100%);
   }
   .bh-scooter {
-    position: absolute; right: 16px; top: 50%; transform: translateY(-64%);
-    font-size: 16px; z-index: 1;
-    filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.6));
+    position: absolute; right: 10px; top: 50%; transform: translateY(-54%);
+    z-index: 1; display: block;
+    filter: drop-shadow(0 0 7px rgba(0, 217, 255, 0.85));
     animation: bhScooterBob 0.45s ease-in-out infinite alternate;
   }
   .balance-card::before {
@@ -3851,4 +3851,52 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
 }
 @media (max-width: 979px) and (prefers-reduced-motion: reduce) {
   .bh-road::before, .bh-scooter { animation: none; }
+}
+
+/* ═══════ تجديد الهيدر + الشريط السفلي — دوك زجاجي دافئ بنور متحرك (موبايل فقط) ═══════ */
+@media (max-width: 979px) {
+  .app-header {
+    background: linear-gradient(180deg, rgba(11, 18, 28, 0.85), rgba(4, 6, 10, 0.66));
+    border-bottom: 1px solid rgba(0, 217, 255, 0.16);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+  }
+  .brand-sub { color: #8fb6c4; letter-spacing: .14em; }
+  .balance-chip {
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.32), rgba(0, 200, 122, 0.17));
+    border-color: rgba(0, 217, 255, 0.6);
+    box-shadow: 0 0 18px rgba(0, 217, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+
+  /* الدوك — زجاج أدفأ وأعمق + لمعة بتمر ببطء */
+  .bottom-nav {
+    border: 1px solid rgba(0, 217, 255, 0.38);
+    /* اللمعة كطبقة خلفية — مش محتاجة overflow:hidden اللي كان بيقص ماسكوت الدوك */
+    background:
+      linear-gradient(105deg, transparent 40%, rgba(170, 246, 255, 0.16) 50%, transparent 60%) 0 0 / 250% 100% no-repeat,
+      linear-gradient(180deg, rgba(15, 22, 32, 0.9), rgba(5, 8, 14, 0.94));
+    box-shadow:
+      0 -1px 0 rgba(255, 255, 255, 0.05),
+      0 16px 36px rgba(0, 0, 0, 0.52),
+      0 0 26px rgba(0, 217, 255, 0.12);
+    backdrop-filter: blur(22px) saturate(165%);
+    -webkit-backdrop-filter: blur(22px) saturate(165%);
+    animation: navShine 5.5s ease-in-out infinite;
+  }
+  @keyframes navShine {
+    0%, 55% { background-position: 140% 0, 0 0; }
+    100%    { background-position: -40% 0, 0 0; }
+  }
+  /* التبويب النشط — بلاطة بتطفو بحد نور */
+  .nav-item { color: rgba(214, 224, 236, 0.6); }
+  .nav-item.active { color: #f0feff; }
+  .nav-item.active .nav-icon {
+    transform: translateY(-2px);
+    box-shadow:
+      0 6px 18px rgba(0, 217, 255, 0.32),
+      0 0 18px rgba(0, 217, 255, 0.34),
+      inset 0 0 12px rgba(0, 217, 255, 0.22);
+  }
+}
+@media (max-width: 979px) and (prefers-reduced-motion: reduce) {
+  .bottom-nav { animation: none; }
 }
