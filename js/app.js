@@ -5910,19 +5910,19 @@ class BHApp {
   getAIModel() {
     const sel = document.getElementById('aiModelSelect');
     if (sel && sel.value) return sel.value;
-    return (localStorage.getItem('BH_AI_MODEL') || 'openrouter/free').trim() || 'openrouter/free';
+    return (localStorage.getItem('BH_AI_MODEL') || 'deepseek/deepseek-chat:free').trim() || 'deepseek/deepseek-chat:free';
   }
 
   // قائمة موديلات OpenRouter المجانية (مع احتياطي محلي لو الخدمة متعطلّة)
   FREE_MODELS = [
-    'openrouter/free',
     'deepseek/deepseek-chat:free',
     'meta-llama/llama-3.1-8b-instruct:free',
     'mistralai/mistral-7b-instruct:free',
     'qwen/qwen-2.5-7b-instruct:free',
     'google/gemma-2-9b-it:free',
     'microsoft/phi-3-mini-128k-instruct:free',
-    'nousresearch/hermes-3-llama-3.1-8b:free'
+    'nousresearch/hermes-3-llama-3.1-8b:free',
+    'openrouter/free'
   ];
 
   async fetchFreeModels() {
@@ -5960,7 +5960,7 @@ class BHApp {
   saveAISettings() {
     const key = (document.getElementById('aiKeyInput').value || '').trim();
     const sel = document.getElementById('aiModelSelect');
-    const model = (sel && sel.value) || 'openrouter/free';
+    const model = (sel && sel.value) || 'deepseek/deepseek-chat:free';
     if (key) localStorage.setItem('BH_AI_KEY', key);
     else localStorage.removeItem('BH_AI_KEY');
     localStorage.setItem('BH_AI_MODEL', model);
@@ -6173,6 +6173,7 @@ class BHApp {
       );
       box.textContent = text || '—';
     } catch (e) {
+      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
       box.textContent = '—';
     }
     if (input) input.value = '';
@@ -6192,6 +6193,7 @@ class BHApp {
         '\nالمتاح للصرف: ' + Math.round(this.data.balances.spendableBalance) + ' ج.م | التحويش الكلي: ' + Math.round(this.data.balances.reservedSavings || 0) + ' ج.م'
       );
     } catch (e) {
+      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
       text = null;
     }
     box.textContent = text || '—';
@@ -6204,35 +6206,41 @@ class BHApp {
     const applyBtn = document.getElementById('smartSplitApply');
     box.textContent = '🤖 الذكاء بيحسب التقسيمة المناسبة…';
     if (applyBtn) applyBtn.style.display = 'none';
-    const reply = await this.askAI(
-      'أنت بوني، مستشار مالي لفارس دليفري مصري. اقترح تقسيمة قبض (تحويش/أساسيات/خروجات) من 100. رد بصيغة JSON فقط من غير أي كلام: {"savings":50,"essentials":40,"outings":10}',
-      this.buildBrainSummary() +
-      '\n\nالتقسيمة الحالية: تحويش ' + this.data.settings.savingsRatio + '%، أساسيات ' + this.data.settings.essentialsRatio + '%، خروجات ' + this.data.settings.outingsRatio + '%'
-    );
-    if (reply == null) { box.textContent = '—'; return null; }
-
-    let split = null;
     try {
-      const cleaned = reply.replace(/```json|```/g, '').trim();
-      const match = cleaned.match(/\{[\s\S]*\}/);
-      if (match) {
-        const j = JSON.parse(match[0]);
-        const s = Math.max(0, Math.round(Number(j.savings) || 0));
-        const e = Math.max(0, Math.round(Number(j.essentials) || 0));
-        const o = 100 - s - e;
-        if (s > 0 && e > 0 && o >= 0) split = { savings: s, essentials: e, outings: o };
-      }
-    } catch (e) { /* ignore */ }
+      const reply = await this.askAI(
+        'أنت بوني، مستشار مالي لفارس دليفري مصري. اقترح تقسيمة قبض (تحويش/أساسيات/خروجات) من 100. رد بصيغة JSON فقط من غير أي كلام: {"savings":50,"essentials":40,"outings":10}',
+        this.buildBrainSummary() +
+        '\n\nالتقسيمة الحالية: تحويش ' + this.data.settings.savingsRatio + '%، أساسيات ' + this.data.settings.essentialsRatio + '%، خروجات ' + this.data.settings.outingsRatio + '%'
+      );
+      if (reply == null) { box.textContent = '—'; return null; }
 
-    if (!split) {
-      box.textContent = '⚠️ الذكاء رد بطريقة مش مفهومة — جرّب تاني';
+      let split = null;
+      try {
+        const cleaned = reply.replace(/```json|```/g, '').trim();
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) {
+          const j = JSON.parse(match[0]);
+          const s = Math.max(0, Math.round(Number(j.savings) || 0));
+          const e = Math.max(0, Math.round(Number(j.essentials) || 0));
+          const o = 100 - s - e;
+          if (s > 0 && e > 0 && o >= 0) split = { savings: s, essentials: e, outings: o };
+        }
+      } catch (e) { /* ignore */ }
+
+      if (!split) {
+        box.textContent = '⚠️ الذكاء رد بطريقة مش مفهومة — جرّب تاني';
+        return null;
+      }
+
+      this._smartSplit = split;
+      box.textContent = '🧮 التقسيمة المقترحة — تحويش ' + split.savings + '% · أساسيات ' + split.essentials + '% · خروجات ' + split.outings + '%';
+      if (applyBtn) applyBtn.style.display = '';
+      return split;
+    } catch (e) {
+      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
+      box.textContent = '—';
       return null;
     }
-
-    this._smartSplit = split;
-    box.textContent = '🧮 التقسيمة المقترحة — تحويش ' + split.savings + '% · أساسيات ' + split.essentials + '% · خروجات ' + split.outings + '%';
-    if (applyBtn) applyBtn.style.display = '';
-    return split;
   }
 
   applySmartSplit() {
