@@ -5957,6 +5957,35 @@ class BHApp {
     };
   }
 
+  // نداء OpenRouter الموحّد — بنقرأ الرد كـ arrayBuffer ونفك ترميزه UTF-8 يدويًا،
+  // لأن iOS Safari أحيانًا بيفك JSON من غير charset بـ ISO-8859-1 فالعربي يطلع بوّظ
+  async aiChat(system, user, maxTokens) {
+    const key = this.getAIKey();
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key,
+        'Referer': 'https://tdrs10.github.io/-bh/',
+        'X-Title': 'BONY'
+      },
+      body: JSON.stringify({
+        model: this.getAIModel(),
+        max_tokens: maxTokens || 500,
+        temperature: 0.6,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ]
+      })
+    });
+    if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
+    const j = JSON.parse(new TextDecoder('utf-8').decode(await r.arrayBuffer()));
+    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if (!text) throw new Error('رد فاضي');
+    return text;
+  }
+
   async brainAskAI() {
     const key = this.getAIKey();
     if (!key) { this.showToast('🤖 حط مفتاحك الأول في المزيد ← تفضيلاتك', 'info'); return null; }
@@ -5969,27 +5998,10 @@ class BHApp {
 
     let out = null;
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + key,
-          'HTTP-Referer': window.location.href,
-          'X-Title': 'BONY — عقل بوني'
-        },
-        body: JSON.stringify({
-          model: this.getAIModel(),
-          max_tokens: 220,
-          temperature: 0.6,
-          messages: [
-            { role: 'system', content: 'أنت مستشار مالي لفارس دليفري مصري. اقترح خطوة عملية واحدة فقط. رد بسطرين: السطر الأول عنوان قصير (أقل من 8 كلمات)، والسطر الثاني شرح عملي في أقل من 30 كلمة بالعربي المصري. من غير مقدمات ولا تعداد.' },
-            { role: 'user', content: this.buildBrainSummary() }
-          ]
-        })
-      });
-      if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
-      const j = await r.json();
-      out = this.parseBrainAIReply(j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+      const text = await this.aiChat(
+        'أنت مستشار مالي لفارس دليفري مصري. اقترح خطوة عملية واحدة فقط. رد بسطرين: السطر الأول عنوان قصير (أقل من 8 كلمات)، والسطر الثاني شرح عملي في أقل من 30 كلمة بالعربي المصري. من غير مقدمات ولا تعداد.',
+        this.buildBrainSummary(), 220);
+      out = this.parseBrainAIReply(text);
       if (!out) throw new Error('رد فاضي');
     } catch (e) {
       this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
@@ -6009,37 +6021,38 @@ class BHApp {
   // ── أدوات الذكاء ──
 
   // مضغوط موحّد للنداءات
-  async askAI(system, user) {
+  // نداء OpenRouter الموحّد — بنقرأ الرد كـ arrayBuffer ونفك ترميزه UTF-8 يدويًا،
+  // لأن iOS Safari أحيانًا بيفك JSON من غير charset بـ ISO-8859-1 فالعربي يطلع بوّظ
+  async aiChat(system, user, maxTokens) {
     const key = this.getAIKey();
     if (!key) { this.showToast('🤖 حط مفتاح الذكاء الأول في المزيد ← تفضيلاتك', 'info'); return null; }
-    try {
-      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + key,
-          'HTTP-Referer': window.location.href,
-          'X-Title': 'BONY — عقل بوني'
-        },
-        body: JSON.stringify({
-          model: this.getAIModel(),
-          max_tokens: 500,
-          temperature: 0.6,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user }
-          ]
-        })
-      });
-      if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
-      const j = await r.json();
-      const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-      if (!text) throw new Error('رد فاضي');
-      return text;
-    } catch (e) {
-      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
-      return null;
-    }
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key,
+        'Referer': 'https://tdrs10.github.io/-bh/',
+        'X-Title': 'BONY'
+      },
+      body: JSON.stringify({
+        model: this.getAIModel(),
+        max_tokens: maxTokens || 500,
+        temperature: 0.6,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ]
+      })
+    });
+    if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
+    const j = JSON.parse(new TextDecoder('utf-8').decode(await r.arrayBuffer()));
+    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if (!text) throw new Error('رد فاضي');
+    return text;
+  }
+
+  async askAI(system, user) {
+    return this.aiChat(system, user);
   }
 
   // ملخص أسبوعي محلي (الأسبوع الحالي مقابل اللي قبله — نفس تعريف startOfWeek في التطبيق)
@@ -6085,13 +6098,17 @@ class BHApp {
     const q = (input && input.value || '').trim();
     if (!q) { this.showToast('✍️ اكتب سؤالك الأول', 'info'); return null; }
     box.textContent = '🤖 بفكر…';
-    const reply = await this.askAI(
-      'أنت بوني، مستشار مالي لفارس دليفري مصري. رد بالعربي المصري من غير مقدمات، في 4-6 سطور بالكتير. لو الإجابة مش من البيانات، قول كده بصراحة وادّي أقرب نصيحة عملية.',
-      'بياناتي:\n' + this.buildBrainSummary() + '\n\nسؤالي: ' + q
-    );
-    box.textContent = reply || '—';
+    try {
+      const text = await this.aiChat(
+        'أنت مستشار مالي لفارس دليفري مصري. رد بالعربي المصري من غير مقدمات، في 4-6 سطور بالكتير. لو الإجابة مش من البيانات، قول كده بصراحة وادّي أقرب نصيحة عملية.',
+        'بياناتي:\n' + this.buildBrainSummary() + '\n\nسؤالي: ' + q
+      );
+      box.textContent = text || '—';
+    } catch (e) {
+      box.textContent = '—';
+    }
     if (input) input.value = '';
-    return reply;
+    return box.textContent;
   }
 
   // 2) ملخص أسبوعي بالذكاء
@@ -6099,13 +6116,18 @@ class BHApp {
     const box = document.getElementById('weeklyAIOut');
     const w = this.buildWeekSummary();
     box.textContent = '🤖 الذكاء بيحلل أسبوعك…';
-    const reply = await this.askAI(
-      'أنت بوني، مستشار مالي لفارس دليفري مصري. حلّل الأسبوع في 5 سطور بالعربي المصري: أبرز ملاحظة، مقارنة بالأسبوع اللي قبله، نصيحة عملية واحدة، وخطة للأسبوع الجاي. من غير مقدمات.',
-      'أسبوعي الحالي:\nالقبض: ' + w.income + ' ج.م | التحويش: ' + w.saved + ' ج.م | المصاريف: ' + w.spent + ' ج.م\nالأسبوع اللي قبله:\nالقبض: ' + w.prevIncome + ' ج.م | المصاريف: ' + w.prevSpent + ' ج.م\nأيام شغل: ' + w.days + '\nأعلى مصاريف: ' + (w.top.join('، ') || 'مفيش') +
-      '\nالمتاح للصرف: ' + Math.round(this.data.balances.spendableBalance) + ' ج.م | التحويش الكلي: ' + Math.round(this.data.balances.reservedSavings || 0) + ' ج.م'
-    );
-    box.textContent = reply || '—';
-    return reply;
+    let text;
+    try {
+      text = await this.aiChat(
+        'أنت بوني، مستشار مالي لفارس دليفري مصري. حلّل الأسبوع في 5 سطور بالعربي المصري: أبرز ملاحظة، مقارنة بالأسبوع اللي قبله، نصيحة عملية واحدة، وخطة للأسبوع الجاي. من غير مقدمات.',
+        'أسبوعي الحالي:\nالقبض: ' + w.income + ' ج.م | التحويش: ' + w.saved + ' ج.م | المصاريف: ' + w.spent + ' ج.م\nالأسبوع اللي قبله:\nالقبض: ' + w.prevIncome + ' ج.م | المصاريف: ' + w.prevSpent + ' ج.م\nأيام شغل: ' + w.days + '\nأعلى مصاريف: ' + (w.top.join('، ') || 'مفيش') +
+        '\nالمتاح للصرف: ' + Math.round(this.data.balances.spendableBalance) + ' ج.م | التحويش الكلي: ' + Math.round(this.data.balances.reservedSavings || 0) + ' ج.م'
+      );
+    } catch (e) {
+      text = null;
+    }
+    box.textContent = text || '—';
+    return text;
   }
 
   // 3) تقسيمة قبض ذكية
