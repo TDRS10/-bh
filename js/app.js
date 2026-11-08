@@ -3285,6 +3285,7 @@ class BHApp {
     this.renderDebtPlanner();
     this.renderAdjustHistory();
     this.renderSmartAlerts();
+    this.renderBrainAdvice();
     this.renderSmartAlertSettings();
     this.renderStrictSettings();
     this.renderWorkTracker();
@@ -5702,6 +5703,183 @@ class BHApp {
     document.getElementById('lwTip').textContent = info.tip;
     card.className = 'card live-weather lw-' + info.level;
     card.style.display = 'block';
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  عقل بوني — اقتراحات ذكية من بياناتك، حاجة حاجة
+  //  (قواعد محلية فقط — من غير إرسال بياناتك لأي خادم)
+  // ═══════════════════════════════════════════════════════════
+
+  getBrainAdvice() {
+    const list = [];
+    const d = new Date();
+    const spendable = this.data.balances.spendableBalance;
+    const reserved = this.data.balances.reservedSavings || 0;
+
+    // 1) قسط/دين متأخر أو مستحق قريب
+    const urgent = (typeof this.getUrgentDebts === 'function' ? this.getUrgentDebts() : [])
+      .filter(x => x.urgency && x.urgency.level !== 'week');
+    if (urgent.length) {
+      const { debt, urgency } = urgent[0];
+      const remaining = Math.max(0, (debt.totalAmount || 0) - (debt.paidAmount || 0));
+      list.push({
+        icon: '📌', target: 'goalsView', action: 'افتح الأهداف',
+        title: 'قسط قرب — ' + debt.creditor,
+        body: 'متبقي ' + remaining.toLocaleString() + ' ج.م · ' + urgency.label
+      });
+    }
+
+    // 2) الرصيد المتاح في خطر
+    if (spendable <= 0) {
+      list.push({
+        icon: '🆘', target: 'moreView', action: 'راجع الرصيد',
+        title: 'رصيدك فضي خالص',
+        body: 'اسحب من التحويش لو محتاج، أو سجّل القبض الجديد عشان تكمل'
+      });
+    } else if (spendable < 200) {
+      list.push({
+        icon: '⚠️', target: 'incomesView', action: 'سجّل قبض',
+        title: 'المتاح قليل — ' + spendable.toLocaleString() + ' ج.م',
+        body: 'يوم أو يومين بالكتير. هبّط المصاريف أو نزّل شغل وسجّل القبض'
+      });
+    }
+
+    // 3) هدف قريب من التحقق
+    const closeGoal = (this.data.goals || []).find(g => g.targetAmount > 0 &&
+      (g.currentAmount / g.targetAmount) >= 0.8 && g.currentAmount < g.targetAmount);
+    if (closeGoal) {
+      const pct = Math.min(100, Math.round((closeGoal.currentAmount / closeGoal.targetAmount) * 100));
+      const left = Math.max(0, closeGoal.targetAmount - closeGoal.currentAmount);
+      list.push({
+        icon: '🎯', target: 'goalsView', action: 'زوّد الهدف',
+        title: 'هدفك «' + closeGoal.title + '» وصل ' + pct + '%',
+        body: 'باقي ' + left.toLocaleString() + ' ج.م — زقّة بسيطة النهاردة وتقفلها'
+      });
+    }
+
+    // 4) مفيش قبض الأسبوع ده
+    const startOfWeek = new Date(d); startOfWeek.setDate(d.getDate() - d.getDay()); startOfWeek.setHours(0, 0, 0, 0);
+    const weekIncome = (this.data.incomes || []).some(i => new Date(i.date) >= startOfWeek);
+    if (!weekIncome) {
+      list.push({
+        icon: '🛵', target: 'incomesView', action: 'سجّل قبض',
+        title: 'مفيش قبض الأسبوع ده',
+        body: 'لو نزلت شغل النهاردة، سجّل القبض أول ما ترجع عشان الحسابات متفضلش فاضية'
+      });
+    }
+
+    // 5) ميزانية الخروجات قربت تخلص
+    const budget = this.data.settings.weeklyOutingsBudget;
+    if (budget && typeof this.getWeeklyOutingsSpent === 'function') {
+      const spent = this.getWeeklyOutingsSpent();
+      if (spent >= budget * 0.8 && spent < budget) {
+        const left = Math.round(budget - spent);
+        list.push({
+          icon: '🍕', target: 'expensesView', action: 'راجع المصاريف',
+          title: 'ميزانية الخروجات قربت',
+          body: 'صرفت ' + Math.round(spent).toLocaleString() + ' من ' + budget.toLocaleString() + ' ج.م — باقي ' + left.toLocaleString() + ' ج.م للأسبوع'
+        });
+      }
+    }
+
+    // 6) مصروف مهيمن على الشهر
+    const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const monthExp = (this.data.expenses || []).filter(e => String(e.date || '').slice(0, 7) === ym);
+    const totalExp = monthExp.reduce((n, e) => n + (Number(e.amount) || 0), 0);
+    if (totalExp >= 500) {
+      const byCat = {};
+      monthExp.forEach(e => { const k = e.category || 'تاني'; byCat[k] = (byCat[k] || 0) + (Number(e.amount) || 0); });
+      const topCat = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a])[0];
+      const share = Math.round((byCat[topCat] / totalExp) * 100);
+      if (share >= 50) {
+        list.push({
+          icon: '🔎', target: 'expensesView', action: 'راجع المصاريف',
+          title: '«' + topCat + '» واخدة ' + share + '% من مصاريف الشهر',
+          body: 'ديفات ' + byCat[topCat].toLocaleString() + ' ج.م — جربه تخفضه شوية وقارن النتيجة'
+        });
+      }
+    }
+
+    // 7) تحويش كبير من غير هدف
+    if (reserved >= 2000 && (this.data.goals || []).length === 0) {
+      list.push({
+        icon: '🏆', target: 'goalsView', action: 'اعمل هدف',
+        title: 'معاك ' + reserved.toLocaleString() + ' ج.م محوشة من غير هدف',
+        body: 'حط هدف وحلم وخلّي الفلوس دي تشتغل لحاجة معينة'
+      });
+    }
+
+    // 8) نسبة التحويش من قبض الشهر قليلة
+    const monthInc = (this.data.incomes || []).filter(i => String(i.date || '').slice(0, 7) === ym);
+    const incTotal = monthInc.reduce((n, i) => n + (Number(i.amount) || 0), 0);
+    const savedTotal = monthInc.reduce((n, i) => n + (Number(i.savingsAmt) || 0), 0);
+    if (incTotal >= 1000 && (savedTotal / incTotal) < 0.2) {
+      list.push({
+        icon: '🐷', target: 'moreView', action: 'ظبّط التقسيم',
+        title: 'التحويش قليل الشهر ده — ' + Math.round((savedTotal / incTotal) * 100) + '% بس',
+        body: 'زد نسبة التحويش من القبض حتى لو بـ10% — الفرق مش هتحسه، والخزنة هتكبر'
+      });
+    }
+
+    // 9) يومك لسه مش متسجل (بعد العصر)
+    if (d.getHours() >= 14 && !(this.data.workDays || {})[localDateKey(d)]) {
+      list.push({
+        icon: '📅', target: 'workView', action: 'سجّل يومك',
+        title: 'نزلت شغل النهاردة؟',
+        body: 'سجّل يومك في تقويم الشغل — حتى الراحة تبقى محسوب عشان السلسلة متتكسرش ظلم'
+      });
+    }
+
+    // 10) الافتراضي — ماشي كويس
+    if (!list.length) {
+      list.push({
+        icon: '💡', target: 'moreView', action: 'تمام',
+        title: 'ماشي مظبوط النهاردة',
+        body: 'مفيش حاجة مستعجلة. راجع ملخص الشهر وشاركه أو زق هدفك حتة'
+      });
+    }
+
+    return list;
+  }
+
+  getBrainIdx() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('BH_BRAIN') || 'null'); } catch (e) { /* ignore */ }
+    if (saved && saved.date === localDateKey(new Date()) && typeof saved.idx === 'number') return saved.idx;
+    return 0;
+  }
+
+  setBrainIdx(idx) {
+    localStorage.setItem('BH_BRAIN', JSON.stringify({ date: localDateKey(new Date()), idx }));
+  }
+
+  renderBrainAdvice() {
+    const card = document.getElementById('brainCard');
+    if (!card) return;
+    const list = this.getBrainAdvice();
+    if (!list.length) { card.style.display = 'none'; return; }
+    const idx = Math.min(this.getBrainIdx(), list.length - 1);
+    const a = list[idx];
+    document.getElementById('brainIcon').textContent = a.icon;
+    document.getElementById('brainTitle').textContent = a.title;
+    document.getElementById('brainBody').textContent = a.body;
+    document.getElementById('brainDoBtn').textContent = a.action + ' ←';
+    document.getElementById('brainCount').textContent = (idx + 1) + '/' + list.length;
+    this._brainTarget = a.target;
+    card.style.display = 'block';
+  }
+
+  nextBrainAdvice() {
+    const list = this.getBrainAdvice();
+    if (!list.length) return;
+    const idx = (this.getBrainIdx() + 1) % list.length;
+    this.setBrainIdx(idx);
+    this.renderBrainAdvice();
+  }
+
+  brainDoAction(target) {
+    const t = target || this._brainTarget;
+    if (t) this.switchTab(t);
   }
 
   // ═══════════════════════════════════════════════════════════

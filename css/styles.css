@@ -3913,3 +3913,14 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
 .live-weather.lw-ok .lw-tip { background: rgba(0,200,122,.1); color: #6ee7b7; border: 1px solid rgba(0,200,122,.3); }
 .live-weather.lw-warn .lw-tip { background: rgba(245,158,11,.1); color: #fcd34d; border: 1px solid rgba(245,158,11,.35); }
 .live-weather.lw-danger .lw-tip { background: rgba(239,68,68,.1); color: #fca5a5; border: 1px solid rgba(239,68,68,.35); }
+
+/* ═══════ عقل بوني — اقتراح واحد في كل مرة ═══════ */
+.brain-card { margin: 0 0 12px; border: 1px solid rgba(0, 217, 255, .35); background: linear-gradient(180deg, rgba(0,217,255,.07), rgba(5,9,16,.6)); }
+.brain-card .brain-body { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.brain-card .brain-icon { font-size: 1.5rem; line-height: 1.15; flex-shrink: 0; }
+.brain-card .brain-text { flex: 1; min-width: 0; }
+.brain-card .brain-text strong { display: block; font-size: .98rem; color: #fff; margin-bottom: 4px; }
+.brain-card .brain-text p { margin: 0; font-size: .85rem; line-height: 1.7; color: var(--text-muted); }
+.brain-card .brain-actions { display: flex; gap: 8px; }
+.brain-card .brain-actions .btn { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .brain-card { animation: none; } }

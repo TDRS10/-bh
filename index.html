@@ -154,6 +154,25 @@
   <div class="lw-tip" id="lwTip"></div>
 </div>
 
+<!-- 🧠 عقل بوني — اقتراح واحد من بياناتك، وزر «اقتراح تاني» للّي بعده -->
+<div class="card brain-card" id="brainCard" style="display:none;">
+  <div class="card-header">
+    <span class="card-title"><span class="card-icon">🧠</span> عقل بوني</span>
+    <span class="sub-balance-label" id="brainCount"></span>
+  </div>
+  <div class="brain-body">
+    <div class="brain-icon" id="brainIcon">💡</div>
+    <div class="brain-text">
+      <strong id="brainTitle">—</strong>
+      <p id="brainBody">—</p>
+    </div>
+  </div>
+  <div class="brain-actions">
+    <button class="btn btn-primary btn-sm" id="brainDoBtn" onclick="app.brainDoAction()">نفّذ ←</button>
+    <button class="btn btn-secondary btn-sm" onclick="app.nextBrainAdvice()">اقتراح تاني ←</button>
+  </div>
+</div>
+
 <div class="card balance-card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💰</span> إجمالي الرصيد الكلّي</span>
