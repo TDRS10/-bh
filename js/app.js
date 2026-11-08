@@ -3286,6 +3286,7 @@ class BHApp {
     this.renderAdjustHistory();
     this.renderSmartAlerts();
     this.renderBrainAdvice();
+    this.renderAIStatus();
     this.renderSmartAlertSettings();
     this.renderStrictSettings();
     this.renderWorkTracker();
@@ -5865,6 +5866,8 @@ class BHApp {
     document.getElementById('brainBody').textContent = a.body;
     document.getElementById('brainDoBtn').textContent = a.action + ' ←';
     document.getElementById('brainCount').textContent = (idx + 1) + '/' + list.length;
+    const aiBtn = document.getElementById('brainAIBtn');
+    if (aiBtn) aiBtn.style.display = this.getAIKey() ? '' : 'none';
     this._brainTarget = a.target;
     card.style.display = 'block';
   }
@@ -5872,6 +5875,7 @@ class BHApp {
   nextBrainAdvice() {
     const list = this.getBrainAdvice();
     if (!list.length) return;
+    this._aiAdvice = null;
     const idx = (this.getBrainIdx() + 1) % list.length;
     this.setBrainIdx(idx);
     this.renderBrainAdvice();
@@ -5880,6 +5884,126 @@ class BHApp {
   brainDoAction(target) {
     const t = target || this._brainTarget;
     if (t) this.switchTab(t);
+  }
+
+  // ── ذكاء اصطناعي اختياري (OpenRouter) — المفتاح في localStorage على جهازك بس ──
+
+  getAIKey() { return (localStorage.getItem('BH_AI_KEY') || '').trim(); }
+  getAIModel() { return (localStorage.getItem('BH_AI_MODEL') || 'openrouter/free').trim() || 'openrouter/free'; }
+
+  saveAISettings() {
+    const key = (document.getElementById('aiKeyInput').value || '').trim();
+    const model = (document.getElementById('aiModelInput').value || 'openrouter/free').trim() || 'openrouter/free';
+    if (key) localStorage.setItem('BH_AI_KEY', key);
+    else localStorage.removeItem('BH_AI_KEY');
+    localStorage.setItem('BH_AI_MODEL', model);
+    this.renderAIStatus();
+    this.renderBrainAdvice();
+    this.showToast(key ? '🤖 الذكاء الاصطناعي اتوصّل — دور على زر «اسأل الذكاء» في عقل بوني' : '🤖 اتشال المفتاح — العقل رجع للقواعد المحلية', key ? 'success' : 'info');
+  }
+
+  clearAISettings() {
+    localStorage.removeItem('BH_AI_KEY');
+    const input = document.getElementById('aiKeyInput');
+    if (input) input.value = '';
+    this.renderAIStatus();
+    this.renderBrainAdvice();
+    this.showToast('🤖 اتمسح المفتاح من الجهاز', 'info');
+  }
+
+  renderAIStatus() {
+    const status = document.getElementById('aiStatus');
+    if (!status) return;
+    const key = this.getAIKey();
+    status.textContent = key
+      ? '✅ مفتاح محفوظ على جهازك — الموديل: ' + this.getAIModel()
+      : '⚪ بدون مفتاح — العقل بيشتغل بقواعده المحلية';
+    const input = document.getElementById('aiKeyInput');
+    if (input && document.activeElement !== input) input.value = '';
+  }
+
+  // ملخص مالي مضغوط للذكاء — من غير أي بيانات شخصية
+  buildBrainSummary() {
+    const s = this.getMonthSummary();
+    const spendable = this.data.balances.spendableBalance;
+    const reserved = this.data.balances.reservedSavings || 0;
+    const urgent = (typeof this.getUrgentDebts === 'function' ? this.getUrgentDebts() : [])
+      .filter(x => x.urgency && x.urgency.level !== 'week').slice(0, 3)
+      .map(x => x.debt.creditor + ' (متبقي ' + Math.max(0, x.debt.totalAmount - x.debt.paidAmount) + '، ' + x.urgency.label + ')')
+      .join('؛ ');
+    const goals = (this.data.goals || []).slice(0, 3).map(g =>
+      g.title + ' ' + Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100)) + '%');
+    const top = s.top.map(t => t.category + ' ' + t.pct + '%').join('، ') || 'مفيش';
+    return [
+      'سائق دليفري في مصر — تطبيق بوني لإدارة القبض والمصاريف',
+      'المتاح للصرف: ' + Math.round(spendable) + ' ج.م | التحويش: ' + Math.round(reserved) + ' ج.م',
+      'قبض الشهر: ' + s.income + ' ج.م | مصاريف الشهر: ' + s.spent + ' ج.م | تحويش الشهر: ' + s.saved + ' ج.م',
+      'أيام شغل الشهر: ' + s.days,
+      'أعلى مصاريف: ' + top,
+      'ديون مستعجلة: ' + (urgent || 'مفيش'),
+      'أهداف: ' + (goals.join('، ') || 'مفيش'),
+      'نسبة التحويش الافتراضية: ' + this.data.settings.savingsRatio + '%'
+    ].join('\n');
+  }
+
+  parseBrainAIReply(text) {
+    const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return null;
+    return {
+      icon: '🧠',
+      title: lines[0].slice(0, 90),
+      body: lines.slice(1).join(' ').slice(0, 300) || '—',
+      target: 'moreView'
+    };
+  }
+
+  async brainAskAI() {
+    const key = this.getAIKey();
+    if (!key) { this.showToast('🤖 حط مفتاحك الأول في المزيد ← تفضيلاتك', 'info'); return null; }
+
+    const setText = (body, title) => {
+      document.getElementById('brainBody').textContent = body;
+      if (title) document.getElementById('brainTitle').textContent = title;
+    };
+    setText('🤖 الذكاء بيفكر في بياناتك…', 'لحظة');
+
+    let out = null;
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + key,
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'BONY — عقل بوني'
+        },
+        body: JSON.stringify({
+          model: this.getAIModel(),
+          max_tokens: 220,
+          temperature: 0.6,
+          messages: [
+            { role: 'system', content: 'أنت مستشار مالي لفارس دليفري مصري. اقترح خطوة عملية واحدة فقط. رد بسطرين: السطر الأول عنوان قصير (أقل من 8 كلمات)، والسطر الثاني شرح عملي في أقل من 30 كلمة بالعربي المصري. من غير مقدمات ولا تعداد.' },
+            { role: 'user', content: this.buildBrainSummary() }
+          ]
+        })
+      });
+      if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
+      const j = await r.json();
+      out = this.parseBrainAIReply(j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+      if (!out) throw new Error('رد فاضي');
+    } catch (e) {
+      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
+      this.renderBrainAdvice();
+      return null;
+    }
+
+    this._aiAdvice = out;
+    this._brainTarget = out.target;
+    document.getElementById('brainIcon').textContent = out.icon;
+    document.getElementById('brainTitle').textContent = out.title;
+    document.getElementById('brainBody').textContent = out.body;
+    document.getElementById('brainCount').textContent = '🤖';
+    return out;
   }
 
   // ═══════════════════════════════════════════════════════════

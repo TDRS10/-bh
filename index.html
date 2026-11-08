@@ -169,6 +169,7 @@
   </div>
   <div class="brain-actions">
     <button class="btn btn-primary btn-sm" id="brainDoBtn" onclick="app.brainDoAction()">نفّذ ←</button>
+    <button class="btn btn-secondary btn-sm" id="brainAIBtn" onclick="app.brainAskAI()">🤖 اسأل الذكاء</button>
     <button class="btn btn-secondary btn-sm" onclick="app.nextBrainAdvice()">اقتراح تاني ←</button>
   </div>
 </div>
@@ -853,6 +854,23 @@
             ينبهك قبل ما تحصل مشكلة: رصيدك قارب يعمل، نسيت تسجّل وردية، أو هدفك قارب يتحقق.
           </p>
           <div id="smartAlertSettings"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="card-icon">🤖</span> عقل بوني — ذكاء اصطناعي (اختياري)</span>
+          </div>
+          <p class="card-desc">
+            الصق مفتاح OpenRouter — بيتحفظ على جهازك بس، ومش بيترفع لأي مكان عام.
+            من غير مفتاح، العقل بيشتغل بالقواعد المحلية زي ما هو.
+          </p>
+          <input type="password" id="aiKeyInput" class="form-control" placeholder="sk-or-v1-..." dir="ltr" autocomplete="off" style="margin-bottom: 8px;">
+          <input type="text" id="aiModelInput" class="form-control" value="openrouter/free" dir="ltr" autocomplete="off" style="margin-bottom: 8px;">
+          <div style="display:flex; gap: 8px;">
+            <button class="btn btn-primary btn-sm" onclick="app.saveAISettings()">حفظ 💾</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.clearAISettings()">مسح المفتاح</button>
+          </div>
+          <div id="aiStatus" style="font-size:.75rem; color: var(--text-muted); margin-top: 8px;"></div>
         </div>
 
 <div class="section-heading"><h2>البيانات والتحديثات</h2><p>النسخ الاحتياطية والتحديث والفحص في مكان واحد.</p></div>
