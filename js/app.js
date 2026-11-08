@@ -1392,6 +1392,7 @@ class BHApp {
     this.initCardTilt();
     this.initNavMascot();
     this.renderDailyProverb();
+    this.loadLiveWeather();
     this.maybeShowWelcome();
     this.scheduleSmartNotification();
 
@@ -5636,6 +5637,73 @@ class BHApp {
   // ═══════════════════════════════════════════════════════════
 
   // Share the app (Web Share API, with a copy-link fallback)
+  // ═══════════════════════════════════════════════════════════
+  //  LIVE WEATHER  (الجو النهاردة — بيانات حية من Open-Meteo)
+  // ═══════════════════════════════════════════════════════════
+
+  // وصف + نصيحة للفارس حسب كود الطقس (WMO) والحرارة والريح
+  weatherInfo(code, temp, rainProb, wind) {
+    let label = 'غايم';
+    let level = 'ok';
+    if (code === 0) { label = 'صافي'; }
+    else if (code <= 3) { label = 'غايم شوية'; }
+    else if (code === 45 || code === 48) { label = 'شبورة'; level = 'warn'; }
+    else if (code >= 51 && code <= 67) { label = 'مطر خفيف'; level = 'warn'; }
+    else if (code >= 71 && code <= 77) { label = 'تلج'; level = 'warn'; }
+    else if (code >= 80 && code <= 82) { label = 'مطر'; level = 'warn'; }
+    else if (code >= 95) { label = 'رعد ومطر'; level = 'danger'; }
+
+    let tip = 'الجو مناسب للشغل — انزل واكسب';
+    if (code >= 95) tip = 'رعد ومطر — خد بالك من الأرض والفرامل';
+    else if (code >= 51) tip = 'فيه مطر — لبس جاكيت وخد بالك من الانزلاق';
+    else if (temp >= 38) tip = 'حر شديد — اشرب مية كتير وخد راحة';
+    else if (temp <= 10) tip = 'برد — البس طبقات قبل ما تنزل';
+    else if (wind >= 35) tip = 'ريح قوية — خد بالك وأنت ماشي';
+    else if (rainProb >= 50) tip = 'احتمال مطر — خد معاك جاكيت';
+
+    if (level === 'ok' && (temp >= 38 || temp <= 10 || wind >= 35 || rainProb >= 50)) level = 'warn';
+    return { label, tip, level };
+  }
+
+  async loadLiveWeather() {
+    const card = document.getElementById('liveWeatherCard');
+    if (!card) return;
+
+    const KEY = 'BH_WEATHER_V1';
+    const FRESH = 30 * 60 * 1000;
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* ignore */ }
+
+    let w = cached && (Date.now() - cached.at < FRESH) ? cached.data : null;
+
+    if (!w) {
+      try {
+        const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=30.0444&longitude=31.2357&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=precipitation_probability_max&timezone=Africa%2FCairo&forecast_days=1');
+        if (!r.ok) throw new Error('http ' + r.status);
+        const j = await r.json();
+        w = {
+          temp: Math.round(j.current.temperature_2m),
+          feels: Math.round(j.current.apparent_temperature),
+          code: j.current.weather_code,
+          wind: Math.round(j.current.wind_speed_10m),
+          rain: Math.round((j.daily && j.daily.precipitation_probability_max && j.daily.precipitation_probability_max[0]) || 0)
+        };
+        localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), data: w }));
+      } catch (e) {
+        w = cached ? cached.data : null;   // أوفلاين: نعرض آخر قراءة لو موجودة
+      }
+    }
+    if (!w) return;
+
+    const info = this.weatherInfo(w.code, w.temp, w.rain, w.wind);
+    document.getElementById('lwTemp').textContent = w.temp;
+    document.getElementById('lwLabel').textContent = info.label;
+    document.getElementById('lwDetails').textContent = 'مطر ' + w.rain + '% · ريح ' + w.wind + ' كم/س · حاسسها ' + w.feels + '°';
+    document.getElementById('lwTip').textContent = info.tip;
+    card.className = 'card live-weather lw-' + info.level;
+    card.style.display = 'block';
+  }
+
   // ═══════════════════════════════════════════════════════════
   //  MONTHLY SHARE CARD  (كارت مشاركة ملخص الشهر)
   // ═══════════════════════════════════════════════════════════

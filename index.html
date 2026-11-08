@@ -141,6 +141,19 @@
 
 <div class="bh-road" aria-hidden="true"><span class="bh-scooter"><svg viewBox="0 0 48 28" width="30" height="18" focusable="false"><g fill="none" stroke="#00D9FF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="22" r="4.4"/><circle cx="39.5" cy="22" r="4.4"/><path d="M12.9 22H27"/><path d="M10.8 17.6 13 12h8.4"/><path d="M27 22l6.8-14"/><path d="M33.8 8h6.2"/><path d="M21.4 12.5l5 4.7"/></g></svg></span></div>
 
+<!-- الجو النهاردة — بيانات حية من Open-Meteo (بتختفي أوفلاين) -->
+<div class="card live-weather" id="liveWeatherCard" style="display:none;">
+  <div class="lw-main">
+    <div class="lw-temp"><span id="lwTemp">--</span>°</div>
+    <div class="lw-meta">
+      <strong id="lwLabel">—</strong>
+      <span id="lwDetails">—</span>
+    </div>
+    <span class="lw-chip" id="lwChip">النهاردة</span>
+  </div>
+  <div class="lw-tip" id="lwTip"></div>
+</div>
+
 <div class="card balance-card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💰</span> إجمالي الرصيد الكلّي</span>
