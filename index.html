@@ -854,6 +854,7 @@
             ينبهك قبل ما تحصل مشكلة: رصيدك قارب يعمل، نسيت تسجّل وردية، أو هدفك قارب يتحقق.
           </p>
           <div id="smartAlertSettings"></div>
+          <button class="btn btn-secondary btn-sm" onclick="app.clearAllNotifications()" style="margin-top:8px;">🗑️ مسح الإشعارات العالقة</button>
         </div>
 
         <div class="card">
@@ -899,7 +900,11 @@
             من غير مفتاح، العقل بيشتغل بالقواعد المحلية زي ما هو.
           </p>
           <input type="password" id="aiKeyInput" class="form-control" placeholder="sk-or-v1-..." dir="ltr" autocomplete="off" style="margin-bottom: 8px;">
-          <input type="text" id="aiModelInput" class="form-control" value="openrouter/free" dir="ltr" autocomplete="off" style="margin-bottom: 8px;">
+          <div style="display:flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+            <label style="font-size:.75rem; color: var(--text-muted); flex-shrink: 0;">الموديل:</label>
+            <select id="aiModelSelect" class="form-control" style="flex: 1; min-width: 0;"></select>
+            <button class="btn btn-secondary btn-sm" onclick="app.fetchFreeModels()" style="padding: 0 10px; white-space: nowrap;">جلب المجانية ↻</button>
+          </div>
           <div style="display:flex; gap: 8px;">
             <button class="btn btn-primary btn-sm" onclick="app.saveAISettings()">حفظ 💾</button>
             <button class="btn btn-secondary btn-sm" onclick="app.clearAISettings()">مسح المفتاح</button>

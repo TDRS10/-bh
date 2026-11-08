@@ -1395,6 +1395,7 @@ class BHApp {
     this.loadLiveWeather();
     this.maybeShowWelcome();
     this.scheduleSmartNotification();
+    this.fetchFreeModels();
 
     // Close the user menu when clicking outside
     document.addEventListener('click', (e) => {
@@ -5498,6 +5499,23 @@ class BHApp {
     } catch (e) { /* non-critical */ }
   }
 
+  // مسح كل إشعارات بوني العالقة من Service Worker (إشعاراتmazmouna / stuck)
+  async clearAllNotifications() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (!('getNotifications' in reg)) {
+        this.showToast('⚠️ المتصفح لا يدعم مسح الإشعارات', 'error');
+        return;
+      }
+      const all = await reg.getNotifications();
+      let closed = 0;
+      all.forEach(n => { if (n.tag && n.tag.startsWith('bh-')) { n.close(); closed++; } });
+      this.showToast(closed ? '✅ تم مسح ' + closed + ' إشعار' : 'ℹ️ مفيش إشعارات عالقة', 'success');
+    } catch (e) {
+      this.showToast('⚠️ معرفتش أمسح الإشعارات — ' + (e && e.message), 'error');
+    }
+  }
+
   // Render the smart alerts settings card
   renderSmartAlertSettings() {
     const box = document.getElementById('smartAlertSettings');
@@ -5889,17 +5907,66 @@ class BHApp {
   // ── ذكاء اصطناعي اختياري (OpenRouter) — المفتاح في localStorage على جهازك بس ──
 
   getAIKey() { return (localStorage.getItem('BH_AI_KEY') || '').trim(); }
-  getAIModel() { return (localStorage.getItem('BH_AI_MODEL') || 'openrouter/free').trim() || 'openrouter/free'; }
+  getAIModel() {
+    const sel = document.getElementById('aiModelSelect');
+    if (sel && sel.value) return sel.value;
+    return (localStorage.getItem('BH_AI_MODEL') || 'openrouter/free').trim() || 'openrouter/free';
+  }
+
+  // قائمة موديلات OpenRouter المجانية (مع احتياطي محلي لو الخدمة متعطلّة)
+  FREE_MODELS = [
+    'openrouter/free',
+    'deepseek/deepseek-chat:free',
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'mistralai/mistral-7b-instruct:free',
+    'qwen/qwen-2.5-7b-instruct:free',
+    'google/gemma-2-9b-it:free',
+    'microsoft/phi-3-mini-128k-instruct:free',
+    'nousresearch/hermes-3-llama-3.1-8b:free'
+  ];
+
+  async fetchFreeModels() {
+    const sel = document.getElementById('aiModelSelect');
+    if (!sel) return;
+    sel.disabled = true;
+    sel.innerHTML = '<option>جاري الإحضار…</option>';
+
+    let models = this.FREE_MODELS.slice();
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/models', { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        const free = (j.data || [])
+          .filter(m => m.pricing && m.pricing.prompt === '0' && m.pricing.completion === '0')
+          .map(m => m.id)
+          .filter(Boolean);
+        if (free.length) models = free;
+      }
+    } catch (e) { /* استخدام الاحتياطي */ }
+
+    // إزالة التكرارات والترتيب
+    const uniq = [...new Set(models)].sort();
+    sel.innerHTML = uniq.map(m => '<option value="' + m + '">' + m + '</option>').join('');
+
+    // تطبيق الموديل المحفوظ لو موجود في القائمة
+    const saved = this.getAIModel();
+    if (uniq.indexOf(saved) >= 0) sel.value = saved;
+    sel.disabled = false;
+
+    const status = document.getElementById('aiStatus');
+    if (status && !!localStorage.getItem('BH_AI_KEY')) status.textContent = '✅ تم إحضار ' + uniq.length + ' موديل مجاني — اختَر الموديل المناسب';
+  }
 
   saveAISettings() {
     const key = (document.getElementById('aiKeyInput').value || '').trim();
-    const model = (document.getElementById('aiModelInput').value || 'openrouter/free').trim() || 'openrouter/free';
+    const sel = document.getElementById('aiModelSelect');
+    const model = (sel && sel.value) || 'openrouter/free';
     if (key) localStorage.setItem('BH_AI_KEY', key);
     else localStorage.removeItem('BH_AI_KEY');
     localStorage.setItem('BH_AI_MODEL', model);
     this.renderAIStatus();
     this.renderBrainAdvice();
-    this.showToast(key ? '🤖 الذكاء الاصطناعي اتوصّل — دور على زر «اسأل الذكاء» في عقل بوني' : '🤖 اتشال المفتاح — العقل رجع للقواعد المحلية', key ? 'success' : 'info');
+    this.showToast(key ? '🤖 الذكاء الاصطناعي اتوصّل — الموديل: ' + model : '🤖 اتشال المفتاح — العقل رجع للقواعد المحلية', key ? 'success' : 'info');
   }
 
   clearAISettings() {
@@ -5915,8 +5982,9 @@ class BHApp {
     const status = document.getElementById('aiStatus');
     if (!status) return;
     const key = this.getAIKey();
+    const model = this.getAIModel();
     status.textContent = key
-      ? '✅ مفتاح محفوظ على جهازك — الموديل: ' + this.getAIModel()
+      ? '✅ مفتاح محفوظ على جهازك — الموديل: ' + model
       : '⚪ بدون مفتاح — العقل بيشتغل بقواعده المحلية';
     const input = document.getElementById('aiKeyInput');
     if (input && document.activeElement !== input) input.value = '';
