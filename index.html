@@ -858,6 +858,40 @@
 
         <div class="card">
           <div class="card-header">
+            <span class="card-title"><span class="card-icon">🤖</span> أدوات الذكاء</span>
+          </div>
+          <p class="card-desc">تلات أدوات بتحتاج مفتاح الذكاء اللي تحت — ومن غيره هيقولك كده.</p>
+
+          <!-- اسأل بوني -->
+          <strong style="font-size:.9rem; color:#fff;">💬 اسأل بوني</strong>
+          <div style="display:flex; gap:8px; margin: 8px 0;">
+            <input type="text" id="askBoniInput" class="form-control" placeholder="أقدر أصرف 500 النهاردة؟">
+            <button class="btn btn-primary btn-sm" onclick="app.askBoni()">اسأل</button>
+          </div>
+          <div class="ai-out" id="askBoniOut"></div>
+
+          <hr style="border:0; border-top:1px solid rgba(255,255,255,.08); margin: 14px 0;">
+
+          <!-- ملخص أسبوعي -->
+          <strong style="font-size:.9rem; color:#fff;">📊 ملخص أسبوعي</strong>
+          <div style="margin: 8px 0;">
+            <button class="btn btn-secondary btn-sm" onclick="app.weeklyAISummary()">حلّل أسبوعي</button>
+          </div>
+          <div class="ai-out" id="weeklyAIOut"></div>
+
+          <hr style="border:0; border-top:1px solid rgba(255,255,255,.08); margin: 14px 0;">
+
+          <!-- تقسيمة قبض -->
+          <strong style="font-size:.9rem; color:#fff;">🧮 تقسيمة قبض ذكية</strong>
+          <div style="display:flex; gap:8px; margin: 8px 0;">
+            <button class="btn btn-secondary btn-sm" onclick="app.smartSplit()">اقترح تقسيمة</button>
+            <button class="btn btn-primary btn-sm" id="smartSplitApply" onclick="app.applySmartSplit()" style="display:none;">طبّقها ✓</button>
+          </div>
+          <div class="ai-out" id="smartSplitOut"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
             <span class="card-title"><span class="card-icon">🤖</span> عقل بوني — ذكاء اصطناعي (اختياري)</span>
           </div>
           <p class="card-desc">

@@ -3924,3 +3924,7 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
 .brain-card .brain-actions { display: flex; gap: 8px; }
 .brain-card .brain-actions .btn { flex: 1; }
 @media (prefers-reduced-motion: reduce) { .brain-card { animation: none; } }
+
+/* ═══════ أدوات الذكاء — نتائج القراءة ═══════ */
+.ai-out { font-size: .85rem; line-height: 1.8; color: #d9ecf2; white-space: pre-wrap; margin: 4px 0 2px; }
+.ai-out:empty { display: none; }

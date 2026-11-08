@@ -6006,6 +6006,158 @@ class BHApp {
     return out;
   }
 
+  // ── أدوات الذكاء ──
+
+  // مضغوط موحّد للنداءات
+  async askAI(system, user) {
+    const key = this.getAIKey();
+    if (!key) { this.showToast('🤖 حط مفتاح الذكاء الأول في المزيد ← تفضيلاتك', 'info'); return null; }
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + key,
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'BONY — عقل بوني'
+        },
+        body: JSON.stringify({
+          model: this.getAIModel(),
+          max_tokens: 500,
+          temperature: 0.6,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ]
+        })
+      });
+      if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
+      const j = await r.json();
+      const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!text) throw new Error('رد فاضي');
+      return text;
+    } catch (e) {
+      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
+      return null;
+    }
+  }
+
+  // ملخص أسبوعي محلي (الأسبوع الحالي مقابل اللي قبله — نفس تعريف startOfWeek في التطبيق)
+  buildWeekSummary(now) {
+    const d = now || new Date();
+    const start = new Date(d); start.setDate(d.getDate() - d.getDay()); start.setHours(0, 0, 0, 0);
+    const prevStart = new Date(start); prevStart.setDate(prevStart.getDate() - 7);
+
+    const sumBetween = (items, from, to) => (items || []).filter(i => {
+      const t = new Date(i.date).getTime();
+      return t >= from && t < to;
+    });
+    const total = (items, pick) => items.reduce((n, i) => n + (Number(pick(i)) || 0), 0);
+
+    const inWeek = sumBetween(this.data.incomes, start.getTime(), start.getTime() + 7 * 86400000);
+    const prevWeek = sumBetween(this.data.incomes, prevStart.getTime(), start.getTime());
+    const expWeek = sumBetween(this.data.expenses, start.getTime(), start.getTime() + 7 * 86400000);
+    const expPrev = sumBetween(this.data.expenses, prevStart.getTime(), start.getTime());
+
+    const byCat = {};
+    expWeek.forEach(e => { const k = e.category || 'تاني'; byCat[k] = (byCat[k] || 0) + (Number(e.amount) || 0); });
+    const top = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).slice(0, 3)
+      .map(k => k + ' ' + byCat[k] + ' ج.م');
+
+    const days = Object.keys(this.data.workDays || {}).filter(k =>
+      new Date(k).getTime() >= start.getTime() && new Date(k).getTime() < start.getTime() + 7 * 86400000 && this.data.workDays[k]).length;
+
+    return {
+      income: total(inWeek, i => i.amount),
+      saved: total(inWeek, i => i.savingsAmt),
+      spent: total(expWeek, e => e.amount),
+      prevIncome: total(prevWeek, i => i.amount),
+      prevSpent: total(expPrev, e => e.amount),
+      top: top,
+      days: days
+    };
+  }
+
+  // 1) اسأل بوني — سؤال حر
+  async askBoni() {
+    const input = document.getElementById('askBoniInput');
+    const box = document.getElementById('askBoniOut');
+    const q = (input && input.value || '').trim();
+    if (!q) { this.showToast('✍️ اكتب سؤالك الأول', 'info'); return null; }
+    box.textContent = '🤖 بفكر…';
+    const reply = await this.askAI(
+      'أنت بوني، مستشار مالي لفارس دليفري مصري. رد بالعربي المصري من غير مقدمات، في 4-6 سطور بالكتير. لو الإجابة مش من البيانات، قول كده بصراحة وادّي أقرب نصيحة عملية.',
+      'بياناتي:\n' + this.buildBrainSummary() + '\n\nسؤالي: ' + q
+    );
+    box.textContent = reply || '—';
+    if (input) input.value = '';
+    return reply;
+  }
+
+  // 2) ملخص أسبوعي بالذكاء
+  async weeklyAISummary() {
+    const box = document.getElementById('weeklyAIOut');
+    const w = this.buildWeekSummary();
+    box.textContent = '🤖 الذكاء بيحلل أسبوعك…';
+    const reply = await this.askAI(
+      'أنت بوني، مستشار مالي لفارس دليفري مصري. حلّل الأسبوع في 5 سطور بالعربي المصري: أبرز ملاحظة، مقارنة بالأسبوع اللي قبله، نصيحة عملية واحدة، وخطة للأسبوع الجاي. من غير مقدمات.',
+      'أسبوعي الحالي:\nالقبض: ' + w.income + ' ج.م | التحويش: ' + w.saved + ' ج.م | المصاريف: ' + w.spent + ' ج.م\nالأسبوع اللي قبله:\nالقبض: ' + w.prevIncome + ' ج.م | المصاريف: ' + w.prevSpent + ' ج.م\nأيام شغل: ' + w.days + '\nأعلى مصاريف: ' + (w.top.join('، ') || 'مفيش') +
+      '\nالمتاح للصرف: ' + Math.round(this.data.balances.spendableBalance) + ' ج.م | التحويش الكلي: ' + Math.round(this.data.balances.reservedSavings || 0) + ' ج.م'
+    );
+    box.textContent = reply || '—';
+    return reply;
+  }
+
+  // 3) تقسيمة قبض ذكية
+  async smartSplit() {
+    const box = document.getElementById('smartSplitOut');
+    const applyBtn = document.getElementById('smartSplitApply');
+    box.textContent = '🤖 الذكاء بيحسب التقسيمة المناسبة…';
+    if (applyBtn) applyBtn.style.display = 'none';
+    const reply = await this.askAI(
+      'أنت بوني، مستشار مالي لفارس دليفري مصري. اقترح تقسيمة قبض (تحويش/أساسيات/خروجات) من 100. رد بصيغة JSON فقط من غير أي كلام: {"savings":50,"essentials":40,"outings":10}',
+      this.buildBrainSummary() +
+      '\n\nالتقسيمة الحالية: تحويش ' + this.data.settings.savingsRatio + '%، أساسيات ' + this.data.settings.essentialsRatio + '%، خروجات ' + this.data.settings.outingsRatio + '%'
+    );
+    if (reply == null) { box.textContent = '—'; return null; }
+
+    let split = null;
+    try {
+      const cleaned = reply.replace(/```json|```/g, '').trim();
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) {
+        const j = JSON.parse(match[0]);
+        const s = Math.max(0, Math.round(Number(j.savings) || 0));
+        const e = Math.max(0, Math.round(Number(j.essentials) || 0));
+        const o = 100 - s - e;
+        if (s > 0 && e > 0 && o >= 0) split = { savings: s, essentials: e, outings: o };
+      }
+    } catch (e) { /* ignore */ }
+
+    if (!split) {
+      box.textContent = '⚠️ الذكاء رد بطريقة مش مفهومة — جرّب تاني';
+      return null;
+    }
+
+    this._smartSplit = split;
+    box.textContent = '🧮 التقسيمة المقترحة — تحويش ' + split.savings + '% · أساسيات ' + split.essentials + '% · خروجات ' + split.outings + '%';
+    if (applyBtn) applyBtn.style.display = '';
+    return split;
+  }
+
+  applySmartSplit() {
+    const s = this._smartSplit;
+    if (!s) return;
+    this.data.settings.savingsRatio = s.savings;
+    this.data.settings.essentialsRatio = s.essentials;
+    this.data.settings.outingsRatio = s.outings;
+    this.saveData();
+    this.renderAll();
+    const applyBtn = document.getElementById('smartSplitApply');
+    if (applyBtn) applyBtn.style.display = 'none';
+    this.showToast('✅ اتطبقت التقسيمة — تحويش ' + s.savings + '%', 'success');
+  }
+
   // ═══════════════════════════════════════════════════════════
   //  MONTHLY SHARE CARD  (كارت مشاركة ملخص الشهر)
   // ═══════════════════════════════════════════════════════════
