@@ -12,7 +12,7 @@ function setup(opts = {}) {
   const calls = [];
   const store = Object.assign({}, opts.store || {});
   const context = vm.createContext({
-    crypto,
+    crypto, TextEncoder, TextDecoder,
     console,
     window: { addEventListener() {}, location: { href: 'http://localhost:8900/index.html' } },
     location: { href: 'http://localhost:8900/index.html' },
@@ -27,10 +27,15 @@ function setup(opts = {}) {
     },
     fetch: async (url) => {
       calls.push(url);
+      const body = AI_REPLY;
       return {
         ok: true,
         status: 200,
-        json: async () => ({ choices: [{ message: { content: AI_REPLY } }] })
+        json: async () => ({ choices: [{ message: { content: body } }] }),
+        arrayBuffer: async () => {
+          const enc = new TextEncoder().encode(JSON.stringify({ choices: [{ message: { content: body } }] }));
+          return enc.buffer;
+        }
       };
     },
     setTimeout() {}, clearTimeout() {}

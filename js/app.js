@@ -5910,20 +5910,28 @@ class BHApp {
   getAIModel() {
     const sel = document.getElementById('aiModelSelect');
     if (sel && sel.value) return sel.value;
-    return (localStorage.getItem('BH_AI_MODEL') || 'deepseek/deepseek-chat:free').trim() || 'deepseek/deepseek-chat:free';
+    return (localStorage.getItem('BH_AI_MODEL') || 'openrouter/free').trim() || 'openrouter/free';
   }
 
   // قائمة موديلات OpenRouter المجانية (مع احتياطي محلي لو الخدمة متعطلّة)
   FREE_MODELS = [
-    'deepseek/deepseek-chat:free',
-    'meta-llama/llama-3.1-8b-instruct:free',
-    'mistralai/mistral-7b-instruct:free',
-    'qwen/qwen-2.5-7b-instruct:free',
-    'google/gemma-2-9b-it:free',
-    'microsoft/phi-3-mini-128k-instruct:free',
-    'nousresearch/hermes-3-llama-3.1-8b:free',
-    'openrouter/free'
+    'openrouter/free',
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'liquid/lfm-3-1.7b:free',
+    'recursive/flint-v1.0:free',
+    'particle-ai/particle-1:free',
+    'thinkingmachines/inkling-2-small:free',
+    'inclusionai/ling-3.2-flash:free',
+    'baidu/ernie-5.5-flash-preview:free',
+    'dots-studio/dots-3-note-preview:free',
+    'cohere/north-mini-code:free'
   ];
+
+  // موديلات الصور/الصوت/الفيديو — مش للمحادثة، بنستبعدها من القائمة
+  isChatModel(id) {
+    return !/lyria|t2a|tts|whisper|audio|image|vision|clip|omni/i.test(id);
+  }
 
   async fetchFreeModels() {
     const sel = document.getElementById('aiModelSelect');
@@ -5937,9 +5945,9 @@ class BHApp {
       if (r.ok) {
         const j = await r.json();
         const free = (j.data || [])
-          .filter(m => m.pricing && m.pricing.prompt === '0' && m.pricing.completion === '0')
+          .filter(m => m.pricing && String(m.pricing.prompt) === '0' && String(m.pricing.completion) === '0')
           .map(m => m.id)
-          .filter(Boolean);
+          .filter(id => id && this.isChatModel(id));
         if (free.length) models = free;
       }
     } catch (e) { /* استخدام الاحتياطي */ }
@@ -6094,29 +6102,57 @@ class BHApp {
   async aiChat(system, user, maxTokens) {
     const key = this.getAIKey();
     if (!key) { this.showToast('🤖 حط مفتاح الذكاء الأول في المزيد ← تفضيلاتك', 'info'); return null; }
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + key,
-        'Referer': 'https://tdrs10.github.io/-bh/',
-        'X-Title': 'BONY'
-      },
-      body: JSON.stringify({
-        model: this.getAIModel(),
-        max_tokens: maxTokens || 500,
-        temperature: 0.6,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user }
-        ]
-      })
-    });
-    if (!r.ok) throw new Error('الخدمة رجّعت ' + r.status);
-    const j = JSON.parse(new TextDecoder('utf-8').decode(await r.arrayBuffer()));
-    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    if (!text) throw new Error('رد فاضي');
-    return text;
+
+    const budget = Math.max(maxTokens || 1200, 1200);   // موديلات الـ reasoning بتحتاج توكنات كتير
+    let lastErr = null;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const tokens = attempt === 0 ? budget : budget * 3;
+      try {
+        const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + key,
+            'Referer': 'https://tdrs10.github.io/-bh/',
+            'X-Title': 'BONY'
+          },
+          body: JSON.stringify({
+            model: this.getAIModel(),
+            max_tokens: tokens,
+            temperature: 0.6,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user }
+            ]
+          })
+        });
+
+        if (!r.ok) {
+          const errTxt = await r.text().catch(() => '');
+          let msg = 'الخدمة رجّعت ' + r.status;
+          try { const ej = JSON.parse(errTxt); if (ej && ej.error && ej.error.message) msg = ej.error.message; } catch (e) { /* ignore */ }
+          throw new Error(msg);
+        }
+
+        const j = JSON.parse(new TextDecoder('utf-8').decode(await r.arrayBuffer()));
+        const msg = j && j.choices && j.choices[0] && j.choices[0].message;
+        let text = msg && msg.content;
+        if (typeof text !== 'string' || !text.trim()) {
+          // موديل reasoning خلصت توكناته في التفكير — نجاوب بح Thinking أو نعيد المحاولة
+          const think = msg && typeof msg.reasoning === 'string' ? msg.reasoning.trim() : '';
+          if (think) text = think;
+          else throw new Error('رد فاضي — الموديل ما ردّش. جرّب موديل تاني من القائمة');
+        }
+        return text.trim();
+      } catch (e) {
+        lastErr = e;
+        // 404/429 = الموديل مش متاح دلوقتي → نجرّب موديل تاني مرة واحدة
+        if (attempt === 0 && /404|429|unavailable|rate-limit/i.test(e.message || '')) continue;
+        if (attempt === 0) continue;
+      }
+    }
+    throw lastErr || new Error('الخدمة رجّعت رد فاضي');
   }
 
   async askAI(system, user) {
