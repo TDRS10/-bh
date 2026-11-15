@@ -5962,7 +5962,7 @@ class BHApp {
     sel.disabled = false;
 
     const status = document.getElementById('aiStatus');
-    if (status && !!localStorage.getItem('BH_AI_KEY')) status.textContent = '✅ تم إحضار ' + uniq.length + ' موديل مجاني — اختَر الموديل المناسب';
+    if (status && !!localStorage.getItem('BH_AI_KEY')) status.textContent = '✅ ' + uniq.length + ' موديل مجاني';
   }
 
   saveAISettings() {
@@ -5990,10 +5990,8 @@ class BHApp {
     const status = document.getElementById('aiStatus');
     if (!status) return;
     const key = this.getAIKey();
-    const model = this.getAIModel();
-    status.textContent = key
-      ? '✅ مفتاح محفوظ على جهازك — الموديل: ' + model
-      : '⚪ بدون مفتاح — العقل بيشتغل بقواعده المحلية';
+    status.textContent = key ? '✅ ' + this.getAIModel() : '⚪ بدون مفتاح';
+    status.title = key ? 'المفتاح محفوظ على جهازك' : 'العقل بيشتغل بقواعده المحلية';
     const input = document.getElementById('aiKeyInput');
     if (input && document.activeElement !== input) input.value = '';
   }

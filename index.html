@@ -141,39 +141,6 @@
 
 <div class="bh-road" aria-hidden="true"><span class="bh-scooter"><svg viewBox="0 0 48 28" width="30" height="18" focusable="false"><g fill="none" stroke="#00D9FF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="22" r="4.4"/><circle cx="39.5" cy="22" r="4.4"/><path d="M12.9 22H27"/><path d="M10.8 17.6 13 12h8.4"/><path d="M27 22l6.8-14"/><path d="M33.8 8h6.2"/><path d="M21.4 12.5l5 4.7"/></g></svg></span></div>
 
-<!-- الجو النهاردة — بيانات حية من Open-Meteo (بتختفي أوفلاين) -->
-<div class="card live-weather" id="liveWeatherCard" style="display:none;">
-  <div class="lw-main">
-    <div class="lw-temp"><span id="lwTemp">--</span>°</div>
-    <div class="lw-meta">
-      <strong id="lwLabel">—</strong>
-      <span id="lwDetails">—</span>
-    </div>
-    <span class="lw-chip" id="lwChip">النهاردة</span>
-  </div>
-  <div class="lw-tip" id="lwTip"></div>
-</div>
-
-<!-- 🧠 عقل بوني — اقتراح واحد من بياناتك، وزر «اقتراح تاني» للّي بعده -->
-<div class="card brain-card" id="brainCard" style="display:none;">
-  <div class="card-header">
-    <span class="card-title"><span class="card-icon">🧠</span> عقل بوني</span>
-    <span class="sub-balance-label" id="brainCount"></span>
-  </div>
-  <div class="brain-body">
-    <div class="brain-icon" id="brainIcon">💡</div>
-    <div class="brain-text">
-      <strong id="brainTitle">—</strong>
-      <p id="brainBody">—</p>
-    </div>
-  </div>
-  <div class="brain-actions">
-    <button class="btn btn-primary btn-sm" id="brainDoBtn" onclick="app.brainDoAction()">نفّذ ←</button>
-    <button class="btn btn-secondary btn-sm" id="brainAIBtn" onclick="app.brainAskAI()">🤖 اسأل الذكاء</button>
-    <button class="btn btn-secondary btn-sm" onclick="app.nextBrainAdvice()">اقتراح تاني ←</button>
-  </div>
-</div>
-
 <div class="card balance-card">
           <div class="card-header">
             <span class="card-title"><span class="card-icon">💰</span> إجمالي الرصيد الكلّي</span>
@@ -198,6 +165,38 @@
           <!-- 🔒 الخزنة المقفولة (وضع القسوة) — بيظهر تلقائيًا لما يكون فيه فلوس مقفولة -->
           <div id="vaultLockedChip" style="display:none; margin-top:10px; padding:8px 10px; border-radius:10px; background:rgba(0,217,255,0.08); border:1px solid rgba(0,217,255,0.3); color:#00D9FF; font-size:0.82rem; font-weight:700; text-align:center;"></div>
         </div>
+
+<!-- 🧠 عقل بوني — اقتراح واحد من بياناتك، وزر «اقتراح تاني» للّي بعده -->
+<div class="card brain-card" id="brainCard" style="display:none;">
+  <div class="card-header">
+    <span class="card-title"><span class="card-icon">🧠</span> عقل بوني</span>
+    <span class="sub-balance-label" id="brainCount"></span>
+  </div>
+  <div class="brain-body">
+    <div class="brain-icon" id="brainIcon">💡</div>
+    <div class="brain-text">
+      <strong id="brainTitle">—</strong>
+      <p id="brainBody">—</p>
+    </div>
+  </div>
+  <div class="brain-actions">
+    <button class="btn btn-primary btn-sm" id="brainDoBtn" onclick="app.brainDoAction()">نفّذ ←</button>
+    <button class="btn btn-secondary btn-sm" id="brainAIBtn" onclick="app.brainAskAI()">🤖 اسأل الذكاء</button>
+    <button class="btn btn-secondary btn-sm" onclick="app.nextBrainAdvice()">اقتراح تاني ←</button>
+  </div>
+</div>
+
+<!-- الجو النهاردة — بيانات حية من Open-Meteo (بتختفي أوفلاين) -->
+<div class="card live-weather" id="liveWeatherCard" style="display:none;">
+  <div class="lw-main">
+    <div class="lw-temp"><span id="lwTemp">--</span>°</div>
+    <div class="lw-meta">
+      <strong id="lwLabel">—</strong>
+      <span id="lwDetails">—</span>
+    </div>
+  </div>
+  <div class="lw-tip" id="lwTip"></div>
+</div>
 
 <div class="card today-hub-card" id="todayHubCard">
           <div class="card-header">
@@ -859,57 +858,38 @@
 
         <div class="card">
           <div class="card-header">
-            <span class="card-title"><span class="card-icon">🤖</span> أدوات الذكاء</span>
+            <span class="card-title"><span class="card-icon">🤖</span> الذكاء الاصطناعي</span>
+            <span class="sub-balance-label" id="aiStatus">—</span>
           </div>
-          <p class="card-desc">تلات أدوات بتحتاج مفتاح الذكاء اللي تحت — ومن غيره هيقولك كده.</p>
+          <p class="card-desc">الصق مفتاح OpenRouter — بيتحفظ على جهازك بس. من غيره، عقل بوني بيشتغل بقواعده المحلية.</p>
 
-          <!-- اسأل بوني -->
-          <strong style="font-size:.9rem; color:#fff;">💬 اسأل بوني</strong>
-          <div style="display:flex; gap:8px; margin: 8px 0;">
+          <input type="password" id="aiKeyInput" class="form-control" placeholder="sk-or-v1-..." dir="ltr" autocomplete="off">
+          <div class="ai-row">
+            <select id="aiModelSelect" class="form-control"></select>
+            <button class="btn btn-secondary btn-sm" onclick="app.fetchFreeModels()">تحديث ⟳</button>
+          </div>
+          <div class="ai-row">
+            <button class="btn btn-primary btn-sm" onclick="app.saveAISettings()">حفظ 💾</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.clearAISettings()">مسح المفتاح</button>
+          </div>
+
+          <div class="ai-sub">💬 اسأل بوني</div>
+          <div class="ai-row">
             <input type="text" id="askBoniInput" class="form-control" placeholder="أقدر أصرف 500 النهاردة؟">
-            <button class="btn btn-primary btn-sm" onclick="app.askBoni()">اسأل</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.askBoni()">اسأل</button>
           </div>
           <div class="ai-out" id="askBoniOut"></div>
 
-          <hr style="border:0; border-top:1px solid rgba(255,255,255,.08); margin: 14px 0;">
-
-          <!-- ملخص أسبوعي -->
-          <strong style="font-size:.9rem; color:#fff;">📊 ملخص أسبوعي</strong>
-          <div style="margin: 8px 0;">
-            <button class="btn btn-secondary btn-sm" onclick="app.weeklyAISummary()">حلّل أسبوعي</button>
-          </div>
+          <div class="ai-sub">📊 ملخص أسبوعي</div>
+          <button class="btn btn-secondary btn-sm" onclick="app.weeklyAISummary()">حلّل أسبوعي</button>
           <div class="ai-out" id="weeklyAIOut"></div>
 
-          <hr style="border:0; border-top:1px solid rgba(255,255,255,.08); margin: 14px 0;">
-
-          <!-- تقسيمة قبض -->
-          <strong style="font-size:.9rem; color:#fff;">🧮 تقسيمة قبض ذكية</strong>
-          <div style="display:flex; gap:8px; margin: 8px 0;">
+          <div class="ai-sub">🧮 تقسيمة قبض ذكية</div>
+          <div class="ai-row">
             <button class="btn btn-secondary btn-sm" onclick="app.smartSplit()">اقترح تقسيمة</button>
             <button class="btn btn-primary btn-sm" id="smartSplitApply" onclick="app.applySmartSplit()" style="display:none;">طبّقها ✓</button>
           </div>
           <div class="ai-out" id="smartSplitOut"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">🤖</span> عقل بوني — ذكاء اصطناعي (اختياري)</span>
-          </div>
-          <p class="card-desc">
-            الصق مفتاح OpenRouter — بيتحفظ على جهازك بس، ومش بيترفع لأي مكان عام.
-            من غير مفتاح، العقل بيشتغل بالقواعد المحلية زي ما هو.
-          </p>
-          <input type="password" id="aiKeyInput" class="form-control" placeholder="sk-or-v1-..." dir="ltr" autocomplete="off" style="margin-bottom: 8px;">
-          <div style="display:flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-            <label style="font-size:.75rem; color: var(--text-muted); flex-shrink: 0;">الموديل:</label>
-            <select id="aiModelSelect" class="form-control" style="flex: 1; min-width: 0;"></select>
-            <button class="btn btn-secondary btn-sm" onclick="app.fetchFreeModels()" style="padding: 0 10px; white-space: nowrap;">جلب المجانية ↻</button>
-          </div>
-          <div style="display:flex; gap: 8px;">
-            <button class="btn btn-primary btn-sm" onclick="app.saveAISettings()">حفظ 💾</button>
-            <button class="btn btn-secondary btn-sm" onclick="app.clearAISettings()">مسح المفتاح</button>
-          </div>
-          <div id="aiStatus" style="font-size:.75rem; color: var(--text-muted); margin-top: 8px;"></div>
         </div>
 
 <div class="section-heading"><h2>البيانات والتحديثات</h2><p>النسخ الاحتياطية والتحديث والفحص في مكان واحد.</p></div>
