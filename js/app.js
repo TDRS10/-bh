@@ -6340,12 +6340,21 @@ class BHApp {
     box.textContent = '🤖 بفكر…';
     try {
       const text = await this.aiChat(
-        'أنت مساعد في تطبيق بوني لإدارة财务 لسائق دليفري مصري. لديك بيانات المستخدم: ' + this.buildBrainSummary() + '\nالبيانات متاحة في التطبيق. رد بالعربي المصري بشكل عملي ومختصر (سطرين بالكتير). إذا طلب المستخدم إجراءً (تسجيل مصروف، إضافة قبض، مراجعة ديون، إلخ)، اقترح الإجراء وقل له أي صفحة يدخلها. لا تنفّذ أي إجراء بنفسك.',
+        'أنت مساعد في تطبيق بوني لإدارة财务 لسائق دليفري مصري. لديك بيانات المستخدم: ' + this.buildBrainSummary() + '\nالبيانات متاحة في التطبيق. رد بالعربي المصري بشكل عملي ومختصر.\n如果 طلب المستخدم تسجيل مصروف، رد بهذا الشكل فقط:\nEXECUTE:{"action":"add_expense","amount":50,"category":"بنزين","note":"طلب المستخدم","date":"YYYY-MM-DD"}\nإذا طلب إضافة قبض، رد:\nEXECUTE:{"action":"add_income","amount":200,"source":"طلب المستخدم","date":"YYYY-MM-DD"}\nإذا طلب التنقل لصفحة، رد:\nEXECUTE:{"action":"switch","target":"expensesView"}\nإذا لم يكن طلباً تنفيذياً، رد بنصيحة عادية دون EXECUTE.',
         'طلب المستخدم: ' + q
       );
       box.textContent = text || '—';
-      this._assistantTarget = this.guessTarget(q);
-      this.showAssistantAction();
+      const m = text.match(/EXECUTE:\s*(\{.*\})/s);
+      if (m) {
+        try {
+          const cmd = JSON.parse(m[1]);
+          this.showConfirmExecute(cmd, text.replace(/EXECUTE:.*/s,'').trim());
+        } catch (e) {
+          // رد غير مفهوم — Ignore
+        }
+      } else {
+        this.hideAssistantAction();
+      }
     } catch (e) {
       this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
       box.textContent = '—';
@@ -6354,28 +6363,71 @@ class BHApp {
     return box.textContent;
   }
 
-  guessTarget(q) {
-    const s = (q || '').toLowerCase();
-    if (/مصروف|صرف|أنفق/.test(s)) return 'expensesView';
-    if (/قبض|دخل|مرتب|أضف/.test(s)) return 'incomesView';
-    if (/دين|قسط|سداد/.test(s)) return 'goalsView';
-    if (/هدف|توفير/.test(s)) return 'goalsView';
-    if (/ميزانية|출| خروج/.test(s)) return 'expensesView';
-    return null;
-  }
-
-  showAssistantAction() {
+  showConfirmExecute(cmd, advice) {
     const box = document.getElementById('assistantOut');
-    const t = this._assistantTarget;
-    if (!t) return;
-    const names = { incomesView: 'إضافة قبض', expensesView: 'تسجيل مصروف', goalsView: 'مراجعة الأهداف' };
     const existing = box.parentElement.querySelector('.assistant-action-btn');
     if (existing) existing.remove();
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary btn-sm assistant-action-btn';
-    btn.textContent = 'نفّذ: ' + names[t] + ' ←';
-    btn.onclick = () => this.switchTab(t);
-    box.parentElement.appendChild(btn);
+    let label = '';
+    if (cmd.action === 'add_expense') label = 'تسجيل مصروف ' + Number(cmd.amount || 0) + ' ج.م — ' + (cmd.category || '');
+    else if (cmd.action === 'add_income') label = 'إضافة قبض ' + Number(cmd.amount || 0) + ' ج.م';
+    else if (cmd.action === 'switch') label = 'انتقل لصفحة ' + cmd.target;
+    const html = advice ? '<p style="font-size:.8rem;color:var(--text-muted);margin:8px 0;">' + advice + '</p>' : '';
+    html += '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm assistant-action-btn" onclick="app.assistantExecute(\'' + JSON.stringify(cmd).replace(/'/g, "\\'") + '\')">✅ نفّذ: ' + label + '</button></div>';
+    box.insertAdjacentHTML('afterend', html);
+  }
+
+  hideAssistantAction() {
+    const box = document.getElementById('assistantOut');
+    const existing = box.parentElement.querySelector('.assistant-action-btn');
+    if (existing) existing.remove();
+  }
+
+  assistantExecute(cmdStr) {
+    let cmd;
+    try { cmd = JSON.parse(cmdStr); } catch (e) { this.showToast('⚠️ أمر غير مفهوم', 'error'); return; }
+    const btn = document.querySelector('.assistant-action-btn');
+    if (btn) btn.disabled = true;
+    try {
+      if (cmd.action === 'add_expense') {
+        const amount = Number(cmd.amount) || 0;
+        const category = cmd.category || 'تاني';
+        const note = cmd.note || '';
+        const date = cmd.date || new Date().toISOString().slice(0,10);
+        if (amount <= 0) throw new Error('المبلغ يجب أن يكون أكبر من صفر');
+        this.saveExpenseData({ amount, category, note, date });
+        this.showToast('✅ تم تسجيل المصروف: ' + amount + ' ج.م', 'success');
+      } else if (cmd.action === 'add_income') {
+        const amount = Number(cmd.amount) || 0;
+        const source = cmd.source || 'إضافة سريعة';
+        const date = cmd.date || new Date().toISOString().slice(0,10);
+        if (amount <= 0) throw new Error('المبلغ يجب أن يكون أكبر من صفر');
+        const sRatio = this.data.settings.savingsRatio / 100;
+        const eRatio = this.data.settings.essentialsRatio / 100;
+        const oRatio = this.data.settings.outingsRatio / 100;
+        const savingsAmt = Math.round(amount * sRatio);
+        const essentialsAmt = Math.round(amount * eRatio);
+        const outingsAmt = Math.round(amount * oRatio);
+        this.data.balances.reservedSavings += savingsAmt;
+        this.data.balances.spendableBalance += (essentialsAmt + outingsAmt);
+        this.touchBalances();
+        const incomeEntry = { id: 'inc_ai_' + Date.now(), amount, savingsAmt, essentialsAmt, outingsAmt, date, source, notes: cmd.note || '' };
+        this.data.incomes.unshift(incomeEntry);
+        this.saveData();
+        this.showToast('✅ تم إضافة القبض: ' + amount + ' ج.م', 'success');
+      } else if (cmd.action === 'switch') {
+        this.switchTab(cmd.target);
+        this.showToast('✅ تم الانتقال لصفحة ' + cmd.target, 'success');
+      } else {
+        throw new Error('إجراء غير مدعوم');
+      }
+      const box = document.getElementById('assistantOut');
+      const existing = box.parentElement.querySelector('.assistant-action-btn');
+      if (existing) existing.remove();
+      this.renderAll();
+    } catch (e) {
+      this.showToast('⚠️ فشل التنفيذ — ' + (e && e.message), 'error');
+      if (btn) btn.disabled = false;
+    }
   }
 
   applySmartSplit() {
