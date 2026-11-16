@@ -6331,6 +6331,53 @@ class BHApp {
     }
   }
 
+  // 💬 المساعد الذكي — يتحكم في التطبيق بناءً على طلبك بالعربي
+  async assistantChat() {
+    const input = document.getElementById('assistantInput');
+    const box = document.getElementById('assistantOut');
+    const q = (input && input.value || '').trim();
+    if (!q) { this.showToast('✍️ اكتب طلبك الأول', 'info'); return null; }
+    box.textContent = '🤖 بفكر…';
+    try {
+      const text = await this.aiChat(
+        'أنت مساعد في تطبيق بوني لإدارة财务 لسائق دليفري مصري. لديك بيانات المستخدم: ' + this.buildBrainSummary() + '\nالبيانات متاحة في التطبيق. رد بالعربي المصري بشكل عملي ومختصر (سطرين بالكتير). إذا طلب المستخدم إجراءً (تسجيل مصروف، إضافة قبض، مراجعة ديون، إلخ)، اقترح الإجراء وقل له أي صفحة يدخلها. لا تنفّذ أي إجراء بنفسك.',
+        'طلب المستخدم: ' + q
+      );
+      box.textContent = text || '—';
+      this._assistantTarget = this.guessTarget(q);
+      this.showAssistantAction();
+    } catch (e) {
+      this.showToast('⚠️ الذكاء مش متاح دلوقتي — ' + (e && e.message), 'error');
+      box.textContent = '—';
+    }
+    if (input) input.value = '';
+    return box.textContent;
+  }
+
+  guessTarget(q) {
+    const s = (q || '').toLowerCase();
+    if (/مصروف|صرف|أنفق/.test(s)) return 'expensesView';
+    if (/قبض|دخل|مرتب|أضف/.test(s)) return 'incomesView';
+    if (/دين|قسط|سداد/.test(s)) return 'goalsView';
+    if (/هدف|توفير/.test(s)) return 'goalsView';
+    if (/ميزانية|출| خروج/.test(s)) return 'expensesView';
+    return null;
+  }
+
+  showAssistantAction() {
+    const box = document.getElementById('assistantOut');
+    const t = this._assistantTarget;
+    if (!t) return;
+    const names = { incomesView: 'إضافة قبض', expensesView: 'تسجيل مصروف', goalsView: 'مراجعة الأهداف' };
+    const existing = box.parentElement.querySelector('.assistant-action-btn');
+    if (existing) existing.remove();
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm assistant-action-btn';
+    btn.textContent = 'نفّذ: ' + names[t] + ' ←';
+    btn.onclick = () => this.switchTab(t);
+    box.parentElement.appendChild(btn);
+  }
+
   applySmartSplit() {
     const s = this._smartSplit;
     if (!s) return;
