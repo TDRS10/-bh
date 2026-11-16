@@ -1308,6 +1308,58 @@ class BHApp {
     if (days >= 3) this.downloadBackup(true);
   }
 
+  // عدد القيود المحفوظة (لتقول للمستخدم كام عنصر رجع من السحابة)
+  countEntries() {
+    const d = this.data || {};
+    return ['incomes', 'expenses', 'goals', 'debts'].reduce((n, k) => n + ((d[k] || []).length), 0);
+  }
+
+  // ابعث نسخة احتياطية بره الجهاز (واتساب/إيميل) — بتفضل موجودة لو الموبايل ضاع
+  async shareBackup() {
+    try {
+      const jsonStr = JSON.stringify(this.data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const file = new File([blob], 'BH_Backup_' + stamp + '.json', { type: 'application/json' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'نسخة بوني الاحتياطية',
+          text: 'نسخة احتياطية من بوني — احتفظ بيها بره الموبايل'
+        });
+        this.showToast('📤 اتبعتت النسخة — احتفظ بيها في واتساب أو الإيميل', 'success');
+        return true;
+      }
+
+      this.downloadBackup(true);
+      this.showToast('📤 المشاركة مش مدعومة هنا — نزّلت النسخة في Downloads وابعتها من there', 'info');
+      return true;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return false;
+      this.showToast('⚠️ مقدرش أبعت النسخة — ' + (e && e.message), 'error');
+      return false;
+    }
+  }
+
+  // استرجع من السحابة — للحالة اللي فتحت فيها بوني على موبايل جديد
+  async restoreFromCloud() {
+    if (typeof window.BHFirebase === 'undefined') { this.showToast('⚠️ السحابة غير متاحة', 'error'); return false; }
+    if (!window.BHFirebase.getUser()) {
+      this.showToast('⚠️ سجل دخول الأول من «سحابة سحابية» عشان تسترجع بياناتك', 'error');
+      return false;
+    }
+    const before = this.countEntries();
+    this.showToast('☁️ جاري الاسترجاع من السحابة…', 'info');
+    try {
+      await this.pullFromCloud();
+    } catch (e) { /* pullFromCloud بتتكلم عن نفسها */ }
+    const after = this.countEntries();
+    if (after > before) this.showToast('✅ اترجّع ' + (after - before) + ' عنصر من السحابة', 'success');
+    else if (after === before) this.showToast('☁️ مفيش حاجة ناقصة — بياناتك كاملة', 'info');
+    return true;
+  }
+
   installUnloadGuard() {
     window.addEventListener('beforeunload', (e) => {
       // Only warn while a form has unsaved input
@@ -2693,6 +2745,8 @@ class BHApp {
 
   confirmResetData() {
     if (confirm('⚠️ هل أنت متأكد تماماً من تصفير وحذف جميع بيانات التطبيق؟ لا يمكن التراجع عن هذا الإجراء!')) {
+      // 🛡️ نسخة أمان قبل التصفير — لو ندمت ترجعها من مجلد Downloads
+      this.downloadBackup(true);
       // 🛡️ Keep a snapshot so the user can restore if it was a mistake
       this._saveSnapshot();
       // 🔐 شنطة جماعية: سجّل كل الآي هات القديم — عشان المزامنة ما ترجّعهمش من السحابة

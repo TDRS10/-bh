@@ -903,11 +903,14 @@
           </p>
           <div class="action-grid" style="margin-bottom: 10px;">
             <button class="btn btn-secondary btn-sm" onclick="app.downloadBackup()">📦 نسخة الآن</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.shareBackup()">📤 ابعتها على واتساب</button>
             <label class="btn btn-secondary btn-sm" style="margin:0; text-align:center;">
               📥 استعادة (Import)
               <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="app.importData(event)">
             </label>
+            <button class="btn btn-secondary btn-sm" onclick="app.restoreFromCloud()">☁️ استرجع من السحابة</button>
           </div>
+          <div class="hint-line">📱 لو الموبايل ضاع: افتح بوني، سجل دخول بحسابك (سحابة سحابية) — وكل بياناتك هترجع. وابعتي نسخة على واتساب كل فترة عشان تكون بره الموبايل.</div>
           <button class="btn btn-danger btn-full btn-sm" onclick="app.confirmResetData()">⚠️ صفر البيانات بالكامل (Reset)</button>
         </div>
 
