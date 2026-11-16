@@ -3924,8 +3924,7 @@ body.bh-poor  .today-hub-card { border-color: rgba(255, 59, 92, 0.35); }
 .brain-card .brain-actions .btn { flex: 1; }
 @media (prefers-reduced-motion: reduce) { .brain-card { animation: none; } }
 
-/* ═══════ أدوات الذكاء — نتائج القراءة ═══════ */
-.hint-line {
+/* ═══════ أدوات الذكاء — نتائج القراءة ═══════ */.hint-line {
   font-size: .76rem;
   line-height: 1.7;
   color: var(--text-muted);

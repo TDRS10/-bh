@@ -166,6 +166,20 @@
           <div id="vaultLockedChip" style="display:none; margin-top:10px; padding:8px 10px; border-radius:10px; background:rgba(0,217,255,0.08); border:1px solid rgba(0,217,255,0.3); color:#00D9FF; font-size:0.82rem; font-weight:700; text-align:center;"></div>
         </div>
 
+<!-- 💬 المساعد الذكي — يتحكم في التطبيق من الصفحة الرئيسية -->
+<div class="card ai-assistant-card" id="aiAssistantCard" style="display:none;">
+  <div class="card-header">
+    <span class="card-title"><span class="card-icon">💬</span> المساعد الذكي</span>
+    <span class="sub-balance-label" id="aiAssistantStatus">—</span>
+  </div>
+  <p class="card-desc">اكتب طلبك بالعربي — يسجل مصروف، يضيف قبض، أو يحولك لصفحة التظيم.</p>
+  <div class="ai-row">
+    <input type="text" id="assistantInput" class="form-control" placeholder="سجل لي مصروف بنزين 50 جنيه...">
+    <button class="btn btn-secondary btn-sm" onclick="app.assistantChat()">إرسال</button>
+  </div>
+  <div class="ai-out" id="assistantOut"></div>
+</div>
+
 <!-- 🧠 عقل بوني — اقتراح واحد من بياناتك، وزر «اقتراح تاني» للّي بعده -->
 <div class="card brain-card" id="brainCard" style="display:none;">
   <div class="card-header">
@@ -890,18 +904,6 @@
             <button class="btn btn-primary btn-sm" id="smartSplitApply" onclick="app.applySmartSplit()" style="display:none;">طبّقها ✓</button>
           </div>
           <div class="ai-out" id="smartSplitOut"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title"><span class="card-icon">💬</span> المساعد الذكي — يتحكم في التطبيق</span>
-          </div>
-          <p class="card-desc">اكتب طلبك بالعربي — يسجل مصروف، يضيف قبض، أو يحولك لصفحة التظيم.</p>
-          <div class="ai-row">
-            <input type="text" id="assistantInput" class="form-control" placeholder="سجل لي مصروف بنزين 50 جنيه...">
-            <button class="btn btn-secondary btn-sm" onclick="app.assistantChat()">إرسال</button>
-          </div>
-          <div class="ai-out" id="assistantOut"></div>
         </div>
 
 <div class="section-heading"><h2>البيانات والتحديثات</h2><p>النسخ الاحتياطية والتحديث والفحص في مكان واحد.</p></div>
